@@ -24,6 +24,4 @@ If a problem line appears above the choices, follow it. When no choices remain, 
 
 ## When a card is expected
 
-A data-changing tool used by an agent or plugin, installing or uninstalling an app, and saving files into a shared folder can require a confirmation card. A read-only operation should not be treated as completed merely because a card is visible. High-permission app installs must be confirmed in Wonton.
-
 If you are unsure, choose “拒绝” (Reject) and ask the agent what it will change and which data it will affect.

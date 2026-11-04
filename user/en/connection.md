@@ -17,7 +17,7 @@ Status meanings:
 
 ## Try these steps first
 
-1. Confirm that the server is running and the phone and server are on the same local network.
+1. Confirm that the server is running; the phone and server are either on the same local network or can both reach the internet.
 2. Reopen Wonton.
 3. If the status is still not “已连接”, open “连接” and read the specific reason.
 4. If the device is not recognized, tap “重新配对” and use a new pairing code instead of continuing with the old device identity.
