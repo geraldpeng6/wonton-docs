@@ -34,10 +34,10 @@ x-wonton:
   id: app.immich.photos
   version: 2.0.0
   kind: app
-  title: { zh: 相册, en: Photos }
-  description: { zh: 照片备份、人脸与语义搜索, en: Photo backup with face and semantic search }
+  title: { zh: Immich, en: Immich }
+  description: { zh: 备份手机里的照片和视频，按人脸和内容搜索, en: Back up your photos and videos, search by face and content }
   icon: icon.png
-  category: photos
+  categories: [photos]
   screenshots: [screenshots/timeline.png, screenshots/search.png]
   author: { name: Example, url: https://example.com }
   homepage: https://immich.app
@@ -79,9 +79,9 @@ x-wonton:
 | `id` | 是 | 反向域名形式，全局唯一，安装后不可修改。至少两段，每段由小写字母、数字和单个连字符组成，总长不超过 63。 |
 | `version` | 是 | 插件包版本（语义化版本），和镜像版本无关。 |
 | `kind` | 是 | `app`（普通应用）、`agent`（Agent 运行时）、`channel`（第三方 IM 渠道）、`model`（模型服务）、`system`（系统插件，仅官方，只能由安装器预装）。 |
-| `title`、`description` | 是 | 多语言文本，至少提供 `zh` 和 `en`。 |
+| `title`、`description` | 是 | 多语言文本，至少提供 `zh` 和 `en`。怎么写见“商店信息”。 |
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
-| `category` | 否 | 商店分类，取“商店信息”里的一项。官方索引要求必填。 |
+| `categories` | 否 | 商店分类，取“商店信息”里的 1 到 3 项。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes` | 否 | 商店信息，见“商店信息”。官方索引要求有 `author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）。 |
@@ -95,7 +95,7 @@ x-wonton:
 | `secrets` | 否 | 插件自己的密钥：核心生成后注入，或插件运行中生成、交给核心保管（见“插件密钥”）。 |
 | `permissions` | 是 | 安装时由主人确认的权限，见下表。没有权限时写空列表。 |
 | `settings` | 否 | 插件包里的 JSON Schema 文件，留给 App 用原生表单渲染（预留）；在那之前插件用自己的网页做设置。 |
-| `requirements` | 否 | `arch`（安装时与宿主架构比对，不符则拒绝）、`memory`、`gpu`（`required`、`optional`，见“显卡”）。 |
+| `requirements` | 否 | 对宿主的要求：`arch`、`memory`、`gpu`，核心按这台主机判断，见“对宿主的要求”。 |
 
 `x-wonton` 里出现未知字段时安装失败；`spec` 比核心支持的版本新时，先报规范版本（见“商店信息”）。
 
@@ -193,28 +193,38 @@ services:
 | `author` | 插件包的作者：`name`（必填）、`url`（HTTPS，可选）。不一定是应用的作者。 |
 | `homepage` | 应用的主页，HTTPS。 |
 | `license` | 应用的许可证，SPDX 表达式，如 `AGPL-3.0-only`、`MIT OR Apache-2.0`。插件包自己的许可证写在仓库的 LICENSE 里。 |
-| `category` | 分类，取下表的一项。 |
+| `categories` | 分类，取下表的 1 到 3 项，不能重复，第一项算主分类。商店按它筛选。分类是固定的一组，插件不能自己加。 |
 | `tags` | 搜索用的关键词，最多 8 个，每个 1 到 24 个字符，不分语言。 |
 | `about` | 详细介绍：多语言，纯文本，空行分段，每种语言不超过 4000 个字符。没写时详情页只显示 `description`。 |
 | `release_notes` | 这个版本的更新说明：多语言，纯文本，每种语言不超过 2000 个字符，升级提示里显示。数据迁移不可逆时要写明。 |
 
-| `category` | 中文名 | 例子 |
+| `categories` | 中文名 | 例子 |
 | --- | --- | --- |
-| `ai` | AI 与模型 | Ollama |
-| `agent` | 助手 | Hermes |
-| `photos` | 照片 | Immich |
-| `media` | 影音 | Navidrome、Jellyfin |
-| `files` | 文件 | Syncthing、Samba、文件搜索 |
+| `ai` | AI | Open WebUI、Vane |
+| `agent` | Agent | Hermes |
+| `photos` | 相册 | Immich |
+| `music` | 音乐 | Navidrome |
+| `video` | 视频 | Jellyfin |
+| `files` | 文件 | File Browser、Samba |
+| `sync` | 同步 | Syncthing |
 | `documents` | 文档 | Paperless-ngx |
-| `productivity` | 效率 | 笔记、待办、日历 |
+| `notes` | 笔记 | Memos |
+| `reading` | 阅读 | Miniflux |
+| `finance` | 记账 | Actual |
+| `productivity` | 效率 | 待办、日历 |
 | `communication` | 通讯 | 第三方 IM 渠道 |
 | `home` | 智能家居 | Home Assistant |
 | `network` | 网络 | DNS、代理 |
+| `monitoring` | 监控 | Uptime Kuma |
 | `security` | 安全 | 密码管理 |
 | `developer` | 开发 | Git 服务 |
 | `downloads` | 下载 | BT 下载 |
 | `tools` | 工具 | 不属于以上各类的 |
 | `system` | 系统 | 只给系统插件（`kind: system`） |
+
+`title` 写产品原名，如 Immich、Syncthing，不要翻译成用途，用途交给 `categories`。插件自己就是产品、没有上游时才用功能名。
+
+`description` 和 `about` 写给普通用户：`description` 一句话说清它能帮你做什么，不写技术实现，读者称呼“你”。
 
 ### 图标和截图
 
@@ -823,6 +833,30 @@ x-wonton:
 - 核心不修改、不删除插件里的这个文件，也不注入回去。
 - 声明在 Bot 服务上时，每个 Bot 各存一份。
 
+## 对宿主的要求
+
+`requirements` 的每一项都是核心能判断的，商店和详情页逐项显示这台主机满足、不满足还是查不出来。核心只跑在 Linux 和 Docker 上，所以没有系统这一项。
+
+```yaml
+requirements:
+  arch: [amd64, arm64]
+  memory: 2G
+  gpu: { need: required, vendors: [nvidia, amd], memory: 8G }
+```
+
+| 字段 | 说明 | 核心怎么判断 |
+| --- | --- | --- |
+| `arch` | `amd64`、`arm64`。不写表示都行。 | Docker 报告的架构。 |
+| `memory` | 应用能跑起来的内存下限（官方写的最低要求，不是推荐值）。写法是数字加 `M` 或 `G`，如 `512M`、`1.5G`，1G 等于 1024M。 | 主机的总内存。标称 8G 的机器实际报出来不到 8G，所以到要求的 90% 就算够。 |
+| `gpu.need` | `required`（默认）：没有符合的显卡就装不上。`optional`：照常装，不给设备，插件自己退回 CPU。 | 见“显卡”。 |
+| `gpu.vendors` | 能用的厂商：`amd`、`nvidia`、`intel`。不写表示哪家都行。 | 驱动可用的显卡的厂商。 |
+| `gpu.memory` | 显存下限，写法同 `memory`。 | 显卡报告的显存；集成显卡和驱动不报告的算查不出来。 |
+
+- 不满足的项写明缺什么（“这台主机只有 1.5 GB 内存”）。有 `required` 的项不满足时插件装不了，商店和预览的 `blocked` 写着原因，安装接口也拒绝：架构和内存的错误类别是 `unsupported`，显卡是 `gpu_unavailable`。
+- `optional` 的显卡不满足时照常装，显示会退回 CPU。
+- 查不出来时如实显示，不拦安装。
+- 只在安装和预览时判断。装好后主机变了，容器自己会出错。
+
 ## 显卡（`devices.gpu`）
 
 要用显卡的插件（生图、生视频、本地模型）申请 `devices.gpu` 权限，并在 `gpu.services` 里写明哪些服务拿到显卡。
@@ -854,13 +888,13 @@ x-wonton:
   permissions:
     - devices.gpu
   requirements:
-    gpu: required
+    gpu: { need: required }
 ```
 
 | 字段 | 说明 |
 | --- | --- |
 | `gpu.services` | 拿到显卡的服务，至少一项，不能重复，都要在 `services` 里。其余服务什么都不拿。 |
-| `requirements.gpu` | `required`（没写时的默认）：本机没有可用的显卡时装不上。`optional`：照常装，不给设备，插件自己退回 CPU。 |
+| `requirements.gpu` | 要什么样的显卡，见“对宿主的要求”。没写时等于 `need: required`。 |
 
 三者缺一不可：写了 `gpu` 或 `requirements.gpu` 却没申请 `devices.gpu`，或者申请了 `devices.gpu` 却没写 `gpu.services`，
 清单都不合法。
@@ -1124,7 +1158,7 @@ x-wonton:
 - 条目用 `wonton-core plugin index-entry <插件包目录> github:<owner>/<repo> <提交号>` 生成，不手写：目录是那个提交的
   检出（核心不连 Git，不核对），条目的 JSON 写到标准输出；加 `--index <索引目录>` 时直接写进本地的索引目录，同一个
   来源的旧条目换掉。
-- 收录要求：`wonton-core plugin check --official` 通过，即有 `icon`、`category`、`license`、`author`、`notices`，所有服务的 `image`
+- 收录要求：`wonton-core plugin check --official` 通过，即有 `icon`、`categories`、`license`、`author`、`notices`，所有服务的 `image`
   按摘要固定，长期运行的服务都有健康检查；申请的权限和插件做的事相符；镜像来自上游官方或作者可复现的构建。
 - 核心镜像内置一份索引和其中插件包的文件。开发镜像和测试用本地的索引目录代替（`WONTON_STORE_INDEX`）：`index.json`
   加上按 sha256 存放的文件（`blobs/<sha256 的十六进制>`）。
@@ -1154,7 +1188,7 @@ x-wonton:
   - 插件包解析不了时只报这一条（和安装时报的一样）；解析得了时列出所有问题。
   - 不合格（退出码 1）：装不上的（核心还不支持的权限、渲染不了的 compose），图标或截图处理不了。
   - 提醒（退出码 0）：镜像没有按摘要固定，长期运行的服务没有健康检查，没有图标，图标的角是透明的，截图的长边不到
-    1280，横屏和竖屏的截图混在一起，`kind: system`。`--official` 时前三项也算不合格，另外要有 `category`、`license`、
+    1280，横屏和竖屏的截图混在一起，`kind: system`。`--official` 时前三项也算不合格，另外要有 `categories`、`license`、
     `author`、`notices`。只看得到 compose 里写的健康检查，镜像自带的看不到。
   - 用法不对时退出码 2。
 - 打包：`wonton-core plugin pack <目录>` 把插件包打成 tar 写到标准输出，只有 compose 文件和它引用的文件，README、截图
