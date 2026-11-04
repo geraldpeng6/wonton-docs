@@ -34,15 +34,14 @@ x-wonton:
   id: app.immich.photos
   version: 2.0.0
   kind: app
-  title: { zh: Immich, en: Immich }
+  title: { en: Immich }
   description: { zh: 备份手机里的照片和视频，按人脸和内容搜索, en: Back up your photos and videos, search by face and content }
   icon: icon.png
-  categories: [photos]
   screenshots: [screenshots/timeline.png, screenshots/search.png]
   author: { name: Example, url: https://example.com }
   homepage: https://immich.app
   license: AGPL-3.0-only
-  tags: [immich, 照片, 备份]
+  tags: { zh: [相册, AI], en: [Photos, AI] }
   about:
     zh: |
       手机里的照片自动备份到家里的服务器。
@@ -79,10 +78,9 @@ x-wonton:
 | `id` | 是 | 反向域名形式，全局唯一，安装后不可修改。至少两段，每段由小写字母、数字和单个连字符组成，总长不超过 63。 |
 | `version` | 是 | 插件包版本（语义化版本），和镜像版本无关。 |
 | `kind` | 是 | `app`（普通应用）、`agent`（Agent 运行时）、`channel`（第三方 IM 渠道）、`model`（模型服务）、`system`（系统插件，仅官方，只能由安装器预装）。 |
-| `title`、`description` | 是 | 多语言文本，至少提供 `zh` 和 `en`。怎么写见“商店信息”。 |
+| `title`、`description` | 是 | 多语言文本，至少写一种语言。怎么写见“商店信息”。 |
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
-| `categories` | 否 | 商店分类，取“商店信息”里的 1 到 3 项。官方索引要求必填。 |
-| `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes` | 否 | 商店信息，见“商店信息”。官方索引要求有 `author` 和 `license`。 |
+| `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `tool_idle_seconds`、`tool_total_seconds`，见“工具与 MCP 总线”。 |
@@ -182,8 +180,7 @@ services:
 
 ## 商店信息
 
-商店、安装确认页和 App 主屏用到的信息写在清单里，随插件包按提交固定。多语言的字段同 `title`，至少有
-`zh` 和 `en`。
+商店、安装确认页和 App 主屏用到的信息写在清单里，随插件包按提交固定。给用户看的文字都按语言写，语言是键，如 `zh`、`en`，至少写一种。App 显示用户设置的语言；缺这种语言时回退到 `en`，再回退到写了的任意一种。官方索引要求 `description`、`tags`、`about`、`release_notes` 都写 `zh` 和 `en`。
 
 | 字段 | 说明 |
 | --- | --- |
@@ -193,36 +190,35 @@ services:
 | `author` | 插件包的作者：`name`（必填）、`url`（HTTPS，可选）。不一定是应用的作者。 |
 | `homepage` | 应用的主页，HTTPS。 |
 | `license` | 应用的许可证，SPDX 表达式，如 `AGPL-3.0-only`、`MIT OR Apache-2.0`。插件包自己的许可证写在仓库的 LICENSE 里。 |
-| `categories` | 分类，取下表的 1 到 3 项，不能重复，第一项算主分类。商店按它筛选。分类是固定的一组，插件不能自己加。 |
-| `tags` | 搜索用的关键词，最多 8 个，每个 1 到 24 个字符，不分语言。 |
+| `tags` | 标签，插件自己写，按语言分开，如 `{ zh: [相册, AI], en: [Photos, AI] }`。每种语言最多 8 个，每个 1 到 24 个字符，不能重复。商店按出现过的标签筛选，所以写用途，不写技术词；也用来搜索。 |
 | `about` | 详细介绍：多语言，纯文本，空行分段，每种语言不超过 4000 个字符。没写时详情页只显示 `description`。 |
 | `release_notes` | 这个版本的更新说明：多语言，纯文本，每种语言不超过 2000 个字符，升级提示里显示。数据迁移不可逆时要写明。 |
 
-| `categories` | 中文名 | 例子 |
-| --- | --- | --- |
-| `ai` | AI | Open WebUI、Vane |
-| `agent` | Agent | Hermes |
-| `photos` | 相册 | Immich |
-| `music` | 音乐 | Navidrome |
-| `video` | 视频 | Jellyfin |
-| `files` | 文件 | File Browser、Samba |
-| `sync` | 同步 | Syncthing |
-| `documents` | 文档 | Paperless-ngx |
-| `notes` | 笔记 | Memos |
-| `reading` | 阅读 | Miniflux |
-| `finance` | 记账 | Actual |
-| `productivity` | 效率 | 待办、日历 |
-| `communication` | 通讯 | 第三方 IM 渠道 |
-| `home` | 智能家居 | Home Assistant |
-| `network` | 网络 | DNS、代理 |
-| `monitoring` | 监控 | Uptime Kuma |
-| `security` | 安全 | 密码管理 |
-| `developer` | 开发 | Git 服务 |
-| `downloads` | 下载 | BT 下载 |
-| `tools` | 工具 | 不属于以上各类的 |
-| `system` | 系统 | 只给系统插件（`kind: system`） |
+标签不是固定的一组，下面这些是推荐的词，大家用同一个词，筛选时才归得到一起。没有合适的可以自己写。
 
-`title` 写产品原名，如 Immich、Syncthing，不要翻译成用途，用途交给 `categories`。插件自己就是产品、没有上游时才用功能名。
+| `zh` | `en` | 例子 |
+| --- | --- | --- |
+| AI | AI | Open WebUI、Vane |
+| 相册 | Photos | Immich |
+| 音乐 | Music | Navidrome |
+| 视频 | Video | Jellyfin |
+| 文件 | Files | File Browser、Samba |
+| 同步 | Sync | Syncthing |
+| 文档 | Documents | Paperless-ngx |
+| 笔记 | Notes | Memos |
+| 阅读 | Reading | Miniflux |
+| 记账 | Finance | Actual |
+| 效率 | Productivity | 待办、日历 |
+| 通讯 | Communication | 第三方 IM 渠道 |
+| 智能家居 | Home | Home Assistant |
+| 网络 | Network | DNS、代理 |
+| 监控 | Monitoring | Uptime Kuma |
+| 安全 | Security | 密码管理 |
+| 开发 | Developer | Git 服务 |
+| 下载 | Downloads | BT 下载 |
+| 工具 | Tools | 其他小工具 |
+
+`title` 写产品原名，如 Immich、Syncthing，不要翻译成用途，用途交给 `tags`。原名不译时只写 `en`，如 `title: { en: Immich }`。插件自己就是产品、没有上游时才用功能名，`zh` 和 `en` 都写。
 
 `description` 和 `about` 写给普通用户：`description` 一句话说清它能帮你做什么，不写技术实现，读者称呼“你”。
 
@@ -879,7 +875,7 @@ x-wonton:
   id: ai.example.comfyui
   version: 1.0.0
   kind: app
-  title: { zh: ComfyUI, en: ComfyUI }
+  title: { en: ComfyUI }
   description: { zh: 用工作流生图、生视频, en: Image and video generation with workflows }
   webui:
     service: web
@@ -1159,7 +1155,7 @@ x-wonton:
 - 条目用 `wonton-core plugin index-entry <插件包目录> github:<owner>/<repo> <提交号>` 生成，不手写：目录是那个提交的
   检出（核心不连 Git，不核对），条目的 JSON 写到标准输出；加 `--index <索引目录>` 时直接写进本地的索引目录，同一个
   来源的旧条目换掉。
-- 收录要求：`wonton-core plugin check --official` 通过，即有 `icon`、`categories`、`license`、`author`、`notices`，所有服务的 `image`
+- 收录要求：`wonton-core plugin check --official` 通过，即有 `icon`、`tags`、`license`、`author`、`notices`，`description`、`tags`、`about`、`release_notes` 都写了 `zh` 和 `en`，所有服务的 `image`
   按摘要固定，长期运行的服务都有健康检查；申请的权限和插件做的事相符；镜像来自上游官方或作者可复现的构建。
 - 核心镜像内置一份索引和其中插件包的文件。开发镜像和测试用本地的索引目录代替（`WONTON_STORE_INDEX`）：`index.json`
   加上按 sha256 存放的文件（`blobs/<sha256 的十六进制>`）。
@@ -1189,8 +1185,8 @@ x-wonton:
   - 插件包解析不了时只报这一条（和安装时报的一样）；解析得了时列出所有问题。
   - 不合格（退出码 1）：装不上的（核心还不支持的权限、渲染不了的 compose），图标或截图处理不了。
   - 提醒（退出码 0）：镜像没有按摘要固定，长期运行的服务没有健康检查，没有图标，图标的角是透明的，截图的长边不到
-    1280，横屏和竖屏的截图混在一起，`kind: system`。`--official` 时前三项也算不合格，另外要有 `categories`、`license`、
-    `author`、`notices`。只看得到 compose 里写的健康检查，镜像自带的看不到。
+    1280，横屏和竖屏的截图混在一起，`kind: system`。`--official` 时前三项也算不合格，另外要有 `tags`、`license`、
+    `author`、`notices`，`description`、`tags`、`about`、`release_notes` 要写 `zh` 和 `en`。只看得到 compose 里写的健康检查，镜像自带的看不到。
   - 用法不对时退出码 2。
 - 打包：`wonton-core plugin pack <目录>` 把插件包打成 tar 写到标准输出，只有 compose 文件和它引用的文件，README、截图
   这些不在里面；解析不了时和 `check` 一样报错，退出码 1。
