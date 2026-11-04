@@ -340,6 +340,11 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 `email_verified`）、`groups`（用户为 `["owner"]`，可用来映射应用内角色）、`offline_access`。
 客户端 ID 就是插件 `id`，密钥在安装时生成，卸载时删除客户端。
 
+- 选型时先看应用接不接受 `http` 的 issuer：有的强制 `https`（如 BookStack），核心的 OIDC 是 `http`，
+  这类应用登录走不通。
+- `webui.path` 可以指向应用的 OIDC 起点：App 打开网页时把它拼在地址后面，核心给出的网页地址
+  （`WONTON_APP_URL`、安装时的探测）不带它，省掉用户先点登录按钮。
+
 ### 网关代登录（`sso: proxy`）
 
 网关认出用户后，在转发给插件的请求上加上清单声明的请求头或 Cookie。应用认反向代理传来的用户名时
@@ -376,6 +381,9 @@ webui:
 值模板里可以用 `{user}`（用户名，同 OIDC 的 `preferred_username`）、`{name}`、`{email}`，以及
 `{secret:<名字>}`，其余文字原样保留，如 `"Bearer {secret:api_token}"`；`{`、`}` 只能用来写占位符。用户没配邮箱时，
 用了 `{email}` 的插件装不上。
+
+上游没有可信代理白名单（对所有来源都信任 `Remote-User` 这类头）时，申请了 `network.egress` 的插件
+过不了 `plugin check --official`，这种应用改用 OIDC。
 
 - `{secret:…}` 只能引用插件自己的 `secrets` 里由核心生成（`generate`）、至少 16 字节的一项：引用不到别的插件的
   密钥，也引用不到插件交给核心保管（`collect`）的秘密。网关按值从响应里找出并去掉它（见下），值太短会误伤。
@@ -1031,6 +1039,8 @@ x-wonton:
   知道在运行）。
 - 检查失败的插件标为异常；容器好了，核心重新核对一遍，插件恢复运行。卸载中途失败、记录损坏这些和容器无关的异常
   不会自己恢复。
+- 一次性服务不需要健康检查：复用主镜像（`image: *image`）时，镜像自带的 `HEALTHCHECK` 通不过，安装会等满
+  5 分钟判失败，写 `healthcheck: test: ["NONE"]` 关掉它。
 
 ## 网络
 
@@ -1081,6 +1091,7 @@ x-wonton:
   - 健康检查不走代理：核心改写调用 wget 和 shell 的写法，包括镜像自带的 `HEALTHCHECK`。入口脚本里的 busybox wget 不看 `no_proxy`，访问内部地址要自己加 `-Y off`。
   - 插件网络不是信任边界：用户的代理放行私有地址时，别的出网插件能经它连到出网插件和 `--lan` 网络上的服务的任何端口。建议：应用支持密码或密钥的内部服务（数据库、Redis），用 `secrets` 生成并设上。不支持的（比如 Ollama）不因此拒收，`lan.ports` 里的端口也不在此列。
   - 经代理出错时：403 是出口容器拒绝了这个目标（内部或私有地址走到了代理）；503 是连不上用户的代理（立刻返回是被拒绝，等 15 秒是没响应）；CONNECT 200 之后 TLS 断开是代理连不上目标。
+  - 出网失败先查代理配置。DNS 被污染时域名解析到代理或内网地址，应用自带的 SSRF 防护会拦下来，报 internal address 一类的错。
 - 核心要求 Docker Engine 28 及以上，并且不开 `allow-direct-routing`：28 起局域网里的其他主机不能再经路由
   直接访问容器里没发布的端口（moby#48724），插件网页才真的只能经核心网关访问；`sso: proxy` 信任网关加的
   请求头，靠的就是这一点。核心启动时检查 Engine 版本，低于 28 时报错退出，不降级运行；
