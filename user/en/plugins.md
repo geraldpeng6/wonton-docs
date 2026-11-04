@@ -60,6 +60,7 @@ Install, update, and uninstall failures:
 - “它已经装了，或者正在安装、升级、卸载，等那边做完。” (It is already installed or another task is running; wait for it to finish.): wait for the task in progress.
 - “应用包不合法，请联系应用的作者。” (The app package is invalid; contact its author.): stop and contact the app author.
 - “家里的服务器正在升级，升级结束后再试。” (The home server is updating; try again when it finishes.): wait for the update to finish.
+- “检查家里服务器上的代理，或者在出网代理设置里改地址后再试。” (Check the server proxy or change it under Outbound proxy, then retry.): fix the proxy under “应用” → “连接” → “出网代理”.
 - “家里的服务器出了错，稍后再试。” (The home server returned an error; try again later.): retry later.
 - “App 和家里的服务器版本对不上，请更新 App 或家里的服务器。” (The app and server versions do not match; update one or both.): update the app and server.
 

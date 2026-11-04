@@ -24,5 +24,3 @@ While the update runs, the task says “正在升级” (Updating). On success i
 - “家里的服务器出了错，稍后再试。” (The home server returned an error; try again later.): retry later.
 - “App 和家里的服务器版本对不上，请更新 App 或家里的服务器。” (The app and server versions do not match; update one or both.): update the app and server.
 - “结果不确定：…” (Result uncertain: …): refresh the Apps page, check the actual version, and then decide whether to retry.
-
-Server-core upgrades require core ≥ 0.9.0. Use the upgrade procedure supplied for the server installation; the app’s “升级” button updates apps, not the server core.
