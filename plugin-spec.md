@@ -1,9 +1,6 @@
 # 插件规范 `x-wonton`（草案 v0.4）
 
-> 草案，字段可能调整。
-> v0.2 加上规范版本（`spec`）、商店信息和插件的发布与来源。
-> v0.3 加上权限 `owner.identity`。
-> v0.4 加上随包的许可声明 `notices`。
+> 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
 一个插件就是一个 `docker-compose.yml`，在顶层加一个 `x-wonton` 扩展字段描述它在 Wonton 里的身份、
 入口、能力和权限。compose 引用的配置文件、图标和设置表单与它放在同一个目录里，合称插件包。
@@ -30,7 +27,7 @@ services:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
 
 x-wonton:
-  spec: "0.2"
+  spec: "0.4"
   id: app.immich.photos
   version: 2.0.0
   kind: app
@@ -184,7 +181,7 @@ services:
 
 | 字段 | 说明 |
 | --- | --- |
-| `spec` | 清单按哪一版规范写成，字符串，如 `"0.2"`（YAML 里要加引号，不然读成数字）。没写时按 `"0.1"`。核心先读它：比核心支持的版本新时安装失败（`unsupported`），提示先升级核心，不再逐项报未知字段。用到 v0.2 的字段时写 `"0.2"`，用到 v0.3 的写 `"0.3"`，用到 v0.4 的写 `"0.4"`。 |
+| `spec` | 必填。清单按哪一版规范写成，字符串，如 `"0.4"`（YAML 里要加引号，不然读成数字）。没写时安装失败。核心先读它：比核心支持的版本新时安装失败（`unsupported`），提示先升级核心，不再逐项报未知字段。 |
 | `icon` | 图标，见下节。 |
 | `screenshots` | 截图：仓库里的 PNG 或 JPEG（路径规则同插件包里的文件），1 到 6 张，按顺序显示。截图不算插件包的一部分：不参与插件包摘要，安装时不取，上传插件包时忽略；商店的详情页要显示时，核心按同一个提交去取。 |
 | `author` | 插件包的作者：`name`（必填）、`url`（HTTPS，可选）。不一定是应用的作者。 |
@@ -430,8 +427,8 @@ webui:
 | `network.lan` | 在局域网上开放 `lan.ports` 列出的端口，见“局域网”。高权限。 |
 | `network.host` | 使用宿主网络。高权限，不开放。 |
 | `devices.gpu` | 使用显卡，见“显卡”。高权限。 |
-| `devices.<路径>` | 访问宿主设备，如 USB。高权限。 |
-| `docker.socket` | 访问 Docker socket。最高权限，默认拒绝，需要单独确认。 |
+| `devices.<路径>` | 访问宿主设备，如 USB。高权限，不开放。 |
+| `docker.socket` | 访问 Docker socket。最高权限，不开放。 |
 
 高权限在安装确认时单独醒目展示。插件不声明的能力一律不给。安装请求必须逐项确认清单里的全部权限，
 少一项或多一项都拒绝安装。
@@ -453,7 +450,7 @@ webui:
 | `WONTON_OIDC_ISSUER`、`WONTON_OIDC_CLIENT_ID`、`WONTON_OIDC_CLIENT_SECRET` | `webui.sso: oidc` | OIDC 客户端配置。 |
 | `WONTON_OIDC_AUTH_URL`、`WONTON_OIDC_TOKEN_URL`、`WONTON_OIDC_USERINFO_URL` | `webui.sso: oidc` | 各端点地址，给不支持发现文档的应用（如 Grafana）。 |
 | `WONTON_CORE_ADDRESS` | `webui.sso: proxy` | 核心在这个插件网络里的地址（网段的最后一个可用地址，如 `172.18.255.254`），核心容器重建后不变。写进应用的“信任的代理地址”，见“网关代登录”。 |
-| `WONTON_OWNER_NAME` | `owner.identity`；`spec` 低于 `0.3` 的清单，`webui.sso` 是 `oidc`、`proxy` 时也给 | 用户的用户名，装好后不变，和 OIDC 的 `sub`、`preferred_username` 以及代登录模板的 `{user}` 同值，见下文。 |
+| `WONTON_OWNER_NAME` | `owner.identity` | 用户的用户名，装好后不变，和 OIDC 的 `sub`、`preferred_username` 以及代登录模板的 `{user}` 同值，见下文。 |
 | `WONTON_OWNER_EMAIL` | 同上，且用户配了邮箱 | 用户的邮箱，和 OIDC 的 `email`、代登录模板的 `{email}` 同值。值是建容器时的快照，见下文。 |
 | `WONTON_MODEL_BASE_URL` | `models` | 模型网关 OpenAI 兼容接口的地址，以 `/v1` 结尾，如 `http://models.wonton.internal:8080/v1`。 |
 | `WONTON_MODEL_ANTHROPIC_BASE_URL`、`WONTON_MODEL_GEMINI_BASE_URL` | `models`，且网关提供该接口 | Anthropic Messages、Gemini 接口的地址，按各自 SDK 的约定不带 `/v1`。 |
@@ -476,8 +473,7 @@ webui:
   `WONTON_MODEL_ANTHROPIC_BASE_URL`。核心不把自己的环境变量传给插件。
 - 地址和令牌以注入值为准，插件不要自己拼：主机名、端口和格式都可能变。
 - 用户的用户名和邮箱同样以注入值为准，不要写死或按规则拼。没申请 `owner.identity` 的插件拿不到它们，安装不多给一份
-  个人信息，引用了就装不上，错误写明“插件没申请 `owner.identity`”。规范版本升到 `0.3` 的插件，靠 `sso` 拿身份变量的要补上
-  这项权限。应用登录时从 OIDC 或代登录模板拿到的身份不归这项权限管，
+  个人信息，引用了就装不上，错误写明“插件没申请 `owner.identity`”。应用登录时从 OIDC 或代登录模板拿到的身份不归这项权限管，
 - 用户名是固定 ID，装好后不变，插件不用处理它变化的情况。它只含小写字母、数字、`_` 和 `-`，以字母开头，最长 32 个
   字符，不是常见的系统用户名，可以直接用来建系统账号；镜像里自带的用户（`postgres`、`node`）可能重名，要插件自己
   处理。应用按用户名或 OIDC 的 `sub` 认人，不要按邮箱认：邮箱会变。
@@ -700,8 +696,7 @@ x-wonton:
 ```
 
 - 核心经插件网络连这个服务（同网页入口），它只对核心可见；插件在运行时它的工具才出现在总线上。只说 stdio 的
-  MCP 服务器要在镜像里自带一个转成 Streamable HTTP 的桥（如 supergateway，见文件搜索插件
-  `geraldpeng6/wonton-plugin-files`）。
+  MCP 服务器要在镜像里自带一个转成 Streamable HTTP 的桥（如 supergateway）。
 - 工具在总线上叫 `<slug>__<工具名>`，如 `app-wonton-files__search_files`。核心连插件的 MCP 服务用 `initialize` 握手
   （MCP 2025-11-25）。
 - 没有标 `readOnlyHint: true`（MCP 的工具注解）的工具算敏感：总线先请用户确认，确认了才转给插件。会改数据的工具
@@ -783,7 +778,7 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
   | --- | --- | --- |
   | `wonton__list_plugins` | 否 | 已装的插件、版本、状态和网页地址；工具列不出来时带 `tools_error`。 |
   | `wonton__search_catalog` | 否 | 按关键词在官方索引里找插件：ID、名字、说明和要申请的权限。 |
-  | `wonton__install_plugin` | 是 | 按官方索引里的 ID 安装，授予它声明的全部权限。声明了高权限的插件只能由用户在 App 里装。 |
+  | `wonton__install_plugin` | 是 | 按官方索引里的 ID 安装，授予它声明的全部权限。高权限也走确认卡片，用户点了就装。 |
   | `wonton__uninstall_plugin` | 是 | 卸载，`delete_data` 为真时同时删除它的数据。 |
   | `wonton__view_file` | 否 | 按文件编号返回图片预览，看不了的类型报错。 |
   | `wonton__share_file` | 否 | 把编号指向的文件分享给用户，返回文件链接，原样放进回复。 |
@@ -1070,11 +1065,11 @@ x-wonton:
     插件还能访问宿主上监听所有地址的服务；插件经自己网络的网关访问核心的身份提供方入口（内部网络没有
     默认路由，`host-gateway` 走不通）。
   - 核心启动核对插件时检查它的网络：和清单、核心的运行方式不符时（比如核心升级前装的插件网络能出网）把
-    插件标为异常，提示重装（可以不删数据）。只是还没给核心留地址的，核心自动迁移，容器不重建。
+    插件标为异常，提示重装（可以不删数据）。
 
   > **已定：默认不能出网**。要出网的插件声明 `network.egress`，安装时列在权限里：
-  > 相册、文档这类插件连不上外网，就带不走数据，符合“住在自己家里”；代价是多一项确认，导入的 CasaOS
-  > 应用要自动加上它。没选的方案是默认能出网（Docker、CasaOS、Umbrel 都是这样）：兼容最好，但插件不声明也能把
+  > 相册、文档这类插件连不上外网，就带不走数据，符合“住在自己家里”；代价是多一项确认。
+  > 没选的方案是默认能出网（Docker、CasaOS、Umbrel 都是这样）：兼容最好，但插件不声明也能把
   > 数据发出去，只能靠审核。
 - 核心的地址：每个插件网络的最后一个可用地址留给核心，容器自动分配只用网段的前一半，核心容器重建后地址不变（`WONTON_CORE_ADDRESS`）。
 - 走代理：要走代理才能出网的主机，用户配一次代理地址，插件不用管。出口容器 `wonton-egress` 接在每个出网插件的网络上，别名 `egress.wonton.internal`，是这些网络里除核心和插件服务之外唯一的容器。连宿主时用网关地址或局域网地址都行，和不配代理时一样。
@@ -1216,20 +1211,6 @@ x-wonton:
   核心，和正式安装是同一份 compose，换掉项目名、核心的容器名（`WONTON_CORE_CONTAINER`）和实例名
   （`WONTON_INSTANCE`），几套开发环境可以共用一台 Docker，同一个插件也能同时装在几套里。
 
-## 兼容 CasaOS 应用
-
-导入 CasaOS 格式（`x-casaos`）的应用时，核心按以下规则转换，再请用户确认：
-
-- `x-casaos.title`、`description` 映射到 `title`、`description`。`x-casaos.icon` 是图片地址：核心导入时把它取下来放进
-  插件包，取不到或不合法时没有图标。
-- `x-casaos.index` 与 `port_map` 映射到 `webui`。
-- `/DATA/AppData/$AppID` 下的卷映射到 `WONTON_APP_DATA`。
-- 其余宿主路径（如 `/DATA/Media`）映射到共享文件夹，并生成对应的读写权限，必须由用户确认。
-- `network_mode: host`、`privileged`、`devices` 生成对应的高权限。
-- `ports` 去掉，网页入口改由网关提供。
-- 加上 `network.egress`：CasaOS 应用都假定能出网。
-- 没有健康检查的服务照常导入，状态显示为“健康未知”。
-
 ## 待定问题
 
 - 插件间依赖与通信的声明方式。
@@ -1238,7 +1219,6 @@ x-wonton:
 - 多个入口和快捷方式（`shortcuts`）、插件给用户发通知（`notify`）的写法。
 - `settings.schema.json` 支持的 JSON Schema 子集。
 - 插件升级时的数据迁移钩子。
-- 网关上 HTTPS 以后，插件网页地址和 OIDC 签发方地址的形式（只有 http）。
 - 共享 Bot的白名单：多个用户，而且会在运行中变化，环境变量表达不了。
 - 多 Bot 时的存储授权：共享文件夹是插件级的授权，家人的私人空间（`storage.home`）要按 Bot 的用户分别
   挂载。
