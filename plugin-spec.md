@@ -34,15 +34,14 @@ x-wonton:
   id: app.immich.photos
   version: 2.0.0
   kind: app
-  title: { zh: 相册, en: Photos }
-  description: { zh: 照片备份、人脸与语义搜索, en: Photo backup with face and semantic search }
+  title: { en: Immich }
+  description: { zh: 备份手机里的照片和视频，按人脸和内容搜索, en: Back up your photos and videos, search by face and content }
   icon: icon.png
-  category: photos
   screenshots: [screenshots/timeline.png, screenshots/search.png]
   author: { name: Example, url: https://example.com }
   homepage: https://immich.app
   license: AGPL-3.0-only
-  tags: [immich, 照片, 备份]
+  tags: { zh: [相册, AI], en: [Photos, AI] }
   about:
     zh: |
       手机里的照片自动备份到家里的服务器。
@@ -79,10 +78,9 @@ x-wonton:
 | `id` | 是 | 反向域名形式，全局唯一，安装后不可修改。至少两段，每段由小写字母、数字和单个连字符组成，总长不超过 63。 |
 | `version` | 是 | 插件包版本（语义化版本），和镜像版本无关。 |
 | `kind` | 是 | `app`（普通应用）、`agent`（Agent 运行时）、`channel`（第三方 IM 渠道）、`model`（模型服务）、`system`（系统插件，仅官方，只能由安装器预装）。 |
-| `title`、`description` | 是 | 多语言文本，至少提供 `zh` 和 `en`。 |
+| `title`、`description` | 是 | 多语言文本，至少写一种语言。怎么写见“商店信息”。 |
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
-| `category` | 否 | 商店分类，取“商店信息”里的一项。官方索引要求必填。 |
-| `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes` | 否 | 商店信息，见“商店信息”。官方索引要求有 `author` 和 `license`。 |
+| `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `tool_idle_seconds`、`tool_total_seconds`，见“工具与 MCP 总线”。 |
@@ -93,9 +91,9 @@ x-wonton:
 | `gpu` | 否 | 拿到显卡的服务（`services`）。要和 `devices.gpu` 权限一起声明，见“显卡”。 |
 | `lan` | 否 | 在局域网上开放的端口（`ports`）。要和 `network.lan` 权限一起声明，见“局域网”。 |
 | `secrets` | 否 | 插件自己的密钥：核心生成后注入，或插件运行中生成、交给核心保管（见“插件密钥”）。 |
-| `permissions` | 是 | 安装时由主人确认的权限，见下表。没有权限时写空列表。 |
+| `permissions` | 是 | 安装时由用户确认的权限，见下表。没有权限时写空列表。 |
 | `settings` | 否 | 插件包里的 JSON Schema 文件，留给 App 用原生表单渲染（预留）；在那之前插件用自己的网页做设置。 |
-| `requirements` | 否 | `arch`（安装时与宿主架构比对，不符则拒绝）、`memory`、`gpu`（`required`、`optional`，见“显卡”）。 |
+| `requirements` | 否 | 对宿主的要求：`arch`、`memory`、`gpu`，核心按这台主机判断，见“对宿主的要求”。 |
 
 `x-wonton` 里出现未知字段时安装失败；`spec` 比核心支持的版本新时，先报规范版本（见“商店信息”）。
 
@@ -115,7 +113,7 @@ x-wonton:
   恢复和升级比对；插件的容器访问不到这个目录。
 - 卷不能用相对路径挂载包里的文件（见“Compose 子集”）；容器要用的包内文件一律经 `configs` 交给它。
 - 包里的第三方素材（如上游的标志）要求随分发附上版权和许可时，写进 `notices` 引用的文件。README 不进包，核心重新编码图片时
-  也不留元数据，这两处的声明到不了主人那里。`notices` 只随包保存和分发，容器拿不到；容器要读的文件用 `configs`。
+  也不留元数据，这两处的声明到不了用户那里。`notices` 只随包保存和分发，容器拿不到；容器要读的文件用 `configs`。
 
 ### 配置文件（`configs`）
 
@@ -184,8 +182,7 @@ services:
 
 ## 商店信息
 
-商店、安装确认页和 App 主屏用到的信息写在清单里，随插件包按提交固定。多语言的字段同 `title`，至少有
-`zh` 和 `en`。
+商店、安装确认页和 App 主屏用到的信息写在清单里，随插件包按提交固定。给用户看的文字都按语言写，语言是键，如 `zh`、`en`，至少写一种。App 显示用户设置的语言；缺这种语言时回退到 `en`，再回退到写了的任意一种。官方索引要求 `description`、`tags`、`about`、`release_notes` 都写 `zh` 和 `en`。
 
 | 字段 | 说明 |
 | --- | --- |
@@ -195,28 +192,37 @@ services:
 | `author` | 插件包的作者：`name`（必填）、`url`（HTTPS，可选）。不一定是应用的作者。 |
 | `homepage` | 应用的主页，HTTPS。 |
 | `license` | 应用的许可证，SPDX 表达式，如 `AGPL-3.0-only`、`MIT OR Apache-2.0`。插件包自己的许可证写在仓库的 LICENSE 里。 |
-| `category` | 分类，取下表的一项。 |
-| `tags` | 搜索用的关键词，最多 8 个，每个 1 到 24 个字符，不分语言。 |
+| `tags` | 标签，插件自己写，按语言分开，如 `{ zh: [相册, AI], en: [Photos, AI] }`。每种语言最多 8 个，每个 1 到 24 个字符，不能重复。商店按出现过的标签筛选，所以写用途，不写技术词；也用来搜索。 |
 | `about` | 详细介绍：多语言，纯文本，空行分段，每种语言不超过 4000 个字符。没写时详情页只显示 `description`。 |
 | `release_notes` | 这个版本的更新说明：多语言，纯文本，每种语言不超过 2000 个字符，升级提示里显示。数据迁移不可逆时要写明。 |
 
-| `category` | 中文名 | 例子 |
+标签不是固定的一组，下面这些是推荐的词，大家用同一个词，筛选时才归得到一起。没有合适的可以自己写。
+
+| `zh` | `en` | 例子 |
 | --- | --- | --- |
-| `ai` | AI 与模型 | Ollama |
-| `agent` | 助手 | Hermes |
-| `photos` | 照片 | Immich |
-| `media` | 影音 | Navidrome、Jellyfin |
-| `files` | 文件 | Syncthing、Samba、文件搜索 |
-| `documents` | 文档 | Paperless-ngx |
-| `productivity` | 效率 | 笔记、待办、日历 |
-| `communication` | 通讯 | 第三方 IM 渠道 |
-| `home` | 智能家居 | Home Assistant |
-| `network` | 网络 | DNS、代理 |
-| `security` | 安全 | 密码管理 |
-| `developer` | 开发 | Git 服务 |
-| `downloads` | 下载 | BT 下载 |
-| `tools` | 工具 | 不属于以上各类的 |
-| `system` | 系统 | 只给系统插件（`kind: system`） |
+| AI | AI | Open WebUI、Vane |
+| 相册 | Photos | Immich |
+| 音乐 | Music | Navidrome |
+| 视频 | Video | Jellyfin |
+| 文件 | Files | File Browser、Samba |
+| 同步 | Sync | Syncthing |
+| 文档 | Documents | Paperless-ngx |
+| 笔记 | Notes | Memos |
+| 阅读 | Reading | Miniflux |
+| 记账 | Finance | Actual |
+| 效率 | Productivity | 待办、日历 |
+| 通讯 | Communication | 第三方 IM 渠道 |
+| 智能家居 | Home | Home Assistant |
+| 网络 | Network | DNS、代理 |
+| 监控 | Monitoring | Uptime Kuma |
+| 安全 | Security | 密码管理 |
+| 开发 | Developer | Git 服务 |
+| 下载 | Downloads | BT 下载 |
+| 工具 | Tools | 其他小工具 |
+
+`title` 写产品原名，如 Immich、Syncthing，不要翻译成用途，用途交给 `tags`。原名不译时只写 `en`，如 `title: { en: Immich }`。插件自己就是产品、没有上游时才用功能名，`zh` 和 `en` 都写。
+
+`description` 和 `about` 写给普通用户：`description` 一句话说清它能帮你做什么，不写技术实现，读者称呼“你”。
 
 ### 图标和截图
 
@@ -298,7 +304,7 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 ## 网页入口与单点登录
 
 插件网页的地址是 `<scheme>://<slug>.<基础域名>[:端口]`，`slug` 是把 `id` 里的 `.` 换成 `-`
-（`app.immich.photos` → `app-immich-photos`）。所有请求经核心网关，网关先校验主人的会话，未登录的请求
+（`app.immich.photos` → `app-immich-photos`）。所有请求经核心网关，网关先校验用户的会话，未登录的请求
 不会到达插件；转发时去掉网关自己的 Cookie 和客户端伪造的 `X-Forwarded-*`，重新设置 `X-Forwarded-For`、
 `X-Forwarded-Host`、`X-Forwarded-Proto`，保留原始 `Host`，支持 WebSocket。
 
@@ -315,14 +321,14 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 
 ### 应用自带的登录（`sso: none`）
 
-主人装好后第一次打开网页时，在应用里自己注册管理员。网关挡在前面，只有主人打得开注册页。
+用户装好后第一次打开网页时，在应用里自己注册管理员。网关挡在前面，只有用户打得开注册页。
 
 - 不要带默认账号和默认密码。应用非要预建管理员时，用 `secrets` 生成密码，不要写死。
 - 注册页只在 `webui` 端口上。`lan.ports` 列出的别的端口装好就开在局域网上，不能提供未认证的管理员注册。`webui` 的端口列进 `lan.ports` 时默认不开，确认页和插件设置里有开关 `lan_webui`，默认关，旁边写明“管理员注册之前，局域网里的设备和这台主机上能出网的插件可能抢先注册”。
 - 应用能关自助注册时，默认关掉第一个账号以外的注册。
-- 应用的登录页关不掉就留着，局域网浏览器里主人登两次。不要为了去掉它去改应用。
-- 插件自己的服务要访问应用（比如 MCP 服务调应用的接口）时，用 `secrets` 里的密钥，不要用主人的账号。
-- 要主人的用户名或邮箱时（比如拿用户名建系统账号），申请 `owner.identity`，不要为此声明 `sso: proxy`。
+- 应用的登录页关不掉就留着，局域网浏览器里用户登两次。不要为了去掉它去改应用。
+- 插件自己的服务要访问应用（比如 MCP 服务调应用的接口）时，用 `secrets` 里的密钥，不要用用户的账号。
+- 要用户的用户名或邮箱时（比如拿用户名建系统账号），申请 `owner.identity`，不要为此声明 `sso: proxy`。
 - 忘了密码按应用自己的办法找回。不删数据重装还是原来的账号，删了数据就要重新注册。
 
 ### OIDC
@@ -336,12 +342,12 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 | `webui.oidc.token_endpoint_auth_method` | 否 | 应用在令牌端点出示密钥的方式：`client_secret_basic`（默认）或 `client_secret_post`。 |
 
 客户端可申请的 scope：`openid`、`profile`（`name`、`preferred_username`）、`email`（`email`、
-`email_verified`）、`groups`（主人为 `["owner"]`，可用来映射应用内角色）、`offline_access`。
+`email_verified`）、`groups`（用户为 `["owner"]`，可用来映射应用内角色）、`offline_access`。
 客户端 ID 就是插件 `id`，密钥在安装时生成，卸载时删除客户端。
 
 ### 网关代登录（`sso: proxy`）
 
-网关认出主人后，在转发给插件的请求上加上清单声明的请求头或 Cookie。应用认反向代理传来的用户名时
+网关认出用户后，在转发给插件的请求上加上清单声明的请求头或 Cookie。应用认反向代理传来的用户名时
 （Navidrome、Paperless-ngx、Grafana 的 auth proxy 等）：
 
 ```yaml
@@ -373,15 +379,15 @@ webui:
 
 `sso: proxy` 至少写一项头或 Cookie。
 值模板里可以用 `{user}`（用户名，同 OIDC 的 `preferred_username`）、`{name}`、`{email}`，以及
-`{secret:<名字>}`，其余文字原样保留，如 `"Bearer {secret:api_token}"`；`{`、`}` 只能用来写占位符。主人没配邮箱时，
+`{secret:<名字>}`，其余文字原样保留，如 `"Bearer {secret:api_token}"`；`{`、`}` 只能用来写占位符。用户没配邮箱时，
 用了 `{email}` 的插件装不上。
 
 - `{secret:…}` 只能引用插件自己的 `secrets` 里由核心生成（`generate`）、至少 16 字节的一项：引用不到别的插件的
   密钥，也引用不到插件交给核心保管（`collect`）的秘密。网关按值从响应里找出并去掉它（见下），值太短会误伤。
 - Cookie 的值只能用 `{secret:…}` 和固定文字，文字里不能有空白、引号、逗号、分号和反斜杠：用户名、显示名和邮箱
   可能有 Cookie 里不能出现的字符。请求头的值里不能有控制字符。不合规的清单在预览和安装时就被拒绝。
-- 只有网关认出主人的请求才加凭据，规则和其他插件网页一样：局域网浏览器要有这个插件子域名的会话，经隧道的
-  已配对设备看设备身份。没认出主人的请求不转发：打开页面跳到核心登录，其余请求 401。
+- 只有网关认出用户的请求才加凭据，规则和其他插件网页一样：局域网浏览器要有这个插件子域名的会话，经隧道的
+  已配对设备看设备身份。没认出用户的请求不转发：打开页面跳到核心登录，其余请求 401。
 - 插件子域名彼此同站，一个插件的页面能让浏览器带着会话向另一个插件发请求。所以网关按 Fetch Metadata
   的资源隔离策略，只认这些请求的登录状态：`Sec-Fetch-Site` 为 `same-origin` 或 `none`；顶层导航
   （`Sec-Fetch-Mode: navigate`，方法为 `GET` 或 `HEAD`）；没有 `Sec-Fetch-Site` 时，没有 `Origin`
@@ -390,9 +396,9 @@ webui:
 - 凭据不回到浏览器：插件响应里设置这些 Cookie 的 `Set-Cookie`（名字不分大小写，包括没写名字、浏览器会读成
   同名的）由网关去掉；值里带着 `{secret:…}` 原文的响应头（比如插件把密钥写回别的 Cookie 或跳转地址）也去掉。
   网关不改响应体：插件不能把凭据写进页面。
-- 主人的显示名这类值写不进请求头时（比如带换行），网关如实报错（500 `proxy_credentials`），不转发。
+- 用户的显示名这类值写不进请求头时（比如带换行），网关如实报错（500 `proxy_credentials`），不转发。
 - 用请求头认用户的应用，“信任的代理地址”只写核心的地址，不写 `0.0.0.0/0` 和整个网段：
-  出网插件的容器和接在 `--lan` 网络上的服务，宿主上的进程和经宿主代理转发的连接都到得了，别的插件能借此冒充主人。
+  出网插件的容器和接在 `--lan` 网络上的服务，宿主上的进程和经宿主代理转发的连接都到得了，别的插件能借此冒充用户。
 
   ```yaml
   environment:
@@ -405,10 +411,10 @@ webui:
   | 插件 | `plugin check` | 核心 |
   | --- | --- | --- |
   | 出网 | `--official` 判不合格，改用 OIDC 或 `{secret:…}` | `webui.service` 的局域网端口同下一行（第三方插件） |
-  | 不出网，开了局域网端口 | 提醒，不判不合格 | `webui.service` 的这些端口默认不开，服务也不接 `--lan` 网络。确认页和插件设置里有开关 `lan_webui`，默认关，旁边写明“局域网里的设备，以及这台主机上能出网的插件，不用密码就能以你的身份打开它”，主人打开后才开 |
+  | 不出网，开了局域网端口 | 提醒，不判不合格 | `webui.service` 的这些端口默认不开，服务也不接 `--lan` 网络。确认页和插件设置里有开关 `lan_webui`，默认关，旁边写明“局域网里的设备，以及这台主机上能出网的插件，不用密码就能以你的身份打开它”，用户打开后才开 |
   | 不出网，也不开局域网端口 | 在索引的审核里登记后通过：它的网络里只有核心和本插件的服务，宿主也连不上 | 不提示 |
 
-  不走单点登录的局域网服务（比如 Ollama 的 API）不适用这一节的任何规则，用不用密钥由主人决定。
+  不走单点登录的局域网服务（比如 Ollama 的 API）不适用这一节的任何规则，用不用密钥由用户决定。
 - 用 `{secret:…}` 的插件分不出是谁在用：每个能打开这个小程序的人都以同一个应用身份登录。
 
 ## 权限
@@ -420,9 +426,9 @@ webui:
 | `models` | 访问模型网关（magpie），见“模型网关”。 |
 | `tools` | 经核心的 MCP 总线调用核心和其他插件的工具，见“工具与 MCP 总线”。 |
 | `matrix.bot` | 以 Bot 身份收发消息，见“Matrix Bot”。 |
-| `notify` | 给主人发通知。 |
-| `owner.identity` | 知道主人的用户名和邮箱，见“安装时注入的变量”。 |
-| `network.egress` | 能访问外网，也能访问主人的局域网，安装确认按这句写。见“网络”。 |
+| `notify` | 给用户发通知。 |
+| `owner.identity` | 知道用户的用户名和邮箱，见“安装时注入的变量”。 |
+| `network.egress` | 能访问外网，也能访问用户的局域网，安装确认按这句写。见“网络”。 |
 | `network.lan` | 在局域网上开放 `lan.ports` 列出的端口，见“局域网”。高权限。 |
 | `network.host` | 使用宿主网络。高权限，不开放。 |
 | `devices.gpu` | 使用显卡，见“显卡”。高权限。 |
@@ -449,8 +455,8 @@ webui:
 | `WONTON_OIDC_ISSUER`、`WONTON_OIDC_CLIENT_ID`、`WONTON_OIDC_CLIENT_SECRET` | `webui.sso: oidc` | OIDC 客户端配置。 |
 | `WONTON_OIDC_AUTH_URL`、`WONTON_OIDC_TOKEN_URL`、`WONTON_OIDC_USERINFO_URL` | `webui.sso: oidc` | 各端点地址，给不支持发现文档的应用（如 Grafana）。 |
 | `WONTON_CORE_ADDRESS` | `webui.sso: proxy` | 核心在这个插件网络里的地址（网段的最后一个可用地址，如 `172.18.255.254`），核心容器重建后不变。写进应用的“信任的代理地址”，见“网关代登录”。 |
-| `WONTON_OWNER_NAME` | `owner.identity`；`spec` 低于 `0.3` 的清单，`webui.sso` 是 `oidc`、`proxy` 时也给 | 主人的用户名，装好后不变，和 OIDC 的 `sub`、`preferred_username` 以及代登录模板的 `{user}` 同值，见下文。 |
-| `WONTON_OWNER_EMAIL` | 同上，且主人配了邮箱 | 主人的邮箱，和 OIDC 的 `email`、代登录模板的 `{email}` 同值。值是建容器时的快照，见下文。 |
+| `WONTON_OWNER_NAME` | `owner.identity`；`spec` 低于 `0.3` 的清单，`webui.sso` 是 `oidc`、`proxy` 时也给 | 用户的用户名，装好后不变，和 OIDC 的 `sub`、`preferred_username` 以及代登录模板的 `{user}` 同值，见下文。 |
+| `WONTON_OWNER_EMAIL` | 同上，且用户配了邮箱 | 用户的邮箱，和 OIDC 的 `email`、代登录模板的 `{email}` 同值。值是建容器时的快照，见下文。 |
 | `WONTON_MODEL_BASE_URL` | `models` | 模型网关 OpenAI 兼容接口的地址，以 `/v1` 结尾，如 `http://models.wonton.internal:8080/v1`。 |
 | `WONTON_MODEL_ANTHROPIC_BASE_URL`、`WONTON_MODEL_GEMINI_BASE_URL` | `models`，且网关提供该接口 | Anthropic Messages、Gemini 接口的地址，按各自 SDK 的约定不带 `/v1`。 |
 | `WONTON_MODEL_API_KEY` | `models` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。 |
@@ -458,12 +464,12 @@ webui:
 | `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，如 `http://mcp.wonton.internal:8080/mcp`。 |
 | `WONTON_MATRIX_HOMESERVER` | `matrix.bot` | Matrix 客户端接口的地址：核心在插件网络里的别名，如 `http://matrix.wonton.internal:8080`。 |
 | `WONTON_MATRIX_USER_ID`、`WONTON_MATRIX_ACCESS_TOKEN` | `matrix.bot` | Bot 的 Matrix 用户 ID 和访问令牌。 |
-| `WONTON_MATRIX_OWNER` | `matrix.bot` | Bot 主人的 Matrix 用户 ID，用作白名单：私人 Bot 只接受主人的指令。 |
-| `WONTON_MATRIX_HOME_ROOM` | `matrix.bot` | Bot 的主房间：核心替主人建好的、和 Bot 的加密私聊，定时任务的结果发到这里。 |
+| `WONTON_MATRIX_OWNER` | `matrix.bot` | Bot 用户的 Matrix 用户 ID，用作白名单：私人 Bot 只接受用户的指令。 |
+| `WONTON_MATRIX_HOME_ROOM` | `matrix.bot` | Bot 的主房间：核心替用户建好的、和 Bot 的加密私聊，定时任务的结果发到这里。 |
 | `WONTON_SECRET_<名字>` | `secrets` 里由核心生成的项 | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
 | `WONTON_LAN_ADDRESSES` | `network.lan` | 局域网端口开在哪些地址上，逗号分隔，如 `192.0.2.10`。地址变了核心重建开端口的容器，见“局域网”。 |
-| `WONTON_PROXY_URL` | `network.egress` | 出口容器的地址 `http://egress.wonton.internal:3128`，主人没配代理时是空串。给有自己代理设置、不读 `HTTP_PROXY` 的程序用，见“网络”。 |
+| `WONTON_PROXY_URL` | `network.egress` | 出口容器的地址 `http://egress.wonton.internal:3128`，用户没配代理时是空串。给有自己代理设置、不读 `HTTP_PROXY` 的程序用，见“网络”。 |
 
 - 这些变量只用于 compose 插值（`${VAR}`、`${VAR:-默认值}` 等，`$$` 表示字面量 `$`），不会自动进入
   容器环境；需要的变量在对应服务的 `environment` 里显式引用，密钥只给用得到它的容器。
@@ -471,19 +477,19 @@ webui:
   `sso: oidc` 却引用 `WONTON_OIDC_CLIENT_SECRET`，或者模型网关不提供 Anthropic 接口却引用
   `WONTON_MODEL_ANTHROPIC_BASE_URL`。核心不把自己的环境变量传给插件。
 - 地址和令牌以注入值为准，插件不要自己拼：主机名、端口和格式都可能变。
-- 主人的用户名和邮箱同样以注入值为准，不要写死或按规则拼。没申请 `owner.identity` 的插件拿不到它们，安装不多给一份
+- 用户的用户名和邮箱同样以注入值为准，不要写死或按规则拼。没申请 `owner.identity` 的插件拿不到它们，安装不多给一份
   个人信息，引用了就装不上，错误写明“插件没申请 `owner.identity`”。规范版本升到 `0.3` 的插件，靠 `sso` 拿身份变量的要补上
   这项权限。应用登录时从 OIDC 或代登录模板拿到的身份不归这项权限管，
 - 用户名是固定 ID，装好后不变，插件不用处理它变化的情况。它只含小写字母、数字、`_` 和 `-`，以字母开头，最长 32 个
   字符，不是常见的系统用户名，可以直接用来建系统账号；镜像里自带的用户（`postgres`、`node`）可能重名，要插件自己
   处理。应用按用户名或 OIDC 的 `sub` 认人，不要按邮箱认：邮箱会变。
-- 主人没配邮箱时不注入 `WONTON_OWNER_EMAIL`，OIDC 也没有 `email` 声明。应用非要邮箱时写 `${WONTON_OWNER_EMAIL:?}`，
-  插件这时装不上，错误写明“主人还没配邮箱”和怎么配：OIDC 登录要 `email` 声明的应用也这样写，不要等到登录时才失败。
+- 用户没配邮箱时不注入 `WONTON_OWNER_EMAIL`，OIDC 也没有 `email` 声明。应用非要邮箱时写 `${WONTON_OWNER_EMAIL:?}`，
+  插件这时装不上，错误写明“用户还没配邮箱”和怎么配：OIDC 登录要 `email` 声明的应用也这样写，不要等到登录时才失败。
   能没有邮箱的写 `${WONTON_OWNER_EMAIL:-}`。
-- 主人改了邮箱或显示名之后，OIDC 声明和代登录的请求头马上换成新值，容器里的 `WONTON_OWNER_EMAIL`
+- 用户改了邮箱或显示名之后，OIDC 声明和代登录的请求头马上换成新值，容器里的 `WONTON_OWNER_EMAIL`
   还是旧值：核心重启只核对插件容器，不重建。升级或重装（可以不删数据）时新建的容器才拿到新值；局域网地址变化只重建
-  `lan.ports` 里的服务，同一个插件的其他服务还是旧值。应用里已有账号的资料由主人在应用里改，插件不写对账代码。
-- 核心不注入 `WONTON_OWNER_ID`：OIDC 的 `sub` 就是主人的用户名，另起一个变量只是同一个值。
+  `lan.ports` 里的服务，同一个插件的其他服务还是旧值。应用里已有账号的资料由用户在应用里改，插件不写对账代码。
+- 核心不注入 `WONTON_OWNER_ID`：OIDC 的 `sub` 就是用户的用户名，另起一个变量只是同一个值。
 
 **数据目录属主**：核心预先创建的绑定挂载目录（`WONTON_APP_DATA` 下）交给谁，看挂载它的服务的
 `user`：
@@ -498,34 +504,34 @@ webui:
 应用数据目录本身和路径上的中间各级目录交给 `PUID:PGID`。核心只改这些目录本身的属主，不递归改里面已有的
 文件。
 
-能以任意 uid 运行的镜像优先写 `user: "${PUID}:${PGID}"`，宿主上的文件就归主人的用户。这里不另设清单
+能以任意 uid 运行的镜像优先写 `user: "${PUID}:${PGID}"`，宿主上的文件就归用户的用户。这里不另设清单
 字段：compose 的 `user` 已经说明了容器以谁运行。
 
 ## 预装插件
 
-核心镜像里带着两类插件包，核心启动后在后台装上，授予清单声明的全部权限：装核心就是主人对它们的确认。目录里
+核心镜像里带着两类插件包，核心启动后在后台装上，授予清单声明的全部权限：装核心就是用户对它们的确认。目录里
 每个子目录一个插件包，一个装完再装下一个；先装系统插件，再装默认插件（默认 Agent 要用模型网关）。
 
-| | 目录 | 什么时候装 | 主人卸掉以后 |
+| | 目录 | 什么时候装 | 用户卸掉以后 |
 | --- | --- | --- | --- |
 | 系统插件（`kind: system`，如模型网关） | `WONTON_SYSTEM_PLUGINS` | 每次启动，没装就装 | 下次启动装回来 |
 | 默认插件（如默认 Agent） | `WONTON_DEFAULT_PLUGINS` | 只装一次 | 不再自动装 |
 
-- 系统插件只能这样装，API 装不了。默认插件是普通插件（不能是 `kind: system`），主人可以照常卸载、重装。
+- 系统插件只能这样装，API 装不了。默认插件是普通插件（不能是 `kind: system`），用户可以照常卸载、重装。
 - 已经装着的照常核对，不重装。系统插件目录里的版本比装着的新时，等核心自己的升级结束后，按“升级”的步骤升级它，装核心就是对它
-  的确认。默认插件只在第一次从目录装，之后和别的官方插件一样由官方索引提示升级、主人确认，核心不随镜像升级它。
-- 默认插件装好、或者主人卸掉它以后，核心在自己的数据目录里记下（`core/plugins/preinstalled/<id>.json`），此后不再
-  自动装：主人换掉默认 Agent，核心不会把它装回来。
+  的确认。默认插件只在第一次从目录装，之后和别的官方插件一样由官方索引提示升级、用户确认，核心不随镜像升级它。
+- 默认插件装好、或者用户卸掉它以后，核心在自己的数据目录里记下（`core/plugins/preinstalled/<id>.json`），此后不再
+  自动装：用户换掉默认 Agent，核心不会把它装回来。
 - 装不上时如实标为异常、写明原因，不影响核心启动：
   - 插件包本身的问题（`invalid_input`、`unsupported`，如不支持本机架构）、本机没有可用的显卡（`gpu_unavailable`）和
     同名的网络或卷不是这个插件的（`conflict`）重试也一样，不重试，下次启动再试；
   - 其余原因（Docker、身份提供方、Matrix、模型网关还没就绪，核心处理图片的子进程起不来，拉镜像失败，没通过健康检查）
     自动重试，间隔逐次加长，最长 10 分钟；等待时原因里写着试了几次、会自动重试。拉不下镜像时原因写成“拉取镜像失败
     （镜像）：Docker 的原话”（错误类别 `image_pull_failed`）；
-  - 等待重试时主人卸掉这个异常的插件，就不再重试；默认插件同样记下，不再自动装。卸载开始了就算，到点时卸载还没
+  - 等待重试时用户卸掉这个异常的插件，就不再重试；默认插件同样记下，不再自动装。卸载开始了就算，到点时卸载还没
     做完也不再重试。
-- 局域网状态页逐个列出这些插件里没在运行的（安装中，或者异常和原因的第一行）：它们每台主机都有，列出来不泄露主人
-  装了什么。原因后面的容器日志可能有聊天内容，只在主人登录后的插件列表里给。其他插件只给个数。
+- 局域网状态页逐个列出这些插件里没在运行的（安装中，或者异常和原因的第一行）：它们每台主机都有，列出来不泄露用户
+  装了什么。原因后面的容器日志可能有聊天内容，只在用户登录后的插件列表里给。其他插件只给个数。
 
 ## 模型网关
 
@@ -543,12 +549,12 @@ webui:
 - 请求 `WONTON_MODEL_DEFAULT`，不写死 provider 的模型名：换 provider 或模型只在网关里改。默认模型还没
   配好时，签发照常成功，请求得到网关自己的错误，插件如实显示，不换用别的模型。
 - 凭据默认可以用网关里的所有模型：插件和网关在同一台机器上，能访问就该能用。凭据由核心自动签发和注入，
-  插件不用配置，作用是按插件记账和单独吊销。要限定某个插件能用的模型、设额度或限定账号，主人在网关自己的
+  插件不用配置，作用是按插件记账和单独吊销。要限定某个插件能用的模型、设额度或限定账号，用户在网关自己的
   网页里改；核心不同步这些设置。
 - 网关没装或没就绪时，安装失败（`models_unavailable`）并说明是网关的原因，不注入半套变量。
 
 > **已定：凭据默认可以用所有模型**。没选的方案是只允许默认模型：最小权限、花费
-> 可控，但需要特定模型（如视觉模型）的插件要主人去网关里放开。
+> 可控，但需要特定模型（如视觉模型）的插件要用户去网关里放开。
 
 ### 提供方（`provides.models`）
 
@@ -589,7 +595,7 @@ provider 的 key，所以只有 `kind: system` 的官方插件可以声明。
   凭据（`<插件 id>/<Bot 名>`，默认 Bot 是 `default`），还有全插件一份的服务时再签发一个插件级的。核心逐项替换 argv，
   不经 shell，在 `credentials.service`（默认 `service`）的容器里以容器的默认用户执行。
 - `issue`：标准输入给出凭据的值（一行）。网关里没有这个名字的凭据时，新建一个，不限定模型；
-  已有时不改动它（主人可能调整过）。退出码 0 表示成功。
+  已有时不改动它（用户可能调整过）。退出码 0 表示成功。
 - `revoke`：删除这个名字的凭据；本来就没有也算成功。
 - 凭据的值由核心生成（32 字节随机数的十六进制）并存在密钥库。网关的数据丢了或重装了，核心用同一个值
   重新签发，使用方不用重启。
@@ -608,7 +614,7 @@ Bot 是一个 Matrix 身份加上驱动它的插件。核心没有接入 Matrix 
 安装失败（`matrix_unavailable`）。安装时核心：
 
 1. 分配 Bot 的用户名：插件 `id` 的最后一段（`agent.echo` 是 `echo`）。这个名字的账号已经存在（家人、别的插件的
-   Bot、停用的账号），或者和主人、核心的管理账号重名时，依次换成 `<名字>-2`、`<名字>-3`……JWT 登录对已有的账号
+   Bot、停用的账号），或者和用户、核心的管理账号重名时，依次换成 `<名字>-2`、`<名字>-3`……JWT 登录对已有的账号
    是直接登录进去，所以核心不登录任何已有的账号，只有这个插件记录在案的 Bot 账号能沿用。插件以
    `WONTON_MATRIX_USER_ID` 为准。
 2. 用 JWT 代 Bot 登录一台新设备，首次登录即建号；不申请刷新令牌。Tuwunel 的 `access_token_ttl`
@@ -616,22 +622,22 @@ Bot 是一个 Matrix 身份加上驱动它的插件。核心没有接入 Matrix 
    令牌，Bot 账号也没有密码。
 3. 按 `bot` 设置显示名（取中文，没有时取英文；没写 `bot.display_name` 时用 `title`）和头像（png、jpg、gif 或
    webp）。
-4. 准备 Bot 的主房间：Bot 建一个加密房间（`trusted_private_chat`，主人和 Bot 都是管理员），先不邀请主人。没有主房间
+4. 准备 Bot 的主房间：Bot 建一个加密房间（`trusted_private_chat`，用户和 Bot 都是管理员），先不邀请用户。没有主房间
    时 Hermes 会在每个新会话的第一条回复里插一段设置提示。
 5. 注入 `WONTON_MATRIX_*` 变量。
-6. 插件装好、健康检查都通过后，把主房间交给主人：核心用 JWT 临时登录主人的一台设备（主人的账号在第一次登录时才建，
-   所以先登录再邀请），Bot 邀请主人，主人加入，双方的 `m.direct` 都记着它，然后退出登录。私聊这时才出现在主人的
-   聊天列表里：早交出去的话，主人在 Bot 启动前发的话它收不到。装不上时主人那边不留私聊；交出之后才失败的（如写
-   安装记录失败），回滚时主人和 Bot 都退出这个房间。
+6. 插件装好、健康检查都通过后，把主房间交给用户：核心用 JWT 临时登录用户的一台设备（用户的账号在第一次登录时才建，
+   所以先登录再邀请），Bot 邀请用户，用户加入，双方的 `m.direct` 都记着它，然后退出登录。私聊这时才出现在用户的
+   聊天列表里：早交出去的话，用户在 Bot 启动前发的话它收不到。装不上时用户那边不留私聊；交出之后才失败的（如写
+   安装记录失败），回滚时用户和 Bot 都退出这个房间。
 
 - `WONTON_MATRIX_HOMESERVER` 是 `http://matrix.wonton.internal:<网关端口>`，核心在声明了 `matrix.bot` 的插件网络里的
   别名。网关按连接的来源地址认出请求来自哪个插件网络（不算网桥自己的地址，那是宿主那一侧），只转发声明了
   `matrix.bot` 的插件的请求，而且只转发 Matrix 客户端接口（`/_matrix/client/`、`/_matrix/media/`），管理接口和
   联邦接口不转；其他来源得到 403 `M_FORBIDDEN`。插件不和 Tuwunel 共用网络。
-- 账号和主房间建好后一直沿用：不删数据卸载后重装、安装失败后重试，都是同一个账号。Bot 还在主房间里，并且主人也在、
-  或者还没交给过主人（上次安装没装完）时沿用它；主人退出过就新建一个。设备每次安装新建，安装失败回滚时吊销。
-- 插件的容器启动时，第一次安装的主人还不在主房间里。要往主房间里发消息的插件，等主人加入（`m.room.member` 事件）
-  之后再发：之前发的消息，房间密钥没有发给主人的设备，主人解不开。
+- 账号和主房间建好后一直沿用：不删数据卸载后重装、安装失败后重试，都是同一个账号。Bot 还在主房间里，并且用户也在、
+  或者还没交给过用户（上次安装没装完）时沿用它；用户退出过就新建一个。设备每次安装新建，安装失败回滚时吊销。
+- 插件的容器启动时，第一次安装的用户还不在主房间里。要往主房间里发消息的插件，等用户加入（`m.room.member` 事件）
+  之后再发：之前发的消息，房间密钥没有发给用户的设备，用户解不开。
 - 令牌对应一台设备，核心不主动轮换。吊销设备、删掉 Bot 时令牌立即失效。核心重启时核对 Bot 的
   设备还在，被吊销了就把插件标为异常，重装（可以不删数据）重新签发；Bot 换了一台设备，要重新建加密身份。
 - 重建容器时沿用设备和令牌（升级；第一次配上或取消出网代理）。核心不单独保存令牌，它只在 Docker 的容器配置里，所以从旧容器读回：
@@ -656,7 +662,7 @@ x-wonton:
 ```
 
 - 每个 Bot 有自己的账号、令牌、主房间和模型凭据（凭据名 `<插件 id>/<Bot 名>`）。安装时核心建默认 Bot
-  `default`；主人新建 Bot 时，核心按 `bots.services` 为它再建一组容器；删掉 Bot 就删掉这组容器并吊销它的
+  `default`；用户新建 Bot 时，核心按 `bots.services` 为它再建一组容器；删掉 Bot 就删掉这组容器并吊销它的
   凭据。其余服务全插件一份。
 - 在这些服务里，`WONTON_MATRIX_*`、`WONTON_MODEL_API_KEY` 是这个 Bot 的值；`WONTON_BOT_NAME` 是 Bot 名
   （小写字母、数字和单个 `-`），`WONTON_BOT_DATA` 是 `${WONTON_APP_DATA}/bots/<Bot 名>`。
@@ -680,7 +686,7 @@ x-wonton:
 ## 工具与 MCP 总线
 
 Agent 经核心的 MCP 总线调用工具：总线把核心自己的工具和所有在运行的插件声明的工具汇总成
-一个 MCP 服务器，按调用方授权，敏感的调用先请主人确认。
+一个 MCP 服务器，按调用方授权，敏感的调用先请用户确认。
 
 ### 提供工具（`mcp`）
 
@@ -700,8 +706,8 @@ x-wonton:
   `geraldpeng6/wonton-plugin-files`）。
 - 工具在总线上叫 `<slug>__<工具名>`，如 `app-wonton-files__search_files`。核心连插件的 MCP 服务用 `initialize` 握手
   （MCP 2025-11-25）。
-- 没有标 `readOnlyHint: true`（MCP 的工具注解）的工具算敏感：总线先请主人确认，确认了才转给插件。会改数据的工具
-  不要标成只读。不会改数据的工具要标上，否则 Bot 每次调用都要主人确认。
+- 没有标 `readOnlyHint: true`（MCP 的工具注解）的工具算敏感：总线先请用户确认，确认了才转给插件。会改数据的工具
+  不要标成只读。不会改数据的工具要标上，否则 Bot 每次调用都要用户确认。
 - 工具返回的内容交给 Agent，Agent 把它当不可信输入。除了下面的文件引用，总线不改内容。
 
 **列工具**
@@ -722,8 +728,8 @@ x-wonton:
 
 **工具结果里的文件**
 
-工具结果是交给 Agent 的。Agent 没有主人的登录，打不开插件网页，也看不到共享文件夹。文件要这样返回，核心把引用换成一个编号，
-Agent 用编号调 `wonton__view_file`、`wonton__share_file`，主人的设备按链接经核心的文件服务下载。
+工具结果是交给 Agent 的。Agent 没有用户的登录，打不开插件网页，也看不到共享文件夹。文件要这样返回，核心把引用换成一个编号，
+Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备按链接经核心的文件服务下载。
 
 | 文件 | 返回 |
 | --- | --- |
@@ -764,7 +770,7 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，主人的设备�
 - 不要：
   - 返回宿主路径；
   - 用 `blob`、`image`、`audio` 塞大文件：超过 1 MiB 的块，总线换成一句说明原因的文字；
-  - 自己往聊天里发文件：发不发给主人由 Agent 决定；
+  - 自己往聊天里发文件：发不发给用户由 Agent 决定；
   - 一次返回几百个文件：一个结果最多登记 100 个，要分页。
 
 ### 使用工具（`tools`）
@@ -779,14 +785,34 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，主人的设备�
   | --- | --- | --- |
   | `wonton__list_plugins` | 否 | 已装的插件、版本、状态和网页地址；工具列不出来时带 `tools_error`。 |
   | `wonton__search_catalog` | 否 | 按关键词在官方索引里找插件：ID、名字、说明和要申请的权限。 |
-  | `wonton__install_plugin` | 是 | 按官方索引里的 ID 安装，授予它声明的全部权限。声明了高权限的插件只能由主人在 App 里装。 |
+  | `wonton__install_plugin` | 是 | 按官方索引里的 ID 安装，授予它声明的全部权限。声明了高权限的插件只能由用户在 App 里装。 |
   | `wonton__uninstall_plugin` | 是 | 卸载，`delete_data` 为真时同时删除它的数据。 |
   | `wonton__view_file` | 否 | 按文件编号返回图片预览，看不了的类型报错。 |
-  | `wonton__share_file` | 否 | 把编号指向的文件分享给主人，返回文件链接，原样放进回复。 |
+  | `wonton__share_file` | 否 | 把编号指向的文件分享给用户，返回文件链接，原样放进回复。 |
+  | `wonton__list_shares` | 否 | 列出用户的共享文件夹的名字。 |
+  | `wonton__save_file` | 按路径授权 | 把 outbox 里的文件存进共享文件夹，见下面的“Bot 存文件”。 |
 
 - 插件目录就是官方索引（见“发布与来源”）。Bot 只能装官方索引里的插件，不能装社区插件和自己写的 compose。
-- 敏感的调用会一直等到主人回答或者确认过期（10 分钟），Agent 的工具超时要比这长。确认卡片发在核心和主人的“Wonton”
-  私聊里，主人在 Wonton App 里回答。主人拒绝或者过期时工具返回错误（`isError: true`），说明原因。
+- 敏感的调用会一直等到用户回答或者确认过期（10 分钟），Agent 的工具超时要比这长。确认卡片发在核心和用户的“Wonton”
+  私聊里，用户在 Wonton App 里回答。用户拒绝或者过期时工具返回错误（`isError: true`），说明原因。
+
+**Bot 存文件**
+
+Bot 把下载好的文件存进用户的共享文件夹，用户在 Navidrome、File Browser 这些插件里就能看到。只要 `tools` 权限，不需要 `storage.share.*`，也因此读不到、列不出共享文件夹里的文件。
+
+```yaml
+services:
+  agent:
+    volumes:
+      - ${WONTON_APP_DATA}/outbox:/opt/data/outbox
+```
+
+- 插件把 `${WONTON_APP_DATA}/outbox` 挂进容器，Bot 把要存的文件放进去，再调 `wonton__save_file`。没挂的插件调用时报错。
+- 参数：`files` 是 outbox 里的相对路径，1 到 100 个；`share` 是共享文件夹的名字；`dir` 是里面的子目录，可选，没有的会建出来。绝对路径、`..`、隐藏文件和软链接都拒绝。
+- 第一次存进一个文件夹时，用户在确认卡片上选：允许这个文件夹，或者允许整个共享文件夹（目标是共享文件夹本身时没有这一项），或者拒绝。授权按路径记在插件上，包括子文件夹，之后不再问。用户可以在插件详情页撤销，卸载插件时一起清掉。调用会一直等到用户回答或者确认过期。
+- 只新增不覆盖：同名时加序号。结果的 `saved` 写每个文件最后的路径，路径可能和请求的名字不一样。
+- 卡片发出之前核心已经把文件复制走，用户确认的就是存下去的内容。存好后 outbox 里的原文件删掉；复制之后又被改过的不删。拒绝或者过期时原文件留给 Bot 处理。
+- 放不下时返回 `storage_full`，磁盘要留 5% 空闲。一批文件中途放不下时停下，前面放好的不撤回，错误里写明。
 
 ## 插件密钥（`secrets`）
 
@@ -825,6 +851,31 @@ x-wonton:
 - 核心不修改、不删除插件里的这个文件，也不注入回去。
 - 声明在 Bot 服务上时，每个 Bot 各存一份。
 
+## 对宿主的要求
+
+`requirements` 的每一项都是核心能判断的，商店和详情页逐项显示这台主机满足、不满足还是查不出来。核心只跑在 Linux 和 Docker 上，所以没有系统这一项。
+
+```yaml
+requirements:
+  arch: [amd64, arm64]
+  memory: 2G
+  gpu: { need: required, vendors: [nvidia, amd], memory: 8G }
+```
+
+| 字段 | 说明 | 核心怎么判断 |
+| --- | --- | --- |
+| `arch` | `amd64`、`arm64`。不写表示都行。 | Docker 报告的架构。 |
+| `memory` | 应用能跑起来的内存下限（官方写的最低要求，不是推荐值）。写法是数字加 `M` 或 `G`，如 `512M`、`1.5G`，1G 等于 1024M。 | 主机的总内存。标称 8G 的机器实际报出来不到 8G，所以到要求的 90% 就算够。 |
+| `gpu.need` | `required`（默认）：没有符合的显卡就装不上。`optional`：照常装，不给设备，插件自己退回 CPU。 | 见“显卡”。 |
+| `gpu.vendors` | 能用的厂商：`amd`、`nvidia`、`intel`。不写表示哪家都行。 | 驱动可用的显卡的厂商。 |
+| `gpu.memory` | 显存下限，写法同 `memory`。 | 显卡报告的显存，到要求的 90% 就算够（标称 8G 的卡实际报 8188 MiB）。集成显卡报告的够要求就算满足，不够算查不出来：划给核显的量不是它的上限。驱动不报告的算查不出来。 |
+
+- 想在自己的主机上看每条要求的判断结果：`wonton-core plugin host [插件包目录]`。
+- 不满足的项写明缺什么（“这台主机只有 1.5 GB 内存”）。有 `required` 的项不满足时插件装不了，商店和预览的 `blocked` 写着原因，安装接口也拒绝：架构和内存的错误类别是 `unsupported`，显卡是 `gpu_unavailable`。
+- `optional` 的显卡不满足时照常装，显示会退回 CPU。
+- 查不出来时如实显示，不拦安装。
+- 只在安装和预览时判断。装好后主机变了，容器自己会出错。
+
 ## 显卡（`devices.gpu`）
 
 要用显卡的插件（生图、生视频、本地模型）申请 `devices.gpu` 权限，并在 `gpu.services` 里写明哪些服务拿到显卡。
@@ -846,7 +897,7 @@ x-wonton:
   id: ai.example.comfyui
   version: 1.0.0
   kind: app
-  title: { zh: ComfyUI, en: ComfyUI }
+  title: { en: ComfyUI }
   description: { zh: 用工作流生图、生视频, en: Image and video generation with workflows }
   webui:
     service: web
@@ -856,13 +907,13 @@ x-wonton:
   permissions:
     - devices.gpu
   requirements:
-    gpu: required
+    gpu: { need: required }
 ```
 
 | 字段 | 说明 |
 | --- | --- |
 | `gpu.services` | 拿到显卡的服务，至少一项，不能重复，都要在 `services` 里。其余服务什么都不拿。 |
-| `requirements.gpu` | `required`（没写时的默认）：本机没有可用的显卡时装不上。`optional`：照常装，不给设备，插件自己退回 CPU。 |
+| `requirements.gpu` | 要什么样的显卡，见“对宿主的要求”。没写时等于 `need: required`。 |
 
 三者缺一不可：写了 `gpu` 或 `requirements.gpu` 却没申请 `devices.gpu`，或者申请了 `devices.gpu` 却没写 `gpu.services`，
 清单都不合法。
@@ -929,7 +980,7 @@ x-wonton:
 清单不合法的情况：`lan` 和 `network.lan` 只写了一个；`ports` 为空、端口为 0 或者同一端口和协议写了两次；把 `mcp`
 的 TCP 端口列进来（它只经核心访问）；同时申请了 `matrix.bot`（地址变了核心要按记录重建容器，而它不保存 Bot 的访问令牌）。
 
-- **端口开在哪里**由核心决定：默认是宿主默认路由所在网卡的私有 IPv4 主地址，主人可以在 App 的局域网设置里改选网卡或地址
+- **端口开在哪里**由核心决定：默认是宿主默认路由所在网卡的私有 IPv4 主地址，用户可以在 App 的局域网设置里改选网卡或地址
   （管理接口 `/_wonton/api/lan`），或者给核心设 `WONTON_LAN_ADDRESSES` 指定。端口只发布在这些地址上，
   从不发布到 `0.0.0.0` 或 `::`。选出的地址经 `WONTON_LAN_ADDRESSES` 交给插件，插件在自己的网页上告诉用户怎么连。
 - **选不出地址就装不上**：错误类别是 `lan_unavailable`（HTTP 422），原因写明是哪一种（没有默认路由、默认路由走的是虚拟网卡、
@@ -940,9 +991,9 @@ x-wonton:
   （关掉地址伪装的桥接网络），只把开着局域网端口的服务以网关优先级 1 接进去（`webui` 的端口要看 `lan_webui`，见“网关代登录”和“应用自带的登录”），端口发布在它上面；这些服务仍在插件网络里，
   主动连外网和局域网的其他主机仍然不通。
 - **地址变了自动跟上**：装了这类插件时，核心启动后和之后每 5 分钟检测一次。地址变了，只重建 `lan.ports` 里的服务的容器，
-  数据不动，正在用的连接会断开；选不出地址时插件标为异常，端口不改开到别的地址上，地址回来后恢复。主人改了设置也一样重建。
+  数据不动，正在用的连接会断开；选不出地址时插件标为异常，端口不改开到别的地址上，地址回来后恢复。用户改了设置也一样重建。
 - **不做发现**：核心不发 mDNS、WS-Discovery、SSDP，也不转发组播和广播，用户按地址连。
-- **身份由插件自己验证**：局域网的连接不经核心登录，用不用密钥、开不开鉴权由主人决定，核心和 `plugin check` 不拦。`webui` 的端口也可以列进来，这时连接绕过网关，没有 TLS；要不要主人打开开关见“网关代登录”和“应用自带的登录”。插件经 IPv4 地址看得到真实的客户端地址；主人选了 IPv6 地址时，
+- **身份由插件自己验证**：局域网的连接不经核心登录，用不用密钥、开不开鉴权由用户决定，核心和 `plugin check` 不拦。`webui` 的端口也可以列进来，这时连接绕过网关，没有 TLS；要不要用户打开开关见“网关代登录”和“应用自带的登录”。插件经 IPv4 地址看得到真实的客户端地址；用户选了 IPv6 地址时，
   那上面的连接由 docker-proxy 转发，插件看到的是网桥的网关地址。
 
 ## Compose 子集
@@ -1028,15 +1079,15 @@ x-wonton:
   > 应用要自动加上它。没选的方案是默认能出网（Docker、CasaOS、Umbrel 都是这样）：兼容最好，但插件不声明也能把
   > 数据发出去，只能靠审核。
 - 核心的地址：每个插件网络的最后一个可用地址留给核心，容器自动分配只用网段的前一半，核心容器重建后地址不变（`WONTON_CORE_ADDRESS`）。
-- 走代理：要走代理才能出网的主机，主人配一次代理地址，插件不用管。出口容器 `wonton-egress` 接在每个出网插件的网络上，别名 `egress.wonton.internal`，是这些网络里除核心和插件服务之外唯一的容器。连宿主时用网关地址或局域网地址都行，和不配代理时一样。
+- 走代理：要走代理才能出网的主机，用户配一次代理地址，插件不用管。出口容器 `wonton-egress` 接在每个出网插件的网络上，别名 `egress.wonton.internal`，是这些网络里除核心和插件服务之外唯一的容器。连宿主时用网关地址或局域网地址都行，和不配代理时一样。
   - 核心给声明了 `network.egress` 的插件的每个服务（`network_mode: none` 的除外）写好 `HTTP_PROXY`、`HTTPS_PROXY`、`http_proxy`、`https_proxy`、`NO_PROXY`、
-    `no_proxy` 和 `NODE_USE_ENV_PROXY=1`。地址是出口容器 `http://egress.wonton.internal:3128`，插件看不到主人的代理。`NO_PROXY` 已经包含回环、
+    `no_proxy` 和 `NODE_USE_ENV_PROXY=1`。地址是出口容器 `http://egress.wonton.internal:3128`，插件看不到用户的代理。`NO_PROXY` 已经包含回环、
     `.wonton.internal`、`auth.<基础域名>`、本插件的服务名和私有网段。没配代理时这些变量都不写。这是核心唯一直接写进容器环境的一组变量。
   - compose 里写了同名变量时以 compose 为准，写成空就是这个服务不走代理。不要写具体的代理地址：官方索引不收，换一台主机也用不了。
   - 程序不读这些变量但有自己的代理设置（SearXNG 的 `outgoing.proxies`、Java 的 `-Dhttp.proxyHost`）时，在配置里引用 `${WONTON_PROXY_URL}`。
   - 健康检查不走代理：核心改写调用 wget 和 shell 的写法，包括镜像自带的 `HEALTHCHECK`。入口脚本里的 busybox wget 不看 `no_proxy`，访问内部地址要自己加 `-Y off`。
-  - 插件网络不是信任边界：主人的代理放行私有地址时，别的出网插件能经它连到出网插件和 `--lan` 网络上的服务的任何端口。建议：应用支持密码或密钥的内部服务（数据库、Redis），用 `secrets` 生成并设上。不支持的（比如 Ollama）不因此拒收，`lan.ports` 里的端口也不在此列。
-  - 经代理出错时：403 是出口容器拒绝了这个目标（内部或私有地址走到了代理）；503 是连不上主人的代理（立刻返回是被拒绝，等 15 秒是没响应）；CONNECT 200 之后 TLS 断开是代理连不上目标。
+  - 插件网络不是信任边界：用户的代理放行私有地址时，别的出网插件能经它连到出网插件和 `--lan` 网络上的服务的任何端口。建议：应用支持密码或密钥的内部服务（数据库、Redis），用 `secrets` 生成并设上。不支持的（比如 Ollama）不因此拒收，`lan.ports` 里的端口也不在此列。
+  - 经代理出错时：403 是出口容器拒绝了这个目标（内部或私有地址走到了代理）；503 是连不上用户的代理（立刻返回是被拒绝，等 15 秒是没响应）；CONNECT 200 之后 TLS 断开是代理连不上目标。
 - 核心要求 Docker Engine 28 及以上，并且不开 `allow-direct-routing`：28 起局域网里的其他主机不能再经路由
   直接访问容器里没发布的端口（moby#48724），插件网页才真的只能经核心网关访问；`sso: proxy` 信任网关加的
   请求头，靠的就是这一点。核心启动时检查 Engine 版本，低于 28 时报错退出，不降级运行；
@@ -1051,7 +1102,7 @@ x-wonton:
   `core_upgrading`。
 - 核心在安装半路重启，或者回滚没做完，会留下没有安装记录的容器和网络。再装时核心按标签（这个插件，实例名和自己相同）
   删掉它们，吊销上次登录的 Bot 设备，然后从头装；命名卷、应用数据目录和密钥接着用。这些网络上还接着别的容器（另一套
-  核心、主人的容器）时什么都不删，拒绝安装（`conflict`）。同名的网络属于其他插件或不是核心创建的，也拒绝安装，不接管
+  核心、用户的容器）时什么都不删，拒绝安装（`conflict`）。同名的网络属于其他插件或不是核心创建的，也拒绝安装，不接管
   也不删。
 - 一台 Docker 上跑几套核心时，每套都要设自己的实例名（`WONTON_INSTANCE`）。没有实例名的两套，标签上分不出来：对方的
   核心还接在网络上时会被上面的检查挡住，已经停了的话，它的插件和数据都会被当成自己的。
@@ -1064,7 +1115,7 @@ x-wonton:
   `notices` 引用的 LICENSE、Dockerfile、源码、截图、测试）核心不取，截图只在商店的详情页里显示。
 - 发布：把清单的 `version` 改成新版本，提交，打 tag `v<version>` 推上去。tag 和清单的版本不一致时装不上。带预发布后缀的
   版本（如 `v1.2.0-beta.1`）只能按 tag 明确安装，不进商店，也不作为升级提示。发布过的 tag 不要移动：已经装上的不受
-  影响，但核心会提示主人这个 tag 被改过。
+  影响，但核心会提示用户这个 tag 被改过。
 - 插件自己的镜像由作者构建，推到公开的镜像仓库，compose 按摘要引用（`名字:标签@sha256:…`，多架构镜像写清单列表的
   摘要）。核心不构建镜像。
 - 公开仓库加上 topic `wonton-plugin`，几分钟后就出现在商店的社区插件里，标为“未审核”。想进官方商店，向官方索引提 PR
@@ -1091,7 +1142,7 @@ x-wonton:
 的输出格式；路径相对包的根目录，不带 `./`，`docker-compose.yml` 也在内。这段文字的 sha256 就是插件包摘要，写成
 `sha256:<十六进制>`。它只取决于文件的内容，和文件从哪里取、怎么打包无关；`wonton-core plugin check` 会打印它。
 
-安装和升级的预览返回摘要，安装请求必须带回同一个摘要，对不上时得到 409 `changed`：主人确认的就是装上的。
+安装和升级的预览返回摘要，安装请求必须带回同一个摘要，对不上时得到 409 `changed`：用户确认的就是装上的。
 
 ### 镜像
 
@@ -1124,13 +1175,13 @@ x-wonton:
 - `format` 是索引格式的版本，核心读不懂的格式按取不到处理，并提示升级核心。
 - 一个插件一项，`source` 和插件 ID 都不重复，商店按这里的顺序列出官方插件，标为“已审核”。`files` 是插件包的全部文件，`compose` 必须
   和 `files` 里的 `docker-compose.yml` 一致。核心按 `files` 核对取到的每个文件，所以文件可以从任何地方取（GitHub、
-  jsDelivr、核心内置的副本）。
+  jsDelivr）。
 - 条目用 `wonton-core plugin index-entry <插件包目录> github:<owner>/<repo> <提交号>` 生成，不手写：目录是那个提交的
   检出（核心不连 Git，不核对），条目的 JSON 写到标准输出；加 `--index <索引目录>` 时直接写进本地的索引目录，同一个
   来源的旧条目换掉。
-- 收录要求：`wonton-core plugin check --official` 通过，即有 `icon`、`category`、`license`、`author`、`notices`，所有服务的 `image`
+- 收录要求：`wonton-core plugin check --official` 通过，即有 `icon`、`tags`、`license`、`author`、`notices`，`description`、`tags`、`about`、`release_notes` 都写了 `zh` 和 `en`，所有服务的 `image`
   按摘要固定，长期运行的服务都有健康检查；申请的权限和插件做的事相符；镜像来自上游官方或作者可复现的构建。
-- 核心镜像内置一份索引和其中插件包的文件。开发镜像和测试用本地的索引目录代替（`WONTON_STORE_INDEX`）：`index.json`
+- 核心不内置索引，从 GitHub 取，取不到时用磁盘上次成功的那份，并说明列表是什么时候的、为什么没更新。开发镜像和测试用本地的索引目录代替（`WONTON_STORE_INDEX`）：`index.json`
   加上按 sha256 存放的文件（`blobs/<sha256 的十六进制>`）。
 
 ### 第三方索引
@@ -1169,7 +1220,7 @@ x-wonton:
 - 公开仓库、topic `wonton-plugin`、有 `v<语义化版本>` tag：核心按 GitHub 星数列出，标为“未审核”。
 - 核心读最新正式版本的 `docker-compose.yml`；没有 tag、清单解析不了的仓库不列出。官方索引里的仓库、插件 ID 和官方插件
   相同的仓库也不列出。
-- 列表缓存 10 分钟。主人可以关掉社区插件（`WONTON_STORE_COMMUNITY=off`）。
+- 列表缓存 10 分钟。用户可以关掉社区插件（`WONTON_STORE_COMMUNITY=off`）。
 
 ### 升级
 
@@ -1182,7 +1233,7 @@ x-wonton:
   “Matrix Bot”），读不到就不升，不签新设备。
 - 新版本的镜像先拉好再动旧容器，拉不下来旧版本不受影响。换容器之后新版本起不来、没通过健康检查，就回滚到旧版本的容器，
   错误里写明退回了哪个版本。
-- 新版本申请的权限和装着的不同时，主人要重新确认全部权限，新增的标出来。
+- 新版本申请的权限和装着的不同时，用户要重新确认全部权限，新增的标出来。
 - 数据迁移由应用自己在启动时做；不可逆的迁移要在 `release_notes` 里写明，回滚后旧版本可能读不了迁移过的数据。
 
 ### 开发与校验
@@ -1192,8 +1243,8 @@ x-wonton:
   - 插件包解析不了时只报这一条（和安装时报的一样）；解析得了时列出所有问题。
   - 不合格（退出码 1）：装不上的（核心还不支持的权限、渲染不了的 compose），图标或截图处理不了。
   - 提醒（退出码 0）：镜像没有按摘要固定，长期运行的服务没有健康检查，没有图标，图标的角是透明的，截图的长边不到
-    1280，横屏和竖屏的截图混在一起，`kind: system`。`--official` 时前三项也算不合格，另外要有 `category`、`license`、
-    `author`、`notices`。只看得到 compose 里写的健康检查，镜像自带的看不到。
+    1280，横屏和竖屏的截图混在一起，`kind: system`。`--official` 时前三项也算不合格，另外要有 `tags`、`license`、
+    `author`、`notices`，`description`、`tags`、`about`、`release_notes` 要写 `zh` 和 `en`。只看得到 compose 里写的健康检查，镜像自带的看不到。
   - 用法不对时退出码 2。
 - 打包：`wonton-core plugin pack <目录>` 把插件包打成 tar 写到标准输出，只有 compose 文件和它引用的文件，README、截图
   这些不在里面；解析不了时和 `check` 一样报错，退出码 1。
@@ -1205,13 +1256,13 @@ x-wonton:
 
 ## 兼容 CasaOS 应用
 
-导入 CasaOS 格式（`x-casaos`）的应用时，核心按以下规则转换，再请主人确认：
+导入 CasaOS 格式（`x-casaos`）的应用时，核心按以下规则转换，再请用户确认：
 
 - `x-casaos.title`、`description` 映射到 `title`、`description`。`x-casaos.icon` 是图片地址：核心导入时把它取下来放进
   插件包，取不到或不合法时没有图标。
 - `x-casaos.index` 与 `port_map` 映射到 `webui`。
 - `/DATA/AppData/$AppID` 下的卷映射到 `WONTON_APP_DATA`。
-- 其余宿主路径（如 `/DATA/Media`）映射到共享文件夹，并生成对应的读写权限，必须由主人确认。
+- 其余宿主路径（如 `/DATA/Media`）映射到共享文件夹，并生成对应的读写权限，必须由用户确认。
 - `network_mode: host`、`privileged`、`devices` 生成对应的高权限。
 - `ports` 去掉，网页入口改由网关提供。
 - 加上 `network.egress`：CasaOS 应用都假定能出网。
@@ -1222,12 +1273,12 @@ x-wonton:
 - 插件间依赖与通信的声明方式。
 - 官方索引的签名（minisign），签名后索引也能经镜像和国内的静态托管分发。
 - 一个仓库放多个插件（`github:<owner>/<repo>/<路径>`）。
-- 多个入口和快捷方式（`shortcuts`）、插件给主人发通知（`notify`）的写法。
+- 多个入口和快捷方式（`shortcuts`）、插件给用户发通知（`notify`）的写法。
 - `settings.schema.json` 支持的 JSON Schema 子集。
 - 插件升级时的数据迁移钩子。
 - 网关上 HTTPS 以后，插件网页地址和 OIDC 签发方地址的形式（只有 http）。
 - 共享 Bot的白名单：多个用户，而且会在运行中变化，环境变量表达不了。
-- 多 Bot 时的存储授权：共享文件夹是插件级的授权，家人的私人空间（`storage.home`）要按 Bot 的主人分别
+- 多 Bot 时的存储授权：共享文件夹是插件级的授权，家人的私人空间（`storage.home`）要按 Bot 的用户分别
   挂载。
 - `network.lan` 能不能和 `matrix.bot` 一起申请：Bot 的令牌能从旧容器读回（见“Matrix Bot”）后，地址变了也能重建。
 - 插件密钥在 App 里的查看（如应用的管理员密码）与轮换；收存的秘密在恢复数据时怎样交还插件。
