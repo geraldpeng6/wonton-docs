@@ -1,4 +1,4 @@
-# 插件规范 `x-wonton`（草案 v0.5）
+# 插件规范 `x-wonton`（草案 v0.6）
 
 > 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
@@ -27,7 +27,7 @@ services:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
 
 x-wonton:
-  spec: "0.5"
+  spec: "0.6"
   id: app.immich.photos
   version: 2.0.0
   kind: app
@@ -84,7 +84,7 @@ x-wonton:
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `tool_idle_seconds`、`tool_total_seconds`，见“工具与 MCP 总线”。 |
 | `bot` | 否 | Bot 的显示名（`display_name`，多语言）和头像（`avatar`，插件包里的文件）。只能和 `matrix.bot` 权限一起声明。 |
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
-| `agent` | `kind=agent` 时必填 | `protocol`：`matrix`（Agent 自己登录 Matrix，须声明 `matrix.bot`）或 `acp`（经 ACP 桥接入）。 |
+| `agent` | `kind=agent` 时必填 | `protocol`：`matrix`（Agent 自己登录 Matrix，须声明 `matrix.bot`）或 `acp`（经 ACP 桥接入）。可选 `login`，见“Agent 插件”。 |
 | `provides` | 否 | 向其他插件提供的能力，v0.1 只有 `models`（见“模型网关”）。只有 `kind: system` 的插件可以声明。 |
 | `gpu` | 否 | 拿到显卡的服务（`services`）。要和 `devices.gpu` 权限一起声明，见“显卡”。 |
 | `lan` | 否 | 在局域网上开放的端口（`ports`）。要和 `network.lan` 权限一起声明，见“局域网”。 |
@@ -184,7 +184,7 @@ services:
 
 | 字段 | 说明 |
 | --- | --- |
-| `spec` | 必填。清单按哪一版规范写成，字符串，如 `"0.5"`（YAML 里要加引号，不然读成数字）。没写时安装失败。核心先读它：比核心支持的版本新时安装失败（`unsupported`），提示先升级核心，不再逐项报未知字段。 |
+| `spec` | 必填。清单按哪一版规范写成，字符串，如 `"0.6"`（YAML 里要加引号，不然读成数字）。没写时安装失败。核心先读它：比核心支持的版本新时安装失败（`unsupported`），提示先升级核心，不再逐项报未知字段。 |
 | `icon` | 图标，见下节。 |
 | `screenshots` | 截图：仓库里的 PNG 或 JPEG（路径规则同插件包里的文件），1 到 6 张，按顺序显示。截图不算插件包的一部分：不参与插件包摘要，安装时不取，上传插件包时忽略；商店的详情页要显示时，核心按同一个提交去取。 |
 | `author` | 插件包的作者：`name`（必填）、`url`（HTTPS，可选）。不一定是应用的作者。 |
@@ -612,6 +612,9 @@ x-wonton:
       credentials:
         issue: [sh, /wonton/credentials.sh, issue, "{name}"]
         revoke: [sh, /wonton/credentials.sh, revoke, "{name}"]
+      providers:
+        list: [sh, /wonton/providers.sh, list]
+        save: [sh, /wonton/providers.sh, save, "{id}"]
 ```
 
 | 字段 | 必填 | 说明 |
@@ -621,6 +624,7 @@ x-wonton:
 | `default_model` | 是 | 注入给使用方的 `WONTON_MODEL_DEFAULT`。网关插件自己保证它存在，核心不认识网关的模型。 |
 | `credentials.issue`、`credentials.revoke` | 是 | 签发和吊销凭据的命令（argv，不经 shell），见下节。 |
 | `credentials.service` | 否 | 在哪个服务的容器里执行命令，默认是 `service`。 |
+| `providers.list`、`providers.save` | 否 | 列出和保存模型服务商的命令（argv，不经 shell），两个要一起写，`save` 要用 `{id}`，见“模型服务商”。在 `credentials.service` 的容器里执行。没声明时，核心只给 App 网关的网页地址，用户在网页里配置。 |
 
 同一台服务器同时只能有一个插件提供 `models`，装第二个时安装失败（`conflict`）。提供方看得到全部模型请求和
 provider 的 key，所以只有 `kind: system` 的官方插件可以声明。
@@ -646,6 +650,34 @@ provider 的 key，所以只有 `kind: system` 的官方插件可以声明。
   - 卸载使用方（删不删数据都一样）或删掉一个 Bot 时吊销，再从密钥库删除；重装是一个新值。网关已经卸载了就没有
     可吊销的；网关装着但没在运行时吊销不了，卸载如实失败。
 - 命令超时 30 秒。失败时错误里附上命令的标准错误输出，并区分“网关未就绪”和“网关拒绝”。
+
+### 模型服务商
+
+用户在 App 里选服务商、贴 key。核心不认识网关，也不存 key，只在网关的容器里执行声明的命令。
+
+`list` 超时 30 秒，退出码 0，在标准输出写一个 JSON：
+
+```json
+{
+  "presets": [{ "id": "deepseek", "title": "DeepSeek" }],
+  "configured": ["deepseek"]
+}
+```
+
+- `presets` 是网关能配的服务商。`id` 是服务商的标识，官方索引的推荐项按它对应；`title` 是厂商的名字，不分语言。
+- `configured` 是已经配好的服务商。App 只显示 `presets` 里的项，所以配好的服务商也要出现在 `presets` 里。
+- 退出码不是 0 或者输出不是这个 JSON 时，错误是 `models_unavailable`，错误里带标准错误输出。
+
+`save` 超时 60 秒。`{id}` 是服务商，必须在 `list` 的 `presets` 里，否则核心不执行，直接报 `invalid_input`。标准输入是 key 加一个换行，key 不超过 4 KiB，不含换行。已有这个服务商时换 key，没有时新建，然后向服务商测试一次。按退出码判断结果，不解析输出：
+
+| 退出码 | 含义 | 核心的错误 |
+| --- | --- | --- |
+| 0 | 保存了，测试通过 | |
+| 3 | 服务商拒绝了 key，没有保存 | `invalid_input` |
+| 4 | 连不上服务商，key 已保存 | `upstream_unavailable` |
+| 其他 | 网关自己出错 | `models_unavailable`，错误里只有退出码 |
+
+核心不把 key 写进日志和审计。
 
 ## Matrix Bot
 
@@ -832,6 +864,7 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
   | `wonton__check_plugin` | 否 | `dir` 是调用方 outbox 里的插件目录（相对路径），和 `wonton-core plugin check` 同一套校验，不装也不改。返回 `id`、`version`、`digest`、`files`（`path` 和 `bytes`）、`problems`、`warnings`；解析不了时只有 `problems`。 |
   | `wonton__plugin_status` | 否 | `id` 是已装的插件。返回 `status`、`url`，有的话带 `health`；有网页时带探测的状态码 `web_status`，探测不了时是 `web_error`。 |
   | `wonton__save_file` | 按路径授权 | 把 outbox 里的文件存进共享文件夹，见下面的“Bot 存文件”。 |
+  | `wonton__help` | 否 | Wonton 和 App 的帮助文档，见下面的“帮助文档”。 |
 
 - 插件目录就是官方索引（见“发布与来源”）。Bot 只能装官方索引里的插件，不能装社区插件和自己写的 compose。
 - 敏感的调用会一直等到用户回答或者确认过期（10 分钟）。确认卡片发在核心和用户的“Wonton”私聊里，用户在 Wonton App
@@ -857,6 +890,43 @@ services:
 - 只新增不覆盖：同名时加序号。结果的 `saved` 写每个文件最后的路径，路径可能和请求的名字不一样。
 - 卡片发出之前核心已经把文件复制走，用户确认的就是存下去的内容。存好后 outbox 里的原文件删掉；复制之后又被改过的不删。拒绝或者过期时原文件留给 Bot 处理。
 - 放不下时返回 `storage_full`，磁盘要留 5% 空闲。一批文件中途放不下时停下，前面放好的不撤回，错误里写明。
+
+**帮助文档**
+
+- 参数都可选。`topic` 是主题；不带时 `topics` 是目录，每项有 `topic`、`lang`、`title`、`summary`。带了时返回那一页：`topic`、`lang`、`title`、`summary`、`body`。不认识的主题返回 `invalid_input`，并列出可选的。`lang` 是语言，默认用用户的语言，缺时回退规则同“商店信息”。
+- 结果都带 `core_version`（读不到时是 `unknown`）、`docs_commit`、`docs_updated_days_ago`。取新文档失败时再带 `refresh_problem`，写明原因。这台核心一份文档都没有时返回 `docs_unavailable`。
+- 页面声明了 `requires_core`、`requires_app` 时目录和页面都带上；核心版本不够时页面再带 `note`。段落里写了“需要核心 ≥ x”时，Agent 拿它和 `core_version` 比。App 的版本 Agent 不知道，要问用户。
+- 文档的来源是公开的[用户文档](user/README.md)。核心镜像带一份，有更新时按官方索引的 `docs` 取，最多等 3 秒，没取完先用手头的回答。
+
+## Agent 插件
+
+`kind: agent` 的插件是一个 Bot 的驱动。`protocol: matrix` 的 Agent 自己登录 Matrix；`protocol: acp` 的由 ACP 桥接到聊天。
+
+**账号登录。** 模型默认经模型网关。Agent 官方程序能用账号登录时，在 `agent.login` 里声明，核心经引导和插件详情的接口把选项交给 App：
+
+```yaml
+x-wonton:
+  kind: agent
+  agent:
+    protocol: acp
+    login:
+      - id: chatgpt
+        title: { zh: ChatGPT 账号, en: ChatGPT account }
+  permissions: [network.egress]
+```
+
+- `id` 在插件内唯一，由小写字母、数字和单个连字符组成。`title` 是多语言文本。
+- 声明了 `login` 的插件必须申请 `network.egress`：账号登录后，模型请求直接发给官方，不经过网关。
+- 登录在官方程序里完成，不要把账号的凭据交给网关或别的程序。登录态放在数据目录里，容器重建后还在。
+- 使用前看该 Agent 的条款。有些厂商不许经第三方转发订阅，也限制使用它的名字和标志。
+
+**帮助 skill。** 官方 Agent 插件要带 [`skills/wonton-help`](skills/wonton-help/SKILL.md)，放进这个 Agent 读 skill 的目录。不带时用户问 Wonton 的用法，Agent 不一定想得到调 `wonton__help`：
+
+| Agent | 目录 |
+| --- | --- |
+| Hermes | `$HERMES_HOME/skills` |
+| Claude Code | `~/.claude/skills` |
+| Codex、OpenClaw、omp、Gemini CLI、OpenCode、Kimi Code 和其他读 Agent Skills 共用目录的 | `~/.agents/skills` |
 
 ## 插件密钥（`secrets`）
 
@@ -1241,7 +1311,28 @@ x-wonton:
       },
       "compose": "<docker-compose.yml 的原文>"
     }
-  ]
+  ],
+  "onboarding": {
+    "agents": ["com.nousresearch.hermes"],
+    "needs": [
+      {
+        "id": "photos",
+        "title": { "zh": "备份照片", "en": "Back up photos" },
+        "plugins": ["app.immich.immich"]
+      }
+    ],
+    "providers": {
+      "zh": [{ "id": "deepseek", "key_url": "https://platform.deepseek.com/api_keys" }],
+      "en": [{ "id": "openrouter", "key_url": "https://openrouter.ai/keys" }]
+    },
+    "prompts": [{ "zh": "你能帮我做什么", "en": "What can you help me with" }]
+  },
+  "docs": {
+    "source": "github:geraldpeng6/wonton-docs",
+    "commit": "<40 位提交号>",
+    "min_core": "0.9.0",
+    "files": { "user/zh/devices.md": "<sha256 的十六进制>" }
+  }
 }
 ```
 
@@ -1249,6 +1340,8 @@ x-wonton:
 - 一个插件一项，`source` 和插件 ID 都不重复，商店按这里的顺序列出官方插件，标为“已审核”。`files` 是插件包的全部文件，`compose` 必须
   和 `files` 里的 `docker-compose.yml` 一致。核心按 `files` 核对取到的每个文件，所以文件可以从任何地方取（GitHub、
   jsDelivr）。
+- `onboarding` 是 App 的新用户引导用的清单，四个键都要有。`agents` 是可选的 Agent，按顺序列出，不在这份索引里或者不是 `kind: agent` 的跳过；`needs` 是用户能选的需求和对应的插件，不在这份索引里的插件跳过；`providers` 是按语言推荐的模型服务商和拿 key 的地址，网关 `presets` 里没有的不显示；`prompts` 是第一次聊天时给用户点的问题。这个键读不懂只影响引导，不影响商店。
+- `docs` 是帮助文档的版本。`source` 不带版本，`files` 最多 500 个文件。核心按 `commit` 取 `files` 列出的文件，全部核对通过后才换用。`min_core` 比这台核心新时不换，继续用手头的。这个键读不懂只影响帮助文档。
 - 条目用 `wonton-core plugin index-entry <插件包目录> github:<owner>/<repo> <提交号>` 生成，不手写：目录是那个提交的
   检出（核心不连 Git，不核对），条目的 JSON 写到标准输出；加 `--index <索引目录>` 时直接写进本地的索引目录，同一个
   来源的旧条目换掉。
