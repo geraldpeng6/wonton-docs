@@ -470,7 +470,7 @@ x-wonton:
 | `network.lan` | 高 | 在局域网上开放 `lan.ports` 列出的端口，见“局域网”。 |
 | `devices.gpu` | 高 | 使用显卡，见“显卡”。 |
 | `devices.<路径>` | 高 | 访问宿主设备，路径只能是 `/dev/net/tun` 或 `/dev/fuse`，如 `devices./dev/net/tun`。 |
-| `network.host` | 很高 | 使用宿主网络：能访问本机所有端口，开的端口出现在本机所有网卡上。 |
+| `network.host` | 很高 | 使用宿主网络：能访问本机所有端口，开的端口直接开在本机的网卡上，开在哪些网卡上由应用决定。 |
 | `cap.<能力>` | 很高或最高 | 给服务增加 Linux capability，如 `cap.NET_ADMIN`。`NET_ADMIN`、`NET_RAW`、`NET_BIND_SERVICE`、`SYS_TIME`、`SYS_NICE`、`IPC_LOCK` 是很高，其余都是最高。 |
 | `host.pid`、`host.ipc` | 最高 | 共享宿主的进程空间或 IPC。 |
 | `security.opt` | 最高 | 修改容器的安全选项。 |
@@ -1193,7 +1193,7 @@ x-wonton:
 - 命名卷在 Docker 里叫 `wonton-<slug>--<卷名>`。同名卷已存在时：属于本插件（上次卸载时保留的数据）就
   直接复用；属于其他插件或不是核心创建的，拒绝安装。安装失败回滚时只删除本次新建的卷，保留的卷不删。
 - 高权限字段按服务生效，必须和 `x-wonton.permissions` 里的权限一一对应：
-  - `network_mode: host` 对应 `network.host`。这个服务不能出现在 `lan.ports` 里；`webui` 指向它时要写健康检查，不能用 `sso: proxy`。
+  - `network_mode: host` 对应 `network.host`。这个服务不能出现在 `lan.ports` 里；`webui` 指向它时要写健康检查，不能用 `sso: proxy`。`webui` 或 `mcp` 指向它时，应用要能从 `127.0.0.1:<端口>` 连上：核心给每个入口加一个中继容器（服务名 `relay-webui`、`relay-mcp`，插件自己不要用这两个名字），经 `${WONTON_APP_DATA}/relay` 里的 unix 套接字转发到这个端口，插件不要往这个目录里放东西。
   - `cap_add` 的每个值对应 `cap.<能力>`。
   - `devices` 对应 `devices.<路径>`，写成 `源:目标[:权限]`，源只能是 `/dev/net/tun` 或 `/dev/fuse`，目标是绝对路径，权限由 `r`、`w`、`m` 组成。显卡不写在这里，由核心按 `gpu.services` 交给服务（见“显卡”）。
   - `pid: host`、`ipc: host` 对应 `host.pid`、`host.ipc`，这两个字段只接受 `host`。
@@ -1267,7 +1267,7 @@ x-wonton:
   > 数据发出去，只能靠审核。
 - 核心的地址：每个插件网络的最后一个可用地址留给核心，容器自动分配只用网段的前一半，核心容器重建后地址不变（`WONTON_CORE_ADDRESS`）。
 - 走代理：要走代理才能出网的主机，用户配一次代理地址，插件不用管。出口容器 `wonton-egress` 接在每个出网插件的网络上，别名 `egress.wonton.internal`，是这些网络里除核心和插件服务之外唯一的容器。连宿主时用网关地址或局域网地址都行，和不配代理时一样。
-  - 核心给声明了 `network.egress` 的插件的每个服务（`network_mode: none` 的除外）写好 `HTTP_PROXY`、`HTTPS_PROXY`、`http_proxy`、`https_proxy`、`NO_PROXY`、
+  - 核心给声明了 `network.egress` 的插件的每个服务（写了 `network_mode` 的除外：`none` 不出网，`host` 走宿主自己的路由，不经出口容器）写好 `HTTP_PROXY`、`HTTPS_PROXY`、`http_proxy`、`https_proxy`、`NO_PROXY`、
     `no_proxy` 和 `NODE_USE_ENV_PROXY=1`。地址是出口容器 `http://egress.wonton.internal:3128`，插件看不到用户的代理。`NO_PROXY` 已经包含回环、
     `.wonton.internal`、`auth.<基础域名>`、本插件的服务名和私有网段。没配代理时这些变量都不写。这是核心唯一直接写进容器环境的一组变量。
   - compose 里写了同名变量时以 compose 为准，写成空就是这个服务不走代理。不要写具体的代理地址：官方索引不收，换一台主机也用不了。
@@ -1282,7 +1282,7 @@ x-wonton:
   `allow-direct-routing` 经 Engine API 查不到，由安装器保证。
 - 插件之间默认互不可达；需要互通时在清单里声明依赖（待定）。
 - 插件不向宿主暴露端口，只有 `network.lan` 的插件把 `lan.ports` 列出的端口发布在局域网地址上（见“局域网”）；
-  网页一律经核心网关访问。声明 `network.host` 的服务例外：它用宿主网络，端口由应用自己监听在宿主的所有网卡上，本机开着防火墙时局域网设备连不进来，要用户自己放行。
+  网页一律经核心网关访问。声明 `network.host` 的服务例外：它用宿主网络，端口由应用自己开在宿主上。只监听 `127.0.0.1` 时局域网绕不过网关；监听所有网卡时局域网设备也能直连，本机开着防火墙时连不进来，要用户自己放行。网关和 MCP 总线经中继连它，不用改防火墙。核心装好后直连一次网页端口，连不上时详情页提示局域网设备可能连不进来，只监听 `127.0.0.1` 的应用也可能看到这条提示。
 - 插件的容器、网络和卷都带标签 `wonton.plugin=<id>`，卸载时据此清理；卸载时选择删除数据才会删除
   命名卷、应用数据目录和插件密钥，共享文件夹永不删除。
 - 安装和卸载不随请求取消：请求断了（手机切网、隧道断开），操作照样做完，结果看插件列表里的状态。同一个插件正在
