@@ -381,7 +381,7 @@ webui:
 
 `sso: proxy` 至少写一项头或 Cookie。
 值模板里可以用 `{user}`（用户名，同 OIDC 的 `preferred_username`）、`{name}`、`{email}`，以及
-`{secret:<名字>}`，其余文字原样保留，如 `"Bearer {secret:api_token}"`；`{`、`}` 只能用来写占位符。用户没配邮箱时，
+`{secret:<名字>}`，其余文字原样保留，如 `"Bearer {secret:api_token}"`；`{`、`}` 只能用来写占位符。用户没填邮箱时，
 用了 `{email}` 的插件装不上。
 
 上游没有可信代理白名单（对所有来源都信任 `Remote-User` 这类头）时，申请了 `network.egress` 的插件
@@ -461,7 +461,7 @@ webui:
 | `WONTON_OIDC_AUTH_URL`、`WONTON_OIDC_TOKEN_URL`、`WONTON_OIDC_USERINFO_URL` | `webui.sso: oidc` | 各端点地址，给不支持发现文档的应用（如 Grafana）。 |
 | `WONTON_CORE_ADDRESS` | `webui.sso: proxy` | 核心在这个插件网络里的地址（网段的最后一个可用地址，如 `172.18.255.254`），核心容器重建后不变。写进应用的“信任的代理地址”，见“网关代登录”。 |
 | `WONTON_OWNER_NAME` | `owner.identity` | 用户的用户名，装好后不变，和 OIDC 的 `sub`、`preferred_username` 以及代登录模板的 `{user}` 同值，见下文。 |
-| `WONTON_OWNER_EMAIL` | 同上，且用户配了邮箱 | 用户的邮箱，和 OIDC 的 `email`、代登录模板的 `{email}` 同值。值是建容器时的快照，见下文。 |
+| `WONTON_OWNER_EMAIL` | 同上，且用户填了邮箱 | 用户的邮箱，和 OIDC 的 `email`、代登录模板的 `{email}` 同值。值是建容器时的快照，见下文。 |
 | `WONTON_MODEL_BASE_URL` | `models` | 模型网关 OpenAI 兼容接口的地址，以 `/v1` 结尾，如 `http://models.wonton.internal:8080/v1`。 |
 | `WONTON_MODEL_ANTHROPIC_BASE_URL`、`WONTON_MODEL_GEMINI_BASE_URL` | `models`，且网关提供该接口 | Anthropic Messages、Gemini 接口的地址，按各自 SDK 的约定不带 `/v1`。 |
 | `WONTON_MODEL_API_KEY` | `models` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。 |
@@ -487,8 +487,10 @@ webui:
 - 用户名是固定 ID，装好后不变，插件不用处理它变化的情况。它只含小写字母、数字、`_` 和 `-`，以字母开头，最长 32 个
   字符，不是常见的系统用户名，可以直接用来建系统账号；镜像里自带的用户（`postgres`、`node`）可能重名，要插件自己
   处理。应用按用户名或 OIDC 的 `sub` 认人，不要按邮箱认：邮箱会变。
-- 用户没配邮箱时不注入 `WONTON_OWNER_EMAIL`，OIDC 也没有 `email` 声明。应用非要邮箱时写 `${WONTON_OWNER_EMAIL:?}`，
-  插件这时装不上，错误写明“用户还没配邮箱”和怎么配：OIDC 登录要 `email` 声明的应用也这样写，不要等到登录时才失败。
+- 显示名和邮箱由用户在 App 里填，填过以后能改，不能改回没有。显示名没填时是用户名，所以 `name` 声明总有值；要显示
+  用户的名字用 `name`，不要用 `preferred_username`。
+- 用户没填邮箱时不注入 `WONTON_OWNER_EMAIL`，OIDC 也没有 `email` 声明。应用非要邮箱时写 `${WONTON_OWNER_EMAIL:?}`，
+  App 的安装页这时让用户先填邮箱，填好才能装：OIDC 登录要 `email` 声明的应用也这样写，不要等到登录时才失败。
   能没有邮箱的写 `${WONTON_OWNER_EMAIL:-}`。
 - 用户改了邮箱或显示名之后，OIDC 声明和代登录的请求头马上换成新值，容器里的 `WONTON_OWNER_EMAIL`
   还是旧值：核心重启只核对插件容器，不重建。升级或重装（可以不删数据）时新建的容器才拿到新值；局域网地址变化只重建
