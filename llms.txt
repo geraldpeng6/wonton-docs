@@ -1,0 +1,15 @@
+# Wonton
+
+> Wonton 是自托管的家庭服务器和手机 App。功能都是插件：一个带 `x-wonton` 清单的 `docker-compose.yml`。
+
+## 写插件
+
+- [Agent 的说明](https://raw.githubusercontent.com/geraldpeng6/wonton-docs/main/skills/wonton-plugin/SKILL.md)：从需求到装好的步骤、禁区和常见报错，Agent Skills 格式
+- [插件规范](https://raw.githubusercontent.com/geraldpeng6/wonton-docs/main/plugin-spec.md)：全部字段和约定
+- [最小例子：静态页](https://github.com/geraldpeng6/wonton-docs/tree/main/skills/wonton-plugin/assets/static)
+- [最小例子：带后端](https://github.com/geraldpeng6/wonton-docs/tree/main/skills/wonton-plugin/assets/backend)
+
+## 可选
+
+- [插件模板](https://github.com/geraldpeng6/wonton-plugin-template)：电脑上有 Docker 时用，带开发环境和发布脚本
+- [官方索引](https://github.com/geraldpeng6/wonton-store)：官方商店收录的插件
