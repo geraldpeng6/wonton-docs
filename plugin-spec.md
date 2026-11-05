@@ -860,7 +860,7 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
   | `wonton__search_catalog` | 否 | 按关键词在官方索引里找插件：ID、名字、说明和要申请的权限。 |
   | `wonton__install_plugin` | 是 | `id` 和 `dir` 必须且只能给一个。`id`：按官方索引里的 ID 安装，授予它声明的全部权限。`dir`：装或更新自己写的插件，见“Agent 写插件”。高权限也走确认卡片，醒目标出；最高级权限多一张确认卡，两张都过才装。 |
   | `wonton__uninstall_plugin` | 是 | 卸载，`delete_data` 为真时同时删除它的数据。 |
-  | `wonton__view_file` | 否 | 按文件编号返回图片预览，看不了的类型报错。 |
+  | `wonton__view_file` | 否 | 按文件编号看文件：图片返回缩小的预览；文本文件（按内容判断：能按 UTF-8 解、没有 NUL 字节，不只看 MIME）返回开头最多 64 KiB 的内容，截断时写明文件总大小。PDF 等其他二进制报错，这类读不了内容。 |
   | `wonton__share_file` | 否 | 把编号指向的文件分享给用户，返回文件链接，原样放进回复。 |
   | `wonton__list_shares` | 否 | 列出用户的共享文件夹的名字。 |
   | `wonton__plugin_guide` | 否 | 写插件的说明和两个最小例子。返回 `spec_version`（这台核心支持的规范版本）、`guide` 和 `examples`。 |
