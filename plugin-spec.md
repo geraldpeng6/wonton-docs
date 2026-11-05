@@ -457,29 +457,32 @@ x-wonton:
 
 ## 权限
 
-| 权限 | 含义 |
-| --- | --- |
-| `storage.share.<名称>:read` / `:write` | 读或写某个共享文件夹，如 `photos`、`documents`、`music`、`downloads`。设备上传的文件在 `transfers` 里。 |
-| `storage.home:read` / `:write` | 读或写当前用户的私人空间。 |
-| `models` | 访问模型网关（magpie），见“模型网关”。 |
-| `tools` | 经核心的 MCP 总线调用核心和其他插件的工具，见“工具与 MCP 总线”。 |
-| `matrix.bot` | 以 Bot 身份收发消息，见“Matrix Bot”。 |
-| `notify` | 给用户发通知。 |
-| `owner.identity` | 知道用户的用户名和邮箱，见“安装时注入的变量”。 |
-| `network.egress` | 能访问外网，也能访问用户的局域网，安装确认按这句写。见“网络”。 |
-| `network.lan` | 在局域网上开放 `lan.ports` 列出的端口，见“局域网”。高权限。 |
-| `network.host` | 使用宿主网络。高权限，不开放。 |
-| `devices.gpu` | 使用显卡，见“显卡”。高权限。 |
-| `devices.<路径>` | 访问宿主设备，如 USB。高权限，不开放。 |
-| `docker.socket` | 访问 Docker socket。最高权限，不开放。 |
+| 权限 | 风险级别 | 含义 |
+| --- | --- | --- |
+| `storage.share.<名称>:read` / `:write` | — | 读或写某个共享文件夹，如 `photos`、`documents`、`music`、`downloads`。设备上传的文件在 `transfers` 里。 |
+| `storage.home:read` / `:write` | — | 读或写当前用户的私人空间。 |
+| `models` | — | 访问模型网关，见“模型网关”。 |
+| `tools` | — | 经核心的 MCP 总线调用核心和其他插件的工具，见“工具与 MCP 总线”。 |
+| `matrix.bot` | — | 以 Bot 身份收发消息，见“Matrix Bot”。 |
+| `notify` | — | 给用户发通知。 |
+| `owner.identity` | — | 知道用户的用户名和邮箱，见“安装时注入的变量”。 |
+| `network.egress` | — | 能访问外网，也能访问用户的局域网，安装确认按这句写。见“网络”。 |
+| `network.lan` | 高 | 在局域网上开放 `lan.ports` 列出的端口，见“局域网”。 |
+| `devices.gpu` | 高 | 使用显卡，见“显卡”。 |
+| `devices.<路径>` | 高 | 访问宿主设备，路径只能是 `/dev/net/tun` 或 `/dev/fuse`，如 `devices./dev/net/tun`。 |
+| `network.host` | 很高 | 使用宿主网络：能访问本机所有端口，开的端口出现在本机所有网卡上。 |
+| `cap.<能力>` | 很高或最高 | 给服务增加 Linux capability，如 `cap.NET_ADMIN`。`NET_ADMIN`、`NET_RAW`、`NET_BIND_SERVICE`、`SYS_TIME`、`SYS_NICE`、`IPC_LOCK` 是很高，其余都是最高。 |
+| `host.pid`、`host.ipc` | 最高 | 共享宿主的进程空间或 IPC。 |
+| `security.opt` | 最高 | 修改容器的安全选项。 |
+| `privileged` | 最高 | 以 Docker 特权模式运行服务。 |
+| `docker.socket` | 最高 | 访问 Docker socket，等于把主机的 root 交给插件。 |
 
-高权限在安装确认时单独醒目展示。插件不声明的能力一律不给。安装请求必须逐项确认清单里的全部权限，
-少一项或多一项都拒绝安装。
+- 高权限和对应的 Compose 字段必须成对出现（见“Compose 子集”）：只写一边时清单不合法，错误写明缺少哪一项。插件不声明的能力一律不给。
+- 风险级别和给用户看的提示由核心决定，安装确认时醒目展示。插件改不了。
+- `kind: agent`，或者声明了 `matrix.bot`、`bots` 的插件，不能申请很高和最高级权限。
+- 安装请求必须逐项确认清单里的全部权限，少一项或多一项都拒绝安装。
 
-核心兑现 `storage.share.*`、`network.egress`（见“网络”）、`network.lan`（见“局域网”）、`models`（见“模型网关”）、
-`matrix.bot`（见“Matrix Bot”）、`tools`（见“工具与 MCP 总线”）、`owner.identity` 和 `devices.gpu`（见“显卡”）。共享文件夹在数据目录的 `shares/<名称>` 下，
-只授权读时必须以 `:ro` 挂载，而且只能整个挂载，不能挂其中的子路径。其余权限清单里可以声明，
-但安装时如实报“尚未支持”。
+核心兑现上表除了 `storage.home:*` 和 `notify` 的全部权限。这两项清单里可以声明，但安装时如实报“尚未支持”。共享文件夹在数据目录的 `shares/<名称>` 下，只授权读时必须以 `:ro` 挂载，而且只能整个挂载，不能挂其中的子路径。
 
 ## 安装时注入的变量
 
@@ -1039,7 +1042,7 @@ x-wonton:
 | AMD、Intel 等开源驱动的显卡（有 DRM 渲染节点） | 设备 `/dev/dri`（整个目录）；有 KFD（amdgpu 的 ROCm 计算接口）时还有 `/dev/kfd`。容器加入这些设备节点所属的组（宿主 `video`、`render` 组的 GID），以非 root 用户运行的服务才开得了设备。 |
 | NVIDIA 官方驱动 | Docker 的 `DeviceRequests`（同 `docker run --gpus all`），由宿主上的 NVIDIA Container Toolkit 把全部 NVIDIA 显卡和驱动库放进容器。 |
 
-- 两种显卡都有时都给。核心只给显卡本身：没有 `privileged`、`cap_add`、`security_opt`、`ipc: host`；要大一点的共享内存
+- 两种显卡都有时都给。核心只给显卡本身；`privileged`、`cap_add`、`security_opt`、`ipc: host` 要分别声明权限；要大一点的共享内存
   写 `shm_size`。
 - 有没有可用的显卡看 sysfs 里的驱动和设备节点，不看 `nvidia-smi`、`rocminfo` 这类命令装没装。`required` 的插件装不上时
   错误类别是 `gpu_unavailable`（HTTP 422），原因分清：没有找到显卡；有显卡但没有可用的驱动（没加载驱动，或者是
@@ -1146,15 +1149,22 @@ x-wonton:
   `unless-stopped`）、`healthcheck`、`depends_on`（含 `service_started`、`service_healthy`、
   `service_completed_successfully`）、`user`、`working_dir`、`labels`（`wonton.` 前缀保留给核心）、
   `hostname`、`expose`、`init`、`read_only`、`shm_size`、`tmpfs`、`stop_signal`、`stop_grace_period`、
-  `pull_policy`（默认 `missing`）、`network_mode`（只接受 `none`），以及 `x-` 扩展字段。`image` 既没写
+  `pull_policy`（默认 `missing`）、`network_mode`（`none` 或 `host`）、`cap_add`、`devices`、`pid`、`ipc`、
+  `security_opt`、`privileged`，以及 `x-` 扩展字段。`image` 既没写
   标签也没写摘要时按 `latest` 拉取，和 compose 一致。
 - 卷：短语法和长语法（`bind`、`volume`、`tmpfs`）。宿主路径只能是 `${WONTON_APP_DATA}`（或其子目录）和
   已授权共享文件夹的根目录，不能含 `..`，不支持相对路径；同一插件的绑定挂载源不能嵌套（同一个目录可以挂进
   多个服务）；命名卷必须在顶层 `volumes` 声明。
 - 命名卷在 Docker 里叫 `wonton-<slug>--<卷名>`。同名卷已存在时：属于本插件（上次卸载时保留的数据）就
   直接复用；属于其他插件或不是核心创建的，拒绝安装。安装失败回滚时只删除本次新建的卷，保留的卷不删。
-- 明确拒绝并给出原因：`ports`（局域网端口写在 `lan.ports`，见“局域网”）、`network_mode`（`none` 以外的取值）、`networks`、`privileged`、
-  `devices`（显卡由核心按 `gpu.services` 交给服务，见“显卡”）、`cap_add`、`security_opt`、`pid`、`ipc`、
+- 高权限字段按服务生效，必须和 `x-wonton.permissions` 里的权限一一对应：
+  - `network_mode: host` 对应 `network.host`。这个服务不能出现在 `lan.ports` 里；`webui` 指向它时要写健康检查，不能用 `sso: proxy`。
+  - `cap_add` 的每个值对应 `cap.<能力>`。
+  - `devices` 对应 `devices.<路径>`，写成 `源:目标[:权限]`，源只能是 `/dev/net/tun` 或 `/dev/fuse`，目标是绝对路径，权限由 `r`、`w`、`m` 组成。显卡不写在这里，由核心按 `gpu.services` 交给服务（见“显卡”）。
+  - `pid: host`、`ipc: host` 对应 `host.pid`、`host.ipc`，这两个字段只接受 `host`。
+  - `security_opt` 对应 `security.opt`，`privileged: true` 对应 `privileged`。
+  - `/var/run/docker.sock:/var/run/docker.sock` 这一条卷对应 `docker.socket`，只能这样写，不能只读。
+- 明确拒绝并给出原因：`ports`（局域网端口写在 `lan.ports`，见“局域网”）、`network_mode`（`none`、`host` 以外的取值）、`networks`、
   `container_name`、`build`、`env_file`、`extends`、`links`、`external_links`、`volumes_from`，以及顶层的
   `networks`、`secrets`。
 - `environment` 里只有键没有值的写法（取宿主环境变量）不受支持。
@@ -1237,7 +1247,7 @@ x-wonton:
   `allow-direct-routing` 经 Engine API 查不到，由安装器保证。
 - 插件之间默认互不可达；需要互通时在清单里声明依赖（待定）。
 - 插件不向宿主暴露端口，只有 `network.lan` 的插件把 `lan.ports` 列出的端口发布在局域网地址上（见“局域网”）；
-  网页一律经核心网关访问。
+  网页一律经核心网关访问。声明 `network.host` 的服务例外：它用宿主网络，端口由应用自己监听在宿主的所有网卡上，本机开着防火墙时局域网设备连不进来，要用户自己放行。
 - 插件的容器、网络和卷都带标签 `wonton.plugin=<id>`，卸载时据此清理；卸载时选择删除数据才会删除
   命名卷、应用数据目录和插件密钥，共享文件夹永不删除。
 - 安装和卸载不随请求取消：请求断了（手机切网、隧道断开），操作照样做完，结果看插件列表里的状态。同一个插件正在
