@@ -901,6 +901,41 @@ services:
 - 页面声明了 `requires_core`、`requires_app` 时目录和页面都带上；核心版本不够时页面再带 `note`。段落里写了“需要核心 ≥ x”时，Agent 拿它和 `core_version` 比。App 的版本 Agent 不知道，要问用户。
 - 文档的来源是公开的[用户文档](user/README.md)。核心镜像带一份，有更新时按官方索引的 `docs` 取，最多等 3 秒，没取完先用手头的回答。
 
+### Agent 权限确认
+
+Agent 自带的工具（shell、文件这类不经 MCP 总线的）要动手之前，Agent 插件可以请用户确认。这不是 MCP 调用：`POST` 和 `WONTON_MCP_URL` 同一个地址，路径换成 `/agent/permissions`，同样要有 `tools` 权限，同样按来源地址认出调用方。
+
+```json
+{
+  "tool_call_id": "call-1",
+  "title": "运行 ls",
+  "description": "列出工作区的文件",
+  "arguments": {"command": "ls"},
+  "options": [
+    {"choice_id": "a", "kind": "allow_once", "name": "这次允许"},
+    {"choice_id": "b", "kind": "allow_always", "name": "总是允许"},
+    {"choice_id": "c", "kind": "reject_once", "name": "拒绝"}
+  ]
+}
+```
+
+- `tool_call_id`、`title`、`options` 必填且不能为空，请求体不超过 1 MiB。`description` 和 `arguments` 可选。`arguments` 会进卡片和审计，秘密要先去掉。
+- `choice_id` 由插件自己定，核心不解释，同一次请求内不能重复。`kind` 只能是 `allow_once`、`allow_always`、`reject_once`、`reject_always`；卡片上的按钮按 `options` 的顺序显示 `name`。
+- `allow_always` 的作用域归 Agent 自己，不写进核心的工具策略，也不放行 MCP 工具。
+- 没有拒绝类的选项时，核心在卡片上加一个“取消”。
+
+这是一个长请求，用户回答或者 10 分钟到期才返回，HTTP 客户端的超时要比这长：
+
+| 响应 | 含义 |
+| --- | --- |
+| `{"outcome": "selected", "choice_id": "a"}` | 用户选了这一项，包括拒绝类的选项。 |
+| `{"outcome": "cancelled"}` | 用户点了核心加的“取消”。 |
+| `{"outcome": "expired"}` | 用户没在期限内回答。 |
+
+- 请求不合法（`kind` 不认识、`options` 为空、`choice_id` 重复等）时返回 400 `invalid_input`。
+- 这个插件已经有 3 个确认在等用户时（和 MCP 工具的确认共用这个上限）返回 429 `too_many_pending`，卡片发不出去时返回 503 `confirmation_unavailable`。这两种都没有问到用户，不能当成同意。
+- 插件提前断开请求就是撤回，卡片随之作废。
+
 ## Agent 插件
 
 `kind: agent` 的插件是一个 Bot 的驱动。`protocol: matrix` 的 Agent 自己登录 Matrix；`protocol: acp` 的由 ACP 桥接到聊天。
