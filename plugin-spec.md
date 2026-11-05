@@ -1289,7 +1289,8 @@ x-wonton:
 - 走代理：要走代理才能出网的主机，用户配一次代理地址，插件不用管。出口容器 `wonton-egress` 接在每个出网插件的网络上，别名 `egress.wonton.internal`，是这些网络里除核心和插件服务之外唯一的容器。连宿主时用网关地址或局域网地址都行，和不配代理时一样。
   - 核心给声明了 `network.egress` 的插件的每个服务（写了 `network_mode` 的除外：`none` 不出网，`host` 走宿主自己的路由，不经出口容器）写好 `HTTP_PROXY`、`HTTPS_PROXY`、`http_proxy`、`https_proxy`、`NO_PROXY`、
     `no_proxy` 和 `NODE_USE_ENV_PROXY=1`。地址是出口容器 `http://egress.wonton.internal:3128`，插件看不到用户的代理。`NO_PROXY` 已经包含回环、
-    `.wonton.internal`、`auth.<基础域名>`、本插件的服务名和私有网段。没配代理时这些变量都不写。这是核心唯一直接写进容器环境的一组变量。
+    `.wonton.internal`、`auth.<基础域名>`、本插件的服务名和 IPv4 私有网段（10/8、100.64/10、169.254/16、172.16/12、192.168/16；IPv6 网段条目会把
+    httpx 这类读了 `NO_PROXY` 的客户端建连接时弄崩，所以不写）。没配代理时这些变量都不写。这是核心唯一直接写进容器环境的一组变量。
   - compose 里写了同名变量时以 compose 为准，写成空就是这个服务不走代理。不要写具体的代理地址：官方索引不收，换一台主机也用不了。
   - 程序不读这些变量但有自己的代理设置（SearXNG 的 `outgoing.proxies`、Java 的 `-Dhttp.proxyHost`）时，在配置里引用 `${WONTON_PROXY_URL}`。
   - 健康检查不走代理：核心改写调用 wget 和 shell 的写法，包括镜像自带的 `HEALTHCHECK`。入口脚本里的 busybox wget 不看 `no_proxy`，访问内部地址要自己加 `-Y off`。
