@@ -1,4 +1,4 @@
-# 插件规范 `x-wonton`（草案 v0.4）
+# 插件规范 `x-wonton`（草案 v0.5）
 
 > 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
@@ -27,12 +27,12 @@ services:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
 
 x-wonton:
-  spec: "0.4"
+  spec: "0.5"
   id: app.immich.photos
   version: 2.0.0
   kind: app
   title: { en: Immich }
-  description: { zh: 备份手机里的照片和视频，按人脸和内容搜索, en: Back up your photos and videos, search by face and content }
+  description: { zh: 备份手机里的照片和视频，按人脸和内容搜索, en: "Back up your photos and videos, search by face and content" }
   icon: icon.png
   screenshots: [screenshots/timeline.png, screenshots/search.png]
   author: { name: Example, url: https://example.com }
@@ -71,7 +71,7 @@ x-wonton:
 
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `spec` | 否 | 清单按哪一版规范写成，见“商店信息”。 |
+| `spec` | 是 | 清单按哪一版规范写成，见“商店信息”。 |
 | `id` | 是 | 反向域名形式，全局唯一，安装后不可修改。至少两段，每段由小写字母、数字和单个连字符组成，总长不超过 63。 |
 | `version` | 是 | 插件包版本（语义化版本），和镜像版本无关。 |
 | `kind` | 是 | `app`（普通应用）、`agent`（Agent 运行时）、`channel`（第三方 IM 渠道）、`model`（模型服务）、`system`（系统插件，仅官方，只能由安装器预装）。 |
@@ -79,7 +79,8 @@ x-wonton:
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
-| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）。 |
+| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`display`（见“底栏页面”）。 |
+| `tabs` | 否 | 能放到 App 底栏的页面，要和 `webui` 一起声明，见“底栏页面”。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `tool_idle_seconds`、`tool_total_seconds`，见“工具与 MCP 总线”。 |
 | `bot` | 否 | Bot 的显示名（`display_name`，多语言）和头像（`avatar`，插件包里的文件）。只能和 `matrix.bot` 权限一起声明。 |
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
@@ -183,7 +184,7 @@ services:
 
 | 字段 | 说明 |
 | --- | --- |
-| `spec` | 必填。清单按哪一版规范写成，字符串，如 `"0.4"`（YAML 里要加引号，不然读成数字）。没写时安装失败。核心先读它：比核心支持的版本新时安装失败（`unsupported`），提示先升级核心，不再逐项报未知字段。 |
+| `spec` | 必填。清单按哪一版规范写成，字符串，如 `"0.5"`（YAML 里要加引号，不然读成数字）。没写时安装失败。核心先读它：比核心支持的版本新时安装失败（`unsupported`），提示先升级核心，不再逐项报未知字段。 |
 | `icon` | 图标，见下节。 |
 | `screenshots` | 截图：仓库里的 PNG 或 JPEG（路径规则同插件包里的文件），1 到 6 张，按顺序显示。截图不算插件包的一部分：不参与插件包摘要，安装时不取，上传插件包时忽略；商店的详情页要显示时，核心按同一个提交去取。 |
 | `author` | 插件包的作者：`name`（必填）、`url`（HTTPS，可选）。不一定是应用的作者。 |
@@ -421,6 +422,38 @@ webui:
 
   不走单点登录的局域网服务（比如 Ollama 的 API）不适用这一节的任何规则，用不用密钥由用户决定。
 - 用 `{secret:…}` 的插件分不出是谁在用：每个能打开这个小程序的人都以同一个应用身份登录。
+
+## 底栏页面（`tabs`）
+
+有 `webui` 的插件可以声明能放到 App 底栏的页面。用户决定放哪些、什么顺序，插件和 Bot 都改不了。App 不支持这些字段时忽略它们，插件照常从“应用”打开。
+
+```yaml
+x-wonton:
+  webui:
+    service: web
+    port: 8080
+  tabs:
+    - id: feed
+      title: { zh: 动态, en: Feed }
+      icon: tabs/feed.svg
+      icon_selected: tabs/feed-fill.svg
+      path: /feed
+      layout: edge-to-edge
+      display: standard
+```
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `id` | 是 | 插件内唯一，由小写字母、数字和单个连字符组成。App 按它记住用户放了哪些页面，升级时不要改。 |
+| `title` | 是 | 多语言，`zh` 和 `en` 都要写。建议 `zh` 不超过 4 个字，`en` 不超过 8 个字母，超了 `plugin check` 提醒。 |
+| `icon` | 是 | 单色图标，插件包里的 PNG 或 SVG。只取透明通道，颜色由 App 上色，全透明或全不透明的图标不合格。SVG 的规则见“图标和截图”。 |
+| `icon_selected` | 否 | 选中时的图标，规则相同。没写时选中只靠颜色区分。 |
+| `path` | 是 | `webui` 下的路径，以 `/` 开头，不能以 `//` 开头，不能有反斜杠和控制字符。 |
+| `layout` | 否 | `inset`（默认）：页面夹在 App 的栏中间。`edge-to-edge`：页面铺满，从栏下面滚过去。 |
+| `display` | 否 | `standard`（默认）或 `fullscreen`：打开时带不带 App 的栏。 |
+
+- 一个插件最多 4 项。不申请新权限，页面能做的事不变。
+- 只有 `webui` 没有 `tabs` 的插件，全屏写在 `webui.display` 上，取值相同。用户在 App 里按页面选的优先于清单。
 
 ## 权限
 
@@ -795,6 +828,9 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
   | `wonton__view_file` | 否 | 按文件编号返回图片预览，看不了的类型报错。 |
   | `wonton__share_file` | 否 | 把编号指向的文件分享给用户，返回文件链接，原样放进回复。 |
   | `wonton__list_shares` | 否 | 列出用户的共享文件夹的名字。 |
+  | `wonton__plugin_guide` | 否 | 写插件的说明和两个最小例子。返回 `spec_version`（这台核心支持的规范版本）、`guide` 和 `examples`。 |
+  | `wonton__check_plugin` | 否 | `dir` 是调用方 outbox 里的插件目录（相对路径），和 `wonton-core plugin check` 同一套校验，不装也不改。返回 `id`、`version`、`digest`、`files`（`path` 和 `bytes`）、`problems`、`warnings`；解析不了时只有 `problems`。 |
+  | `wonton__plugin_status` | 否 | `id` 是已装的插件。返回 `status`、`url`，有的话带 `health`；有网页时带探测的状态码 `web_status`，探测不了时是 `web_error`。 |
   | `wonton__save_file` | 按路径授权 | 把 outbox 里的文件存进共享文件夹，见下面的“Bot 存文件”。 |
 
 - 插件目录就是官方索引（见“发布与来源”）。Bot 只能装官方索引里的插件，不能装社区插件和自己写的 compose。
@@ -1296,7 +1332,7 @@ x-wonton:
 - 插件间依赖与通信的声明方式。
 - 官方索引的签名（minisign），签名后索引也能经镜像和国内的静态托管分发。
 - 一个仓库放多个插件（`github:<owner>/<repo>/<路径>`）。
-- 多个入口和快捷方式（`shortcuts`）、插件给用户发通知（`notify`）的写法。
+- 快捷方式（`shortcuts`）、插件给用户发通知（`notify`）的写法。
 - `settings.schema.json` 支持的 JSON Schema 子集。
 - 插件升级时的数据迁移钩子。
 - 共享 Bot的白名单：多个用户，而且会在运行中变化，环境变量表达不了。
