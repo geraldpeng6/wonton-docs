@@ -858,18 +858,18 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
   | --- | --- | --- |
   | `wonton__list_plugins` | 否 | 已装的插件、版本、状态和网页地址；工具列不出来时带 `tools_error`。 |
   | `wonton__search_catalog` | 否 | 按关键词在官方索引里找插件：ID、名字、说明和要申请的权限。 |
-  | `wonton__install_plugin` | 是 | 按官方索引里的 ID 安装，授予它声明的全部权限。高权限也走确认卡片，用户点了就装。 |
+  | `wonton__install_plugin` | 是 | `id` 和 `dir` 必须且只能给一个。`id`：按官方索引里的 ID 安装，授予它声明的全部权限。`dir`：装或更新自己写的插件，见“Agent 写插件”。高权限也走确认卡片，醒目标出；最高级权限多一张确认卡，两张都过才装。 |
   | `wonton__uninstall_plugin` | 是 | 卸载，`delete_data` 为真时同时删除它的数据。 |
   | `wonton__view_file` | 否 | 按文件编号返回图片预览，看不了的类型报错。 |
   | `wonton__share_file` | 否 | 把编号指向的文件分享给用户，返回文件链接，原样放进回复。 |
   | `wonton__list_shares` | 否 | 列出用户的共享文件夹的名字。 |
   | `wonton__plugin_guide` | 否 | 写插件的说明和两个最小例子。返回 `spec_version`（这台核心支持的规范版本）、`guide` 和 `examples`。 |
   | `wonton__check_plugin` | 否 | `dir` 是调用方 outbox 里的插件目录（相对路径），和 `wonton-core plugin check` 同一套校验，不装也不改。返回 `id`、`version`、`digest`、`files`（`path` 和 `bytes`）、`problems`、`warnings`；解析不了时只有 `problems`。 |
-  | `wonton__plugin_status` | 否 | `id` 是已装的插件。返回 `status`、`url`，有的话带 `health`；有网页时带探测的状态码 `web_status`，探测不了时是 `web_error`。 |
+  | `wonton__plugin_status` | 否 | `id` 是已装的插件。返回 `status`、`url`，有的话带 `health`；有网页时带探测的状态码 `web_status`，探测不了时是 `web_error`。调用方写的插件还带 `logs`：每个服务（`service`）最近的日志（`text`），最多 40 行、8 KiB；取不到时是 `logs_error`。 |
   | `wonton__save_file` | 按路径授权 | 把 outbox 里的文件存进共享文件夹，见下面的“Bot 存文件”。 |
   | `wonton__help` | 否 | Wonton 和 App 的帮助文档，见下面的“帮助文档”。 |
 
-- 插件目录就是官方索引（见“发布与来源”）。Bot 只能装官方索引里的插件，不能装社区插件和自己写的 compose。
+- 插件目录就是官方索引（见“发布与来源”）。Bot 能装官方索引里的插件和自己写的插件（见“Agent 写插件”），不能装社区插件。
 - 敏感的调用会一直等到用户回答或者确认过期（10 分钟）。确认卡片发在核心和用户的“Wonton”私聊里，用户在 Wonton App
   里回答。用户拒绝或者过期时工具返回错误（`isError: true`），说明原因。
 - 用户在 App 里点了“我来操作”时，这个插件的敏感调用先停住，不发卡片也不执行，用户交还后才继续判定。这段最多 10 分钟，
@@ -1446,6 +1446,7 @@ x-wonton:
   错误里写明退回了哪个版本。
 - 新版本申请的权限和装着的不同时，用户要重新确认全部权限，新增的标出来。
 - 数据迁移由应用自己在启动时做；不可逆的迁移要在 `release_notes` 里写明，回滚后旧版本可能读不了迁移过的数据。
+- Bot 更新自己写的插件不一定要用户确认，见“Agent 写插件”。
 
 ### 开发与校验
 
@@ -1464,6 +1465,34 @@ x-wonton:
 - 模板仓库 `geraldpeng6/wonton-plugin-template` 带开发环境和检查、发布的脚本。开发环境用发布的核心镜像在本机起一套
   核心，和正式安装是同一份 compose，换掉项目名、核心的容器名（`WONTON_CORE_CONTAINER`）和实例名
   （`WONTON_INSTANCE`），几套开发环境可以共用一台 Docker，同一个插件也能同时装在几套里。
+
+### Agent 写插件
+
+用户在聊天里说想要什么，能调工具的 Agent 插件（申请了 `tools`）可以写一个插件，装到这台机器上。说明在
+[`skills/wonton-plugin`](skills/wonton-plugin/SKILL.md)，核心也经 `wonton__plugin_guide` 给同一份。
+
+1. Agent 把插件目录写在自己的 outbox（`${WONTON_APP_DATA}/outbox`，见“Bot 存文件”）。
+2. 调 `wonton__check_plugin`，`dir` 是 outbox 下的相对路径，改到没有 `problems`。这一步不打扰用户。
+3. 调 `wonton__install_plugin`，`dir` 同上。校验不过时不发卡片，返回 `invalid_input` 和全部问题。过了的话用户在确认卡片上看全部权限和镜像，批准后才装。失败时回滚，错误里带容器日志。
+4. 要改时改目录，再调一次：这次是更新，数据保留，失败回滚，版本号不用改。插件包摘要没变时返回 `invalid_input`，写明没有变化。
+
+规则：
+
+- 核心读 `dir` 时逐级不跟软链接，只收普通文件，校验和装的是读到的同一份，之后再改目录不影响正在确认的那一份。目录不会被删。
+- 核心不构建，Agent 也没有 Docker。写法只有一种：公开镜像加 `configs`，代码在插件包里，受插件包的大小限制。
+- 核心记下插件是哪个 Bot 写的。只有写它的 Bot 能更新。`dir` 里的 `id` 已被别的插件占用时返回 `invalid_input`。用户用文件升级后，插件不再归 Agent。
+- 同一个 Bot 对同一个插件再次提交时，还在等的旧卡片作废，旧调用收到“被取代”的错误。
+
+| 操作 | 确认卡片 |
+| --- | --- |
+| 第一次装 | 每次都发，高权限醒目标出，以前留下的数据和密钥也写明。最高级权限多一张。 |
+| 更新，新增了权限、局域网端口或拿到显卡的服务 | 发，只列新增的项。 |
+| 更新，申请了很高或最高级权限 | 每次都发。最高级权限多一张。 |
+| 更新，用户打开了“每次都问” | 每次都发。 |
+| 其他更新 | 不发，写审计。 |
+| 卸载 | 每次都发。 |
+
+换镜像不算新增。减少权限时按新清单授予。
 
 ## 待定问题
 
