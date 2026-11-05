@@ -999,6 +999,32 @@ x-wonton:
 - **身份由插件自己验证**：局域网的连接不经核心登录，用不用密钥、开不开鉴权由用户决定，核心和 `plugin check` 不拦。`webui` 的端口也可以列进来，这时连接绕过网关，没有 TLS；要不要用户打开开关见“网关代登录”和“应用自带的登录”。插件经 IPv4 地址看得到真实的客户端地址；用户选了 IPv6 地址时，
   那上面的连接由 docker-proxy 转发，插件看到的是网桥的网关地址。
 
+### 第三方客户端的账号（`lan.client`）
+
+要让用户把地址和账号填进第三方客户端（比如 Subsonic 播放器）的插件，写 `lan.client`。这样的账号由核心生成密码，用户不用先打开应用的网页。
+
+```yaml
+x-wonton:
+  lan:
+    ports:
+      - { service: navidrome, port: 4533 }
+    client:
+      address: "http://{host}:4533"
+      username: "{user}"
+      password: "{secret:client_password}"
+  secrets:
+    client_password: { generate: { bytes: 24 } }
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `lan.client.address` | 客户端填的地址，必须写 `{host}`，核心换成端口开着的局域网地址（IPv6 带方括号）。开在几个地址上就给几个。 |
+| `lan.client.username`、`password` | 值模板，写法和 `webui.proxy` 相同（`{user}`、`{email}`、`{secret:…}`，不能用 `{name}`）；`{secret:…}` 要引用核心生成、至少 16 字节的密钥。 |
+
+- 写了 `lan.client` 的插件，`lan.ports` 全部受开关 `lan_webui` 管：默认关，服务也不接 `--lan` 网络。
+- 开关打开后，插件详情里显示地址和账号，可以复制。详情接口只给用户本人，Bot 和其他插件拿不到。
+- 账号由插件自己在应用里建好，比如用一次性服务（见“一次性服务与首次写配置”）。用户在应用里改了密码，核心显示的不会跟着变，界面上有这句提示。
+
 ## Compose 子集
 
 核心经 Docker API 渲染插件，只接受下面的字段，其余字段一律报错：
