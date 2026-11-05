@@ -1028,6 +1028,25 @@ requirements:
 - 查不出来时如实显示，不拦安装。
 - 只在安装和预览时判断。装好后主机变了，容器自己会出错。
 
+## 资源限制
+
+普通插件什么都不用写。核心给每个服务设下面的默认值，都是防失控用的，碰不到时没有任何影响：
+
+| 字段 | 默认值 | 说明 |
+| --- | --- | --- |
+| `cpu_shares` | 512 | 只是权重：机器闲时不限速，忙时给系统让路。 |
+| `mem_limit` | 主机总内存的 80%，且不低于 `requirements.memory` | 超过时进程被系统结束。不用交换区。 |
+| `pids_limit` | 4096 | 进程和线程的总数。 |
+| `cpus` | 不限 | 硬上限，闲时也限速，一般不用写。 |
+
+要不一样时在 compose 的服务上写这些字段，再加 `mem_reservation`（内存紧张时优先保留多少，不能大于 `mem_limit`），写法和 compose 相同。插件不能要交换区。
+
+用户可以调整单个插件的内存和 CPU 上限，对它的每个服务生效，优先于 compose 写的值。
+
+- 有的主机还会给所有插件设一个总量，并留一部分内存给系统。插件不能假设一定用得到 80%。
+- 内存超限被结束时，核心记下是哪个服务。容器反复重启时插件显示为异常，原因写内存。
+- 进程数超限时 `fork` 返回错误，由插件自己报。
+
 ## 显卡（`devices.gpu`）
 
 要用显卡的插件（生图、生视频、本地模型）申请 `devices.gpu` 权限，并在 `gpu.services` 里写明哪些服务拿到显卡。
@@ -1184,6 +1203,7 @@ x-wonton:
   `unless-stopped`）、`healthcheck`、`depends_on`（含 `service_started`、`service_healthy`、
   `service_completed_successfully`）、`user`、`working_dir`、`labels`（`wonton.` 前缀保留给核心）、
   `hostname`、`expose`、`init`、`read_only`、`shm_size`、`tmpfs`、`stop_signal`、`stop_grace_period`、
+  `mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”）、
   `pull_policy`（默认 `missing`）、`network_mode`（`none` 或 `host`）、`cap_add`、`devices`、`pid`、`ipc`、
   `security_opt`、`privileged`，以及 `x-` 扩展字段。`image` 既没写
   标签也没写摘要时按 `latest` 拉取，和 compose 一致。
