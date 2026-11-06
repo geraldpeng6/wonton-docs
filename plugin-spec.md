@@ -585,6 +585,7 @@ x-wonton:
 | --- | --- | --- |
 | `WONTON_APP_ID` | 总是 | 插件 `id`。 |
 | `WONTON_APP_DATA` | 总是 | 插件私有数据目录（宿主路径）。绑定挂载的子目录由核心逐级预先创建，属主见下文；路径上有软链接或不是目录时拒绝安装。 |
+| `WONTON_SERVICE_DOMAIN` | 总是 | 这个插件在插件网络里的域名 `<slug>.wonton.internal`，如 `app-immich-photos.wonton.internal`。服务的稳定地址名是 `<服务名>.${WONTON_SERVICE_DOMAIN}`：核心连插件的网页、MCP 和内网资源都用它当 Host，上游服务做精确 Host 校验（如 Playwright MCP 的 `--allowed-hosts`）时把它写进白名单，见“网络”。 |
 | `WONTON_SHARE_<名称>` | 授权了该共享文件夹 | 共享文件夹路径（大写，`-` 换成 `_`，如 `WONTON_SHARE_PHOTOS`）。 |
 | `TZ`、`PUID`、`PGID` | 总是 | 时区与运行用户。`TZ` 是 IANA 时区名，如 `Asia/Shanghai`、`UTC`。 |
 | `WONTON_APP_URL` | 声明了 `webui` | 插件网页的公开地址，不带末尾 `/`。应用生成回调地址、外部链接时使用。 |
@@ -1385,7 +1386,10 @@ x-wonton:
 
 ## 网络
 
-- 每个插件有独立的 Docker 网络 `wonton-<slug>`，容器叫 `wonton-<slug>--<服务名>`，服务之间用服务名互访。服务名只能有小写字母、数字、`-` 和 `_`，不能含 `--`，不能以 `-` 结尾。核心加入所有插件网络并负责
+- 每个插件有独立的 Docker 网络 `wonton-<slug>`，容器叫 `wonton-<slug>--<服务名>`，服务之间用服务名互访。服务名是
+  合法的 DNS 标签：只能有小写字母、数字和 `-`，不能含 `--`，不能以 `-` 开头或结尾。每个服务在插件网络里还有一个
+  别名 `<服务名>.<slug>.wonton.internal`（如 `mcp.app-immich-photos.wonton.internal`），核心访问插件的网页、MCP
+  和内网资源时都用它当 Host；宿主网络的服务照旧走中继。别名和实例名无关：网络本来就按实例分开。核心加入所有插件网络并负责
   路由。插件之间、插件和 Tuwunel、插件和模型网关都不共用网络。开发环境的核心设了实例名（`WONTON_INSTANCE`）时，网络、
   容器和命名卷的名字在 `wonton-` 后多一段 `<实例名>--`。
 - 核心以低于默认的网关优先级（`gw_priority: -1`）接入插件网络，默认路由和发布的端口始终在核心自己的网络上。
