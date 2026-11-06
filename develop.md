@@ -245,3 +245,11 @@ docker build -t ghcr.io/<你>/<名字>:<版本> images/<名字>
 ```
 
 默认拉取策略下本机已有该镜像时可直接使用。镜像引用和核心支持范围查[镜像](plugin-spec.md#镜像)与 [Compose 子集](plugin-spec.md#compose-子集)，不把本机构建步骤写进插件安装流程。
+
+自建镜像从写好到发布分三步，每一步能证明的东西不同：
+
+1. **本机验证。** Compose 里只写标签（`ghcr.io/<你>/<名字>:<版本>`），用上面的命令在开发主机构建，再 `scripts/dev.sh install`、`smoke`。这一步证明插件在这台机器上能装能用。`scripts/check.sh` 提醒“镜像没有按摘要固定”是正常的；`--official` 因此不合格也是正常的。
+2. **交给别人审查，还没获准发布。** 别的机器拉不到你本机的镜像，审查者要自己构建。PR 说明里写清：镜像还没发布、Compose 没有摘要，构建命令（`docker build -t <镜像:标签> images/<名字>`），以及你验证时的平台（`docker version` 里的 `OS/Arch`）。不要为了让 `--official` 通过而自己推送镜像。
+3. **获准发布后。** 运行 `scripts/publish.sh`（或 GitHub Actions 的“发布”）。它构建 `linux/amd64` 和 `linux/arm64`、推送，把仓库返回的清单列表摘要写回 Compose，这时 `--official` 才能通过。
+
+摘要只能来自推送到镜像仓库后返回的结果或 `docker buildx imagetools inspect`。本机的镜像 ID（`docker images` 里的 `IMAGE ID`、`docker inspect` 的 `Id`）不是镜像仓库里的摘要，不能写成 `@sha256:…`：别人按它拉不到镜像。
