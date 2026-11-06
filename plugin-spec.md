@@ -538,8 +538,9 @@ x-wonton:
     cross_origin_isolated: true
 ```
 
-- 网关给这个插件的网页响应加 `Document-Isolation-Policy: isolate-and-credentialless`。应用自己的 COOP/COEP 照常保留。
-- iOS 和浏览器按响应头隔离。Android 的 App 在 WebView 156 及以上为声明了的插件打开隔离；更旧的 WebView 给不了，App 打开前提示用户，用户可以选“仍然打开”。应用最好有不用 `SharedArrayBuffer` 的降级。
+- 网关给这个插件的网页响应加 `Document-Isolation-Policy: isolate-and-credentialless`，应用自己带的同名头会被替换。网关自己的错误页不加。
+- 应用仍要自己发 `Cross-Origin-Opener-Policy: same-origin` 和 `Cross-Origin-Embedder-Policy: require-corp`（或 `credentialless`）：iOS 和 Safari 只看这两个头。
+- Android 的 App 在 WebView 156 及以上为声明了的插件打开隔离，没声明的插件不受影响。更旧的 WebView 给不了，App 打开前提示用户，用户可以选“仍然打开”，这时页面没有 `SharedArrayBuffer`。应用最好有不用它的降级。
 - 这一项放宽了 Android 上的安全保障：页面可能和别的网页共用渲染进程。插件详情页会写明；Agent 写的插件，安装和更新的确认卡片上也会写明，更新时新加这一项要主人确认。
 
 ## 权限
