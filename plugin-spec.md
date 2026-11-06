@@ -1282,7 +1282,7 @@ x-wonton:
 
 | 字段 | 说明 |
 | --- | --- |
-| `lan.ports[].service` | 开端口的服务，要在 `services` 里，不能写 `network_mode: none`。 |
+| `lan.ports[].service` | 开端口的服务，要在 `services` 里，不能写 `network_mode: none`，不能是写了 `network_mode: service:…` 的服务（写它借用的那个服务）。 |
 | `lan.ports[].port` | 端口号。宿主端口和容器端口相同，不做映射。 |
 | `lan.ports[].protocol` | `tcp`（默认）或 `udp`。 |
 
@@ -1342,7 +1342,7 @@ x-wonton:
   `service_completed_successfully`）、`user`、`working_dir`、`labels`（`wonton.` 前缀保留给核心）、
   `hostname`、`expose`、`init`、`read_only`、`shm_size`、`tmpfs`、`stop_signal`、`stop_grace_period`、
   `mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”）、
-  `pull_policy`（默认 `missing`）、`network_mode`（`none` 或 `host`）、`cap_add`、`devices`、`pid`、`ipc`、
+  `pull_policy`（默认 `missing`）、`network_mode`（`none`、`host` 或 `service:<服务名>`）、`cap_add`、`devices`、`pid`、`ipc`、
   `security_opt`、`privileged`，以及 `x-` 扩展字段。`image` 既没写
   标签也没写摘要时按 `latest` 拉取，和 compose 一致。
 - 卷：短语法和长语法（`bind`、`volume`、`tmpfs`）。宿主路径只能是 `${WONTON_APP_DATA}`（或其子目录）和
@@ -1350,6 +1350,16 @@ x-wonton:
   多个服务）；命名卷必须在顶层 `volumes` 声明。
 - 命名卷在 Docker 里叫 `wonton-<slug>--<卷名>`。同名卷已存在时：属于本插件（上次卸载时保留的数据）就
   直接复用；属于其他插件或不是核心创建的，拒绝安装。安装失败回滚时只删除本次新建的卷，保留的卷不删。
+- `network_mode: service:<服务名>` 让这个服务借用同一插件里另一个服务的网络（同一个网络命名空间，
+  `127.0.0.1` 互通）。上游应用只监听回环地址时，用它配一个独立的代理容器对外，不用合并镜像、不改上游源码。
+  不算高权限，不用声明权限。
+  - 被借用的服务不能再写 `network_mode`：不能链式借用，不能借用 `host` 或 `none` 的网络。
+  - 借用的服务不能写 `networks`、`ports`、`hostname`、`domainname`、`dns`、`dns_search`、`extra_hosts`、
+    `mac_address`、`expose`，写了空列表也不行：这些都由被借用的服务决定。
+  - `webui.service`、`mcp.service`、`lan.ports[].service` 写被借用的服务，端口是借用的服务在这个网络里监听的端口。
+  - 借用的服务自动依赖被借用的服务，先启动后者；被借用的服务重建时（如开关局域网访问），借用的服务跟着重建。
+  - 两个服务要么都是 Bot 服务，要么都不是。
+
 - 高权限字段按服务生效，必须和 `x-wonton.permissions` 里的权限一一对应：
   - `network_mode: host` 对应 `network.host`。这个服务不能出现在 `lan.ports` 里；`webui` 指向它时要写健康检查，不能用 `sso: proxy`。`webui` 或 `mcp` 指向它时，应用要能从 `127.0.0.1:<端口>` 连上：核心给每个入口加一个中继容器（服务名 `relay-webui`、`relay-mcp`，插件自己不要用这两个名字），经 `${WONTON_APP_DATA}/relay` 里的 unix 套接字转发到这个端口，插件不要往这个目录里放东西。
   - `cap_add` 的每个值对应 `cap.<能力>`。
@@ -1357,7 +1367,7 @@ x-wonton:
   - `pid: host`、`ipc: host` 对应 `host.pid`、`host.ipc`，这两个字段只接受 `host`。
   - `security_opt` 对应 `security.opt`，`privileged: true` 对应 `privileged`。
   - `/var/run/docker.sock:/var/run/docker.sock` 这一条卷对应 `docker.socket`，只能这样写，不能只读。
-- 明确拒绝并给出原因：`ports`（局域网端口写在 `lan.ports`，见“局域网”）、`network_mode`（`none`、`host` 以外的取值）、`networks`、
+- 明确拒绝并给出原因：`ports`（局域网端口写在 `lan.ports`，见“局域网”）、`network_mode`（`none`、`host`、`service:<服务名>` 以外的取值）、`networks`、
   `container_name`、`build`、`env_file`、`extends`、`links`、`external_links`、`volumes_from`，以及顶层的
   `networks`、`secrets`。
 - `environment` 里只有键没有值的写法（取宿主环境变量）不受支持。
@@ -1425,7 +1435,7 @@ x-wonton:
   > 数据发出去，只能靠审核。
 - 核心的地址：每个插件网络的最后一个可用地址留给核心，容器自动分配只用网段的前一半，核心容器重建后地址不变（`WONTON_CORE_ADDRESS`）。
 - 走代理：要走代理才能出网的主机，用户配一次代理地址，插件不用管。出口容器 `wonton-egress` 接在每个出网插件的网络上，别名 `egress.wonton.internal`，是这些网络里除核心和插件服务之外唯一的容器。连宿主时用网关地址或局域网地址都行，和不配代理时一样。
-  - 核心给声明了 `network.egress` 的插件的每个服务（写了 `network_mode` 的除外：`none` 不出网，`host` 走宿主自己的路由，不经出口容器）写好 `HTTP_PROXY`、`HTTPS_PROXY`、`http_proxy`、`https_proxy`、`NO_PROXY`、
+  - 核心给声明了 `network.egress` 的插件的每个服务（写了 `network_mode: none` 或 `host` 的除外：`none` 不出网，`host` 走宿主自己的路由，不经出口容器；`service:<服务名>` 照常写）写好 `HTTP_PROXY`、`HTTPS_PROXY`、`http_proxy`、`https_proxy`、`NO_PROXY`、
     `no_proxy` 和 `NODE_USE_ENV_PROXY=1`。地址是出口容器 `http://egress.wonton.internal:3128`，插件看不到用户的代理。`NO_PROXY` 已经包含回环、
     `.wonton.internal`、`auth.<基础域名>`、本插件的服务名和 IPv4 私有网段（10/8、100.64/10、169.254/16、172.16/12、192.168/16；IPv6 网段条目会把
     httpx 这类读了 `NO_PROXY` 的客户端建连接时弄崩，所以不写）。没配代理时这些变量都不写。这是核心唯一直接写进容器环境的一组变量。
