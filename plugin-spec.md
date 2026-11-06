@@ -881,7 +881,7 @@ provider 的 key，所以只有 `kind: system` 的官方插件可以声明。
 
 `/models` 和 `providers.list.configured` 只说明模型能力和已配置服务商，不证明 key 仍有效。最小补全会计费，
 不能每轮巡检发送（30 秒一次约每天 2880 次）。仅在核心启动后首轮、使用方刚安装或刚启动时各检查一次；
-服务商错误后每 5 分钟复查，恢复即停止。安装已经完成首轮检查时不重复请求；缺模型时不发补全。
+服务商错误后每 5 分钟复查，恢复即停止。安装已经完成首轮检查时不重复请求；缺模型以及缺模型后首次列出默认组时不发补全。
 请求发到 `<apis.openai>/chat/completions`：`model` 为 `default_model`，一条用户消息，`max_tokens: 1`、
 `stream: false`。预览只查模型列表，不发补全。不新增服务商专用命令，健康检查凭据沿用 `credentials.issue`、
 `credentials.revoke` 合同，与使用方凭据和用量分开。
