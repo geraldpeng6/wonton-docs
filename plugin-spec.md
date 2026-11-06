@@ -689,6 +689,10 @@ x-wonton:
       providers:
         list: [sh, /wonton/providers.sh, list]
         save: [sh, /wonton/providers.sh, save, "{id}"]
+        test: [sh, /wonton/providers.sh, test, "{id}"]
+        custom:
+          save: [sh, /wonton/providers.sh, custom-save]
+          test: [sh, /wonton/providers.sh, custom-test]
 ```
 
 | 字段 | 必填 | 说明 |
@@ -698,7 +702,10 @@ x-wonton:
 | `default_model` | 是 | 注入给使用方的 `WONTON_MODEL_DEFAULT`。网关插件自己保证它存在，核心不认识网关的模型。 |
 | `credentials.issue`、`credentials.revoke` | 是 | 签发和吊销凭据的命令（argv，不经 shell），见下节。 |
 | `credentials.service` | 否 | 在哪个服务的容器里执行命令，默认是 `service`。 |
-| `providers.list`、`providers.save` | 否 | 列出和保存模型服务商的命令（argv，不经 shell），两个要一起写，`save` 要用 `{id}`，见“模型服务商”。在 `credentials.service` 的容器里执行。没声明时，核心只给 App 网关的网页地址，用户在网页里配置。 |
+| `providers.list`、`providers.save`、`providers.test` | 声明 `providers` 时必填 | 列出、保存和只测试模型服务商的命令（非空 argv，不经 shell），三个要一起写，`save` 和 `test` 都要用 `{id}`。见“模型服务商”。没声明 `providers` 时，核心只给 App 网关的网页地址，用户在网页里配置。 |
+| `providers.custom` | 否 | 自定义模型服务商的 `save`、`test` 命令（非空 argv，不经 shell），两个要一起写，且都不能含占位符。见“模型服务商”。 |
+
+命令都在 `credentials.service`（默认 `service`）的容器里执行，以容器默认用户运行。核心不经 shell 拼接或解释 argv。
 
 同一台服务器同时只能有一个插件提供 `models`，装第二个时安装失败（`conflict`）。提供方看得到全部模型请求和
 provider 的 key，所以只有 `kind: system` 的官方插件可以声明。
@@ -742,16 +749,48 @@ provider 的 key，所以只有 `kind: system` 的官方插件可以声明。
 - `configured` 是已经配好的服务商。App 只显示 `presets` 里的项，所以配好的服务商也要出现在 `presets` 里。
 - 退出码不是 0 或者输出不是这个 JSON 时，错误是 `models_unavailable`，错误里带标准错误输出。
 
-`save` 超时 60 秒。`{id}` 是服务商，必须在 `list` 的 `presets` 里，否则核心不执行，直接报 `invalid_input`。标准输入是 key 加一个换行，key 不超过 4 KiB，不含换行。已有这个服务商时换 key，没有时新建，然后向服务商测试一次。按退出码判断结果，不解析输出：
+`save` 和 `test` 超时 60 秒。`{id}` 必须在 `list` 的 `presets` 里，否则核心不执行，直接报 `invalid_input`。
+标准输入都是 key 加一个换行；key 不能为空、不超过 4 KiB、不含回车或换行，不合格时核心不执行命令。
+已有服务商时 `save` 换 key，没有时新建，然后测试一次；`test` 只测试，成功或失败都不改变已有配置，也不留下临时配置。
+key 只经标准输入传递，不进入 argv、日志、审计或错误信息。按退出码判断结果，不解析输出：
 
 | 退出码 | 含义 | 核心的错误 |
 | --- | --- | --- |
-| 0 | 保存了，测试通过 | |
-| 3 | 服务商拒绝了 key，没有保存 | `invalid_input` |
-| 4 | 连不上服务商，key 已保存 | `upstream_unavailable` |
+| 0 | 操作成功（`save` 保存并测试通过，`test` 测试通过） | |
+| 3 | 服务商拒绝了 key | `invalid_input`；`save` 不保存，`test` 不改变配置 |
+| 4 | 连不上服务商 | `upstream_unavailable`；`save` 的说明是“key 已保存”，`test` 的说明是“什么都没保存” |
 | 其他 | 网关自己出错 | `models_unavailable`，错误里只有退出码 |
 
-核心不把 key 写进日志和审计。
+可选的 `custom.save`、`custom.test` 用来接 OpenAI 兼容的自定义服务商，超时 60 秒，不使用占位符。
+标准输入是一行紧凑 JSON 加一个换行，例如：
+
+```json
+{"base_url":"http://192.0.2.10:8080/v1","model":"example-model","key":"example-key"}
+```
+
+`custom.save` 用这些参数保存服务商并测试；名字由网关定，保存后出现在 `list` 的 `configured` 和 `presets` 里，
+使用方请求 `WONTON_MODEL_DEFAULT` 时应能用到这个模型。`custom.test` 只测试，不改变已有配置，也不留下临时配置。
+退出码和保存语义同上表，另有退出码 2 表示地址或模型名不合法（`invalid_input`）。连不上时，保存操作说明“key 已保存”，
+测试操作说明“什么都没保存”。秘密输入和错误信息的限制与 `save`、`test` 相同。
+
+核心接口：
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /_wonton/api/models/providers` | 返回按官方推荐清单筛选的服务商、拿 key 的地址、网关已配置的 `configured`（包括自定义服务商）和网页地址；`custom` 表示网关是否声明了 `providers.custom`。这不是命令 `list` 的原始 JSON。 |
+| `PUT /_wonton/api/models/providers/{id}` | 请求体 `{"key":…}`，转给 `save`。 |
+| `POST /_wonton/api/models/providers/{id}/test` | 请求体 `{"key":…}`，转给 `test`，什么都不保存。 |
+| `PUT /_wonton/api/models/custom-provider` | 请求体包含 `base_url`、`model`、`key`，转给 `custom.save`。 |
+| `POST /_wonton/api/models/custom-provider/test` | 请求体同上，转给 `custom.test`，什么都不保存。 |
+
+保存和测试成功（退出码 0）时返回 HTTP 204，没有响应体。鉴权与 `PUT /_wonton/api/models/providers/{id}` 相同，
+这些写接口的请求体上限都是 8 KiB。核心先校验自定义输入：`base_url` 不超过 2048 字节、没有 Unicode 空白，
+且能解析为 `http` 或 `https` URL；`model` 非空、不超过 200 字节、没有控制字符和 Unicode 空白；
+key 非空、不超过 4096 字节、没有 CR 或 LF。不合格是 HTTP 400 `invalid_input`，不执行命令。
+key 被拒（退出码 3）以及自定义地址或模型名不合法（退出码 2）是 HTTP 400 `invalid_input`；
+连不上服务商（退出码 4）是 HTTP 502 `upstream_unavailable`；其他命令失败是 HTTP 503 `models_unavailable`。
+网关未就绪时也报 HTTP 503 `models_unavailable`。未声明 `custom` 时，列表的 `custom` 为 `false`，
+自定义操作报 HTTP 503 `models_unavailable`。核心不保存 key。
 
 ## Matrix Bot
 
