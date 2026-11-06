@@ -597,10 +597,10 @@ x-wonton:
 | `WONTON_MODEL_ANTHROPIC_BASE_URL`、`WONTON_MODEL_GEMINI_BASE_URL` | `models`，且网关提供该接口 | Anthropic Messages、Gemini 接口的地址，按各自 SDK 的约定不带 `/v1`。 |
 | `WONTON_MODEL_API_KEY` | `models` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。 |
 | `WONTON_MODEL_DEFAULT` | `models` | 默认模型名，由网关决定（magpie 是路由组 `group/wonton-default`）。 |
-| `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，如 `http://mcp.wonton.internal:8080/mcp`。 |
+| `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，路径里带着这个 Bot 的总线令牌，如 `http://mcp.wonton.internal:8080/mcp/<令牌>`；没有 Bot 的插件不带令牌段，如 `http://mcp.wonton.internal:8080/mcp`。 |
 | `WONTON_MATRIX_HOMESERVER` | `matrix.bot` | Matrix 客户端接口的地址：核心在插件网络里的别名，如 `http://matrix.wonton.internal:8080`。 |
 | `WONTON_MATRIX_USER_ID`、`WONTON_MATRIX_ACCESS_TOKEN` | `matrix.bot` | Bot 的 Matrix 用户 ID 和访问令牌。 |
-| `WONTON_MATRIX_OWNER` | `matrix.bot` | Bot 用户的 Matrix 用户 ID，用作白名单：私人 Bot 只接受用户的指令。 |
+| `WONTON_MATRIX_ALLOWED_USERS` | `matrix.bot` | 逗号分隔的 Matrix 用户 ID，Bot 只听这些人的话（ADR-0045 的“Bot 听谁的”）：私人 Bot 是归属人，共享 Bot 是主人。家人加入、联系人批了之后名单变长，核心重建这个 Bot 的服务，沿用设备和令牌。 |
 | `WONTON_MATRIX_HOME_ROOM` | `matrix.bot` | Bot 的主房间：核心替用户建好的、和 Bot 的加密私聊，定时任务的结果发到这里。 |
 | `WONTON_SECRET_<名字>` | `secrets` 里由核心生成的项 | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
@@ -859,7 +859,8 @@ Bot 是一个 Matrix 身份加上驱动它的插件。核心没有接入 Matrix 
 
 ### 一个插件多个 Bot（`bots`）
 
-核心只发默认 Bot，家人的私人 Bot 留待以后。格式先定下，到时插件不用改结构。
+核心发安装时的默认 Bot，和主人建的共享 Bot（归全家，ADR-0045）；家人的私人 Bot 在那边的任务里接上，
+用的也是这里定下的格式。
 
 ```yaml
 x-wonton:
@@ -872,16 +873,16 @@ x-wonton:
 - 每个 Bot 有自己的账号、令牌、主房间和模型凭据（凭据名 `<插件 id>/<Bot 名>`）。安装时核心建默认 Bot
   `default`；用户新建 Bot 时，核心按 `bots.services` 为它再建一组容器；删掉 Bot 就删掉这组容器并吊销它的
   凭据。其余服务全插件一份。
-- 在这些服务里，`WONTON_MATRIX_*`、`WONTON_MODEL_API_KEY` 是这个 Bot 的值；`WONTON_BOT_NAME` 是 Bot 名
-  （小写字母、数字和单个 `-`），`WONTON_BOT_DATA` 是 `${WONTON_APP_DATA}/bots/<Bot 名>`。
+- 在这些服务里，`WONTON_MATRIX_*`、`WONTON_MODEL_API_KEY`、`WONTON_MCP_URL` 是这个 Bot 的值；`WONTON_BOT_NAME`
+  是 Bot 名（小写字母、数字和单个 `-`），`WONTON_BOT_DATA` 是 `${WONTON_APP_DATA}/bots/<Bot 名>`。
 - 隔离：Bot 服务挂载应用数据目录时只能挂自己的 `${WONTON_BOT_DATA}`，也不能用命名卷，这样一个 Bot 读不到
   别的 Bot 的记忆和凭据。
 - 依赖：Bot 服务可以依赖同一个 Bot 的服务和全插件一份的服务；全插件一份的服务不能依赖 Bot 服务。
   `webui`、`mcp`、`provides` 不能指向 Bot 服务。
 - Bot 服务在插件网络里的别名是 `<服务名>-<Bot 名>`，同一个 Bot 的服务之间也用它互访，如
   `http://sidecar-${WONTON_BOT_NAME}:8080`。
-- 全插件一份的服务引用 `WONTON_MATRIX_*` 时安装失败；引用 `WONTON_MODEL_API_KEY` 时拿到插件级的凭据
-  （凭据名是插件 `id`）。
+- 全插件一份的服务引用 `WONTON_MATRIX_*` 或 `WONTON_MCP_URL` 时安装失败；引用 `WONTON_MODEL_API_KEY` 时
+  拿到插件级的凭据（凭据名是插件 `id`）。
 - 没有 `bots` 时插件只有一个 Bot，变量对所有服务都一样。
 
 > **已定：每个 Bot 一组容器**，即上面的写法，沿用单 Bot 的变量名。隔离最好：
@@ -913,6 +914,8 @@ x-wonton:
   MCP 服务器要在镜像里自带一个转成 Streamable HTTP 的桥（如 supergateway）。
 - 工具在总线上叫 `<slug>__<工具名>`，如 `app-wonton-files__search_files`。核心连插件的 MCP 服务用 `initialize` 握手
   （MCP 2025-11-25）。
+- 总线转来的 `tools/call` 在 `_meta` 里带 `app.wonton/user`：私人 Bot 调用时是归属人的用户名，共享 Bot 不带。
+  多用户的应用按它切到这个人的数据；不认它的插件对所有人给同样的数据。
 - 没有标 `readOnlyHint: true`（MCP 的工具注解）的工具算敏感：总线先请用户确认，确认了才转给插件。会改数据的工具
   不要标成只读。不会改数据的工具要标上，否则 Bot 每次调用都要用户确认。
 - 工具返回的内容交给 Agent，Agent 把它当不可信输入。除了下面的文件引用，总线不改内容。
@@ -985,7 +988,9 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
 
 - 申请了 `tools` 的插件得到 `WONTON_MCP_URL`，以 Streamable HTTP 连接。网关按来源地址认出调用方（同“模型网关”），
   不在插件网络里的请求得到 403 `unauthenticated`，没申请 `tools` 的得到 403 `permission_denied`。
-- 申请了 `tools` 的插件看到全部工具；按 Bot 的白名单放行留待以后（一个插件多个 Bot 时，每个 Bot 另发令牌）。
+- 有 Bot 的插件（`matrix.bot`）按总线令牌认出是哪个 Bot：令牌在 `WONTON_MCP_URL` 的路径里，令牌和来源插件对不上
+  就得到 403 `unauthenticated`。没有 Bot 的工具插件按来源地址认。工具列表按 Bot：核心工具，加归属人能用的插件的
+  工具（“家人能用”的开关，见 ADR-0045）。
 - 插件装上、卸掉、恢复运行时工具列表随之变化，总线给连着的客户端发 `notifications/tools/list_changed`。
 - 核心自己的工具：
 
@@ -1038,7 +1043,7 @@ services:
 
 ### Agent 权限确认
 
-Agent 自带的工具（shell、文件这类不经 MCP 总线的）要动手之前，Agent 插件可以请用户确认。这不是 MCP 调用：`POST` 和 `WONTON_MCP_URL` 同一个地址，路径换成 `/agent/permissions`，同样要有 `tools` 权限，同样按来源地址认出调用方。
+Agent 自带的工具（shell、文件这类不经 MCP 总线的）要动手之前，Agent 插件可以请用户确认。这不是 MCP 调用：`POST` 和 `WONTON_MCP_URL` 同一个地址，路径把 `mcp/<令牌>` 换成 `agent/permissions/<令牌>`（没有 Bot 的插件是 `/agent/permissions`），同样要有 `tools` 权限，同样按来源地址和令牌认出调用方。
 
 ```json
 {
@@ -1686,7 +1691,6 @@ x-wonton:
 - 快捷方式（`shortcuts`）、插件给用户发通知（`notify`）的写法。
 - `settings.schema.json` 支持的 JSON Schema 子集。
 - 插件升级时的数据迁移钩子。
-- 共享 Bot的白名单：多个用户，而且会在运行中变化，环境变量表达不了。
 - 多 Bot 时的存储授权：共享文件夹是插件级的授权，家人的私人空间（`storage.home`）要按 Bot 的用户分别
   挂载。
 - `network.lan` 能不能和 `matrix.bot` 一起申请：Bot 的令牌能从旧容器读回（见“Matrix Bot”）后，地址变了也能重建。
