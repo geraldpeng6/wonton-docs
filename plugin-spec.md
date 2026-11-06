@@ -463,14 +463,15 @@ x-wonton:
 
 用户点胶囊的关闭：如果是手动进的全屏，回到带栏的样子，页面不重新加载；打开就全屏的页面回到进来之前的标签。
 
-全屏时页面的位置按 `layout` 算：
+全屏时页面铺满整个屏幕，谁来躲开状态栏、刘海或灵动岛、Home 条（导航栏）和胶囊，按 `layout` 分：
 
-| `layout` | 网页框 | 胶囊 |
+| `layout` | 页面内容 | 胶囊 |
 | --- | --- | --- |
-| `inset` | 在屏幕的安全区内，顶部至少让出胶囊的高度。页面不用躲刘海和 Home 条，`env(safe-area-inset-*)` 是 0 | 在顶部让出的那一条里，不盖页面 |
-| `edge-to-edge` | 铺满屏幕。写 `viewport-fit=cover`，按 `--wonton-inset-top`（胶囊下沿）和 `--wonton-inset-bottom`（Home 条）留位置 | 浮在页面上 |
+| `inset` | App 把内容留在安全区内，顶部躲开胶囊。页面什么都不用做，`env(safe-area-inset-*)` 是 0。内容够不到的屏幕边，App 用页面贴边那一行像素拉伸填满，看起来是页面延伸到了屏幕边 | 不盖页面 |
+| `edge-to-edge` | 铺满屏幕。写 `viewport-fit=cover`，按 `--wonton-inset-top`、`--wonton-inset-bottom`、`--wonton-inset-left`、`--wonton-inset-right` 留位置 | 浮在页面上，在 `--wonton-inset-top` 之上 |
 
-- 顶部那一条的颜色取页面的 `<meta name="theme-color">`，没有时用 App 的背景色。写上它，这一条和页面的顶部连成一片。
+- `inset` 的页面贴边那一行最好是纯色（固定的顶栏、底栏都算），拉伸后看不出来；图片或渐变贴边时能看出拉伸。要真正画到屏幕边，用 `edge-to-edge`。
+- 胶囊有地方时放在灵动岛旁边，不占页面；否则放在状态栏下面，`--wonton-inset-top` 是它的下沿。所以别把它当成固定值，按变量算。
 - 用 `--wonton-inset-*`，不要用 `env()`：一些 Android WebView 版本的 `env()` 值不可靠。
 - 返回：iOS 从左边缘滑动，Android 按返回键，都是先退网页历史，到头才退出全屏。页面自己用横滑手势时，别从屏幕边缘开始。
 
@@ -488,6 +489,7 @@ App 在文档开始前把下面的 CSS 变量写到根元素，同时设置 `col
 | `--border-radius-xs`、`--border-radius-md`、`--border-radius-lg`、`--border-radius-full` | 圆角 |
 | `--wonton-accent-fill`、`--wonton-accent-ink`、`--wonton-accent-ink-on-fill` | 重点色的底色、文字和图标、放在重点色上的文字 |
 | `--wonton-inset-top`、`--wonton-inset-bottom` | 栏占的高度，含安全区；全屏时见“全屏”。`inset` 布局下是 0 |
+| `--wonton-inset-left`、`--wonton-inset-right` | 左右安全区，横屏时躲刘海和圆角。`inset` 布局下是 0 |
 
 变量名只增不改。页面也可能在浏览器里打开，所以写上后备值：
 
