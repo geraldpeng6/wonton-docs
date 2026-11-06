@@ -1430,6 +1430,7 @@ x-wonton:
   | `models.wonton.internal` | `models` | 模型网关声明的服务和端口。 |
   | `matrix.wonton.internal` | `matrix.bot` | Tuwunel 的 Matrix 客户端接口。 |
   | `mcp.wonton.internal` | `tools` | 核心的 MCP 总线。 |
+  | `health.wonton.internal` | `plugins.health` | 只读的健康接口，见“插件健康探测”。 |
 
   不让声明 `models` 的插件直接加入模型网关的网络：那样这些插件彼此也连通了，还能访问网关容器的所有端口。
   经核心转发只多一跳（核心网关的 p50 约 0.27 ms），却守住了插件之间的隔离，核心也能按插件
