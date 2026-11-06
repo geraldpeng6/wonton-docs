@@ -211,6 +211,8 @@ scripts/dev.sh kit-update
 
 可选传入模板仓库的 ref，例如 `scripts/dev.sh kit-update <ref>`；省略时使用 `main`。命令先解析来源提交、获取新的 `scripts/kit.files`，再按新清单下载全部文件；全部取到才替换。取不到时退出报错，不改原有文件，不留下半套更新。更新不需要 Docker。完成后查看命令打印的 `git diff --stat`，把套件更新与插件改动一并纳入自己的审查流程。
 
+仓库是在套件出现以前从模板建的（没有 `scripts/KIT`）时，先从模板 main 复制 `scripts/dev.sh` 和 `scripts/lib.sh` 过来，再执行上面的命令。
+
 `scripts/kit.files` 列出的文件由模板维护，**不要在插件仓库中修改套件文件**；插件自定义命令另写脚本。`scripts/smoke-probes.sh` 是插件自己的钩子，不属于套件，继续在插件仓库中维护。
 
 `scripts/KIT` 用一行 40 位提交 SHA 记录套件来源。插件的 `.github/workflows/check.yml` 固定调用模板 `.github/workflows/plugin-check.yml@<同一 SHA>`；更新命令同时改写这条固定引用，使本地套件和 CI 对应同一来源提交，而不是让 CI 跟随浮动的 `main`。模板仓库是套件源头，在模板中执行更新只提示来源并退出，不执行更新；模板自己的检查使用本地工作流引用。
