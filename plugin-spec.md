@@ -81,7 +81,7 @@ x-wonton:
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`display`（见“全屏”）、`cross_origin_isolated`（见“跨源隔离”）。 |
 | `tabs` | 否 | 能放到 App 底栏的页面，要和 `webui` 一起声明，见“底栏页面”。 |
-| `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `headers`（见“提供工具”）、`tool_idle_seconds`、`tool_total_seconds`，见“工具与 MCP 总线”。 |
+| `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `headers`（见“提供工具”）、`tool_idle_seconds`、`tool_total_seconds`、`tools`（只提供列出的工具），见“工具与 MCP 总线”。 |
 | `bot` | 否 | Bot 的显示名（`display_name`，多语言）、静态头像（`avatar`）和状态头像（`avatars`：`idle`、`working`、`waiting`、`offline` 四个状态各一个文件），都是插件包里的文件。只能和 `matrix.bot` 权限一起声明，见“Matrix Bot”。 |
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
 | `agent` | `kind=agent` 时必填 | `protocol`：`matrix`（Agent 自己登录 Matrix，须声明 `matrix.bot`）或 `acp`（经 ACP 桥接入）。可选 `login`，见“Agent 插件”。 |
@@ -1038,6 +1038,7 @@ x-wonton:
       Authorization: Bearer {secret:app_token}
     tool_idle_seconds: 600    # 可选，见“工具调用的期限”
     tool_total_seconds: 1800  # 可选
+    tools: [search_files, read_file]  # 可选，只提供列出的工具
 ```
 
 - 核心经插件网络连这个服务（同网页入口），它只对核心可见；插件在运行时它的工具才出现在总线上。只说 stdio 的
@@ -1079,6 +1080,10 @@ x-wonton:
         Authorization: Bearer {secret:app_token}
   ```
 
+- `tools` 是允许列表：写了就只提供列出的工具，名字是上游的原名（不带 `<slug>__` 前缀）；不写时全部提供。至少一项、
+  不能重复，每个名字按 MCP 2025-11-25 的工具名规定校验（1–128 个字符，只有 ASCII 字母、数字、`_`、`-` 和 `.`）。
+  列表里写了但上游没有的名字：其余工具照常提供，缺哪些写在 `wonton__list_plugins` 的 `tools_error` 里；调用不在
+  列表里的工具和调用不存在的工具一样报错。
 - 没有标 `readOnlyHint: true`（MCP 的工具注解）的工具算敏感：总线先请用户确认，确认了才转给插件。会改数据的工具
   不要标成只读。不会改数据的工具要标上，否则 Bot 每次调用都要用户确认。
 - 工具返回的内容交给 Agent，Agent 把它当不可信输入。除了下面的文件引用，总线不改内容。
