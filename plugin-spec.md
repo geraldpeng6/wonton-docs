@@ -928,6 +928,7 @@ x-wonton:
 
 - 总线等一个 `tools/call` 有两个期限：空闲期限（默认 10 分钟，`tool_idle_seconds`），收到这个调用的 `notifications/progress` 就重新计时，总线的请求都带 `progressToken`；总期限（默认 30 分钟，`tool_total_seconds`），不管有没有进度。都可以声明得更长，最多一周。长的工具要么发进度，要么把两个期限都写长：只写总期限，空闲期限先到；空闲期限超过总期限（不写时按 30 分钟算）的清单不合法。
 - 到期后总线给插件发 `notifications/cancelled`，工具要尽量停下来。这时不知道工具做到了哪一步，结果算不确定，不算失败：Agent 收到 `isError: true`，`_meta` 的 `app.wonton/failure` 写明原因（`tool_timed_out`，或者 `session_replaced`、`connection_lost`、`result_too_large`）；需要确认的调用，卡片标“结果不确定”。
+- 整个回答超过 48 MiB（一条 JSON 消息的上限，和单个内容块的 1 MiB 是两回事）也算 `result_too_large`，结果不确定：大文件按“工具结果里的文件”用引用交，不要塞在回答里。
 - 请求没到插件（连接已经关了、连不上插件）不算不确定，算失败。
 - 只读的调用，Agent 发了 `notifications/cancelled` 或者关闭了会话，总线把取消传给插件。确认过的调用不跟着 Agent 走：它取消了或者关闭了会话都照样执行，结果在卡片上。
 
