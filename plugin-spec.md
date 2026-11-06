@@ -180,7 +180,7 @@ services:
 
 ## 商店信息
 
-商店、安装确认页和 App 主屏用到的信息写在清单里，随插件包按提交固定。给用户看的文字都按语言写，语言是键，如 `zh`、`en`，至少写一种。App 显示用户设置的语言；缺这种语言时回退到 `en`，再回退到写了的任意一种。官方索引要求 `description`、`tags`、`about`、`release_notes` 都写 `zh` 和 `en`。
+商店、安装确认页和 App 主屏用到的信息写在清单里，随插件包按提交固定。给用户看的文字都按语言写，语言是键，至少写一种。键是 BCP 47 语言标签：`en`（英文）、`zh`（简体中文）、`zh-Hant`（繁体中文）、`ja`（日文）等。App 按用户在用的语言挑：先找完全一样的，再按文字系统找，`zh-TW`、`zh-HK` 用 `zh-Hant`，没写 `zh-Hant` 时用 `zh`；都没有时回退到 `en`，再回退到写了的任意一种。繁体中文和日文的用户看到的是你写的 `zh-Hant`、`ja`，没写就是简体或英文，建议补上。官方索引要求 `description`、`tags`、`about`、`release_notes` 都写 `zh` 和 `en`。
 
 | 字段 | 说明 |
 | --- | --- |
@@ -515,7 +515,7 @@ body {
 
 | 方法 | 说明 |
 | --- | --- |
-| `ui/initialize`、`ui/notifications/initialized` | 握手。`hostCapabilities` 是 `openLinks` 和 `message.text`。`hostContext` 有 `theme`、`styles`、`locale`、`timeZone`、`platform: mobile`、`displayMode`（带栏 `inline`，全屏 `fullscreen`）、`availableDisplayModes`、`safeAreaInsets`。App 收到握手或页面加载完就撤掉骨架屏，先到先算 |
+| `ui/initialize`、`ui/notifications/initialized` | 握手。`hostCapabilities` 是 `openLinks` 和 `message.text`。`hostContext` 有 `theme`、`styles`、`locale`（App 在用的语言，如 `zh-Hant`；页面自己的 `navigator.language` 是用户要的语言）、`timeZone`、`platform: mobile`、`displayMode`（带栏 `inline`，全屏 `fullscreen`）、`availableDisplayModes`、`safeAreaInsets`。App 收到握手或页面加载完就撤掉骨架屏，先到先算 |
 | `ui/notifications/host-context-changed` | 明暗、重点色、字号、全屏状态变了 |
 | `ui/request-display-mode` | `mode` 是 `inline` 或 `fullscreen`，回实际生效的模式。用户把这个页面设成不全屏时不生效 |
 | `ui/open-link` | 系统浏览器打开，只收 `https` |
