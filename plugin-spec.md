@@ -82,7 +82,7 @@ x-wonton:
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`display`（见“全屏”）、`cross_origin_isolated`（见“跨源隔离”）。 |
 | `tabs` | 否 | 能放到 App 底栏的页面，要和 `webui` 一起声明，见“底栏页面”。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `headers`（见“提供工具”）、`tool_idle_seconds`、`tool_total_seconds`，见“工具与 MCP 总线”。 |
-| `bot` | 否 | Bot 的显示名（`display_name`，多语言）和头像（`avatar`，插件包里的文件）。只能和 `matrix.bot` 权限一起声明。 |
+| `bot` | 否 | Bot 的显示名（`display_name`，多语言）、静态头像（`avatar`）和状态头像（`avatars`：`idle`、`working`、`waiting`、`offline` 四个状态各一个文件），都是插件包里的文件。只能和 `matrix.bot` 权限一起声明，见“Matrix Bot”。 |
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
 | `agent` | `kind=agent` 时必填 | `protocol`：`matrix`（Agent 自己登录 Matrix，须声明 `matrix.bot`）或 `acp`（经 ACP 桥接入）。可选 `login`，见“Agent 插件”。 |
 | `provides` | 否 | 向其他插件提供的能力，v0.1 只有 `models`（见“模型网关”）。只有 `kind: system` 的插件可以声明。 |
@@ -97,11 +97,11 @@ x-wonton:
 
 ## 插件包
 
-插件包是一个目录：`docker-compose.yml`，加上它引用的文件——`icon`、`settings`、`bot.avatar`、`notices` 和
+插件包是一个目录：`docker-compose.yml`，加上它引用的文件——`icon`、`settings`、`bot.avatar`、`bot.avatars`、`notices` 和
 顶层 `configs` 的 `file`。`screenshots` 不算在内（见“商店信息”）。
 
 - 引用的路径相对 compose 文件所在的目录，不能是绝对路径、不能含 `..`、不能用变量，也不能经过软链接；
-  单个文件不超过 1 MiB，整个插件包（文件大小相加）不超过 2 MiB。引用的文件不存在时安装失败。
+  单个文件不超过 2 MiB，整个插件包（文件大小相加）不超过 16 MiB。引用的文件不存在时安装失败。
 - 安装接口收 compose 文本，或者打包好的插件包目录：tar（如 `tar -C <目录> -cf - .` 或 `wonton-core plugin pack` 的输出）、
   tar.gz 和 zip，按内容认格式，不看扩展名和 `Content-Type`。compose 引用了包里的文件时只能传压缩包。
 - `docker-compose.yml` 可以在压缩包的根目录，也可以在唯一的顶层目录里（如 GitHub 的 “Download ZIP”）。核心只读 compose
@@ -895,8 +895,9 @@ Bot 是一个 Matrix 身份加上驱动它的插件。核心没有接入 Matrix 
 2. 用 JWT 代 Bot 登录一台新设备，首次登录即建号；不申请刷新令牌。Tuwunel 的 `access_token_ttl`
    只作用于申请了刷新令牌的客户端，这样拿到的访问令牌不会过期，而 Agent 多半不会自己刷新令牌。插件只拿到
    令牌，Bot 账号也没有密码。
-3. 按 `bot` 设置显示名（取中文，没有时取英文；没写 `bot.display_name` 时用 `title`）和头像（png、jpg、gif 或
-   webp）。
+3. 按 `bot` 设置显示名（取中文，没有时取英文；没写 `bot.display_name` 时用 `title`）和静态头像（png、jpg、gif 或
+   webp）。只在新建账号时设置：沿用的账号（不删数据重装、升级、安装失败后重试）不重设，用户或 Agent 后来改过的
+   名字和头像不会被冲掉。见下面的“名字和头像”。
 4. 准备 Bot 的主房间：Bot 建一个加密房间（`trusted_private_chat`，用户和 Bot 都是管理员），先不邀请用户。没有主房间
    时 Hermes 会在每个新会话的第一条回复里插一段设置提示。
 5. 注入 `WONTON_MATRIX_*` 变量。
@@ -923,6 +924,66 @@ Bot 是一个 Matrix 身份加上驱动它的插件。核心没有接入 Matrix 
 - 卸载插件时吊销 Bot 的所有设备；选择删除数据时再停用 Bot 账号，账号随之退出所有房间。停用不可恢复，所以
   保留数据重装时沿用原账号，房间和历史都还在；删除数据后重装是一个新账号。卸载结果的 `bot` 字段写着 Bot 的
   用户 ID、吊销的设备数和是否停用。
+
+### 名字和头像
+
+名字和静态头像就是 Bot 的 Matrix 全局资料（`displayname`、`avatar_url`），所有 Matrix 客户端都看得到。每改一次，
+Bot 在的每个房间都会多一条成员事件，App 把它显示成“某某 改名为 某某”一行。
+
+状态头像不进房间：四个状态的头像整组写在 Bot 资料的自定义字段 `app.wonton.avatars` 里，不产生成员事件，
+别的客户端看不到，换一整套也只是一次资料写入：
+
+```json
+{
+  "states": {
+    "idle":    { "url": "mxc://…", "mimetype": "video/mp4", "w": 480, "h": 480, "size": 812345, "duration_ms": 3000, "poster": "mxc://…" },
+    "working": { "url": "mxc://…", "mimetype": "image/webp", "w": 512, "h": 512, "size": 402311, "duration_ms": 2000 }
+  }
+}
+```
+
+`states` 的键是状态，各字段：`url` 是 Matrix 媒体库里的 `mxc://` 地址，`mimetype`、`w`、`h`、`size` 照文件写，
+`duration_ms` 只有动图和视频有，`poster` 是视频的静态首帧（`mxc://`），可以不写。键只认 `idle`、`working`、
+`waiting`、`offline` 这四个，认不出的键原样保留。没写的状态用 `idle` 的，`idle` 也没有就显示静态头像。
+状态头像经 `wonton__set_profile`（见“工具与 MCP 总线”）改；直接写这个字段会绕开核心的媒体检查和每小时
+10 次的改动上限，规范不提倡。
+
+四个状态什么时候出现，由核心和 App 判断（插件在运行、请求和工具调用数这些事实，加上 Matrix 的“正在输入”），
+插件不用上报：
+
+- `offline` 离线：插件没在运行——正在安装、升级、启动，或者停了、出错了。
+- `waiting` 等你确认：插件在运行，有这个 Bot 发起的确认卡片在等用户回答。
+- `working` 工作中：有模型请求或工具调用在进行，或者 Bot 正在输入。
+- `idle` 待机：其余时候。
+
+**默认素材**
+
+清单的 `bot` 可以带 `avatars`，每个状态指向插件包里的一个文件：
+
+```yaml
+x-wonton:
+  bot:
+    display_name: { zh: Hermes, en: Hermes }
+    avatar: avatar.png                 # 静态头像
+    avatars:
+      idle: avatars/idle.mp4
+      working: avatars/working.webp
+      waiting: avatars/waiting.mp4
+      offline: avatars/offline.mp4
+```
+
+视频的首帧放在旁边：同名换成 `.jpg` 后缀的文件（如 `avatars/idle.jpg`），核心有就一起传成首帧，可以省略。
+
+核心在安装、升级时，只在 Bot 资料里还没有 `app.wonton.avatars` 字段时按清单传上去写进去；字段已经在（用户或
+Agent 设过，包括清成了空表）就不碰。所以升级到带素材的版本也能拿到默认形象，用户或 Agent 设过的不会被冲掉。
+
+**限制**
+
+- 方形，边长不超过 640 像素。
+- 每个文件不超过 2 MiB；动图和视频不超过 6 秒。
+- 格式：静态头像只能是 PNG、JPEG、WebP 的静态图；状态头像另可 GIF、动图 WebP、H.264 的 MP4（不要声音）。
+- 核心按文件内容判断格式和尺寸，不看扩展名。清单的静态头像 `bot.avatar` 例外：安装时只按扩展名认
+  png、jpg、gif、webp（见上面安装的第 3 步）。
 
 ### 一个插件多个 Bot（`bots`）
 
@@ -1106,6 +1167,8 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
   | `wonton__check_plugin` | 否 | `dir` 是调用方 outbox 里的插件目录（相对路径），和 `wonton-core plugin check` 同一套校验，不装也不改。返回 `id`、`version`、`digest`、`files`（`path` 和 `bytes`）、`problems`、`warnings`；解析不了时只有 `problems`。 |
   | `wonton__plugin_status` | 否 | `id` 是已装的插件。返回 `status`、`url`，有的话带 `health`；有网页时带探测的状态码 `web_status`，探测不了时是 `web_error`。调用方写的插件还带 `logs`：每个服务（`service`）最近的日志（`text`），最多 40 行、8 KiB；取不到时是 `logs_error`。 |
   | `wonton__save_file` | 按路径授权 | 把 outbox 里的文件存进共享文件夹，见下面的“Bot 存文件”。 |
+  | `wonton__get_profile` | 否 | 读你自己的 Bot 的资料：实际名字、有没有静态头像、哪些状态设了状态头像，和“名字和头像”里的状态与限制。只作用于调用方自己的 Bot，不接受参数。 |
+  | `wonton__set_profile` | 否 | 改你自己的 Bot 的名字或头像，不需要用户确认。`name`：新名字，去掉首尾空白后 1 到 32 个字符，不含控制字符，不能用核心（Wonton、云吞、雲吞）或用户的名字，不分大小写。`avatar`：静态头像在 outbox 里的相对路径。`avatars`：要改的状态，每项是相对 outbox 的路径，写 `null` 清掉这个状态，没写的不动。不收 `mxc://`。成功后删掉用过的 outbox 文件，失败时保留。每个 Bot 每小时最多成功改 10 次，超了返回 `rate_limited` 和还要等的秒数。 |
   | `wonton__help` | 否 | Wonton 和 App 的帮助文档，见下面的“帮助文档”。 |
 
 - 插件目录就是官方索引（见“发布与来源”）。Bot 能装官方索引里的插件和自己写的插件（见“Agent 写插件”），不能装社区插件。
