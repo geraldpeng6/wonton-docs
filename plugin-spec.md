@@ -1646,7 +1646,7 @@ x-wonton:
   `service_completed_successfully`）、`user`、`working_dir`、`labels`（`wonton.` 前缀保留给核心）、
   `hostname`、`expose`、`init`、`read_only`、`shm_size`、`tmpfs`、`stop_signal`、`stop_grace_period`、
   `mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”）、
-  `pull_policy`（默认 `missing`）、`network_mode`（`none`、`host` 或 `service:<服务名>`）、`cap_add`、`devices`、`pid`、`ipc`、
+  `pull_policy`（默认 `missing`）、`network_mode`（`none`、`host` 或 `service:<服务名>`）、`cap_add`、`cap_drop`、`devices`、`pid`、`ipc`、
   `security_opt`、`privileged`，以及 `x-` 扩展字段。`image` 既没写
   标签也没写摘要时按 `latest` 拉取，和 compose 一致。`image:` 要直接写完整的
   `镜像:标签@sha256:…` 引用，不用 YAML 锚点或别名（`&name`、`*name`）：自动升级镜像的机器人认不出别名里的
@@ -1666,12 +1666,14 @@ x-wonton:
   - 借用的服务自动依赖被借用的服务，先启动后者；被借用的服务重建时（如开关局域网访问），借用的服务跟着重建。
   - 两个服务要么都是 Bot 服务，要么都不是。
 
+- 所有插件容器默认带 `no-new-privileges:true`，核心写进 HostConfig，不需要声明。依赖 setuid 的镜像
+  （容器里用 sudo 的）写 `security_opt: [no-new-privileges:false]` 退回 Docker 默认，这一项不算权限。
 - 高权限字段按服务生效，必须和 `x-wonton.permissions` 里的权限一一对应：
   - `network_mode: host` 对应 `network.host`。这个服务不能出现在 `lan.ports` 里；`webui` 指向它时要写健康检查，不能用 `sso: proxy`（原因见“网关代登录”）。它连不到插件网络里的服务，包括同一个插件的：宿主不能直接访问插件网络，这是隔离承诺（见“网络”）。要和插件网络里的服务通信就反过来：让插件网络里的服务去连它开在宿主上的端口（Beszel 的做法：Agent 只在宿主网络里开 SSH 服务，Hub 主动拨号），或者整个插件都用宿主网络。`webui` 或 `mcp` 指向它时，应用要能从 `127.0.0.1:<端口>` 连上：核心给每个入口加一个中继容器（服务名 `relay-webui`、`relay-mcp`，插件自己不要用这两个名字），经 `${WONTON_APP_DATA}/relay` 里的 unix 套接字转发到这个端口，插件不要往这个目录里放东西。
-  - `cap_add` 的每个值对应 `cap.<能力>`。
+  - `cap_add` 的每个值对应 `cap.<能力>`；`cap_drop` 只减不加，不需要权限。两者的值都按能力名写，小写规范成大写，`ALL` 也收。核心把插件的 `cap_drop` 和宿主网络默认去掉的 `NET_RAW` 合并去重，写了 `NET_RAW` 或 `ALL` 就不再重复。
   - `devices` 对应 `devices.<路径>`，写成 `源:目标[:权限]`，源只能是 `/dev/net/tun` 或 `/dev/fuse`，目标是绝对路径，权限由 `r`、`w`、`m` 组成。显卡不写在这里，由核心按 `gpu.services` 交给服务（见“显卡”）。
   - `pid: host`、`ipc: host` 对应 `host.pid`、`host.ipc`，这两个字段只接受 `host`。
-  - `security_opt` 对应 `security.opt`，`privileged: true` 对应 `privileged`。
+  - `security_opt` 里的 `no-new-privileges` 写法是例外：写 `no-new-privileges` 或 `no-new-privileges:true` 等于默认的加固，写 `no-new-privileges:false` 退回 Docker 默认，都不算权限；其他写法对应 `security.opt`，可以和退回默认在同一个服务里同用。`privileged: true` 对应 `privileged`。
   - `/var/run/docker.sock:/var/run/docker.sock` 这一条卷对应 `docker.socket`，只能这样写，不能只读。
 - 明确拒绝并给出原因：`ports`（局域网端口写在 `lan.ports`，见“局域网”）、`network_mode`（`none`、`host`、`service:<服务名>` 以外的取值）、`networks`、
   `container_name`、`build`、`env_file`、`extends`、`links`、`external_links`、`volumes_from`，以及顶层的
