@@ -411,7 +411,7 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 | `webui.oidc.redirect_paths` | 是 | 应用登录回调的路径（以 `/` 开头，相对插件网页地址），核心据此登记客户端的回调地址。 |
 | `webui.oidc.post_logout_paths` | 否 | 额外的登出回跳路径，默认 `[]`；与 `redirect_paths` 一样每项以 `/` 开头。核心把路径拼在插件网页地址后，登记到 `post_logout_redirect_uris`。 |
 | `webui.oidc.token_endpoint_auth_method` | 否 | 应用在令牌端点出示密钥的方式：`client_secret_basic`（默认）或 `client_secret_post`。 |
-| `webui.oidc.owner_groups` | 否 | 用户是家庭的主人时，`groups` 在 `owner` 之外再加这些组名，按组名对角色的应用（BookStack、Grafana 等）用它把主人对到管理员等角色。名字 1–64 个字符，只含 ASCII 字母、数字和 `_-.:`，不重复，最多 8 个。 |
+| `webui.oidc.owner_groups` | 否 | 用户是家庭的主人时，`groups` 在 `owner` 之外再加这些组名，按组名对角色的应用（如 BookStack）用它把主人对到管理员等角色。名字 1–64 个字符，只含 ASCII 字母、数字和 `_-.:`，不重复，最多 8 个。 |
 | `webui.oidc.requires_email` | 否 | 应用用 `email` 声明认人或必填邮箱时写 `true`：用户没填邮箱就装不上，安装页让用户先填，不用等到登录才失败。 |
 
 客户端可申请的 scope：`openid`、`profile`（`name`、`preferred_username`）、`email`（`email`、
@@ -441,8 +441,9 @@ x-wonton:
 ```
 
 BookStack 把 `groups` 里的名字对到角色：先按角色显示名（大小写不敏感），再按角色设置里的“外部认证
-ID”；内置管理员角色的显示名是 `Admin`，`admin` 就对得上。应用没有组同步功能时不用 `owner_groups`，
-按它认角色的方式在文档里写清楚怎么给主人管理员。
+ID”；内置管理员角色的显示名是 `Admin`，`admin` 就对得上。BookStack 还要求 `https` 的签发方地址
+（本节末的选型项），核心现在的 `http` 签发方它不接受：环境变量名作对照用，换成同类应用时以各自文档
+为准。应用没有组同步功能时不用 `owner_groups`，按它认角色的方式在文档里写清楚怎么给主人管理员。
 
 应用不能自己注册管理员、要插件预建账号时，申请 `owner.identity`，按应用官方的引导机制用
 `WONTON_OWNER_NAME` 和 `WONTON_OWNER_EMAIL` 建（多数应用有建管理员的官方环境变量），不要装完再改
