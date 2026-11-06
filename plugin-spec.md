@@ -702,6 +702,7 @@ x-wonton:
 | `WONTON_APP_ID` | 总是 | 插件 `id`。 |
 | `WONTON_APP_DATA` | 总是 | 插件私有数据目录（宿主路径）。绑定挂载的子目录由核心逐级预先创建，属主见下文；路径上有软链接或不是目录时拒绝安装。 |
 | `WONTON_SERVICE_DOMAIN` | 总是 | 这个插件在插件网络里的域名 `<slug>.wonton.internal`，如 `app-immich-photos.wonton.internal`。服务的稳定地址名是 `<服务名>.${WONTON_SERVICE_DOMAIN}`：核心连插件的网页、MCP 和内网资源都用它当 Host，上游服务做精确 Host 校验（如 Playwright MCP 的 `--allowed-hosts`）时把它写进白名单，见“网络”。 |
+| `WONTON_HOST_NAME` | 总是 | 宿主主机名（核心从 Docker daemon 的 `/info` 取，如 `server-01`），可填服务的 `hostname:` 或应用里的主机设置。它是用户的主机名，可能是不想公开的信息，截图里要遮住。取不到时是空字符串。 |
 | `WONTON_SHARE_<名称>` | 授权了该共享文件夹 | 共享文件夹路径（大写，`-` 换成 `_`，如 `WONTON_SHARE_PHOTOS`）。 |
 | `TZ`、`PUID`、`PGID` | 总是 | 时区与运行用户。`TZ` 是 IANA 时区名，如 `Asia/Shanghai`、`UTC`。 |
 | `WONTON_APP_URL` | 声明了 `webui` | 插件网页的公开地址，不带末尾 `/`。应用生成回调地址、外部链接时使用。 |
