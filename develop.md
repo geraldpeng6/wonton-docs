@@ -150,6 +150,9 @@ scripts/dev.sh smoke
 
 把插件特有的验证写在 `scripts/smoke-probes.sh`，按模板中的钩子示例改成真实业务探针；未编写的探测项会 FAIL 并显示写法。这个文件属于插件，更新套件不会替换它。不要只以进程存在或 HTTP 返回成功代替身份和工具的真实验证。
 
+几个人或几个 Agent 共用一台 Docker 时，设 `WONTON_SMOKE_MAX_STACKS=<套数>` 限制同时跑的验证栈，超过就排队，
+`WONTON_SMOKE_WAIT_MINUTES`（默认 45）后放弃。不设就不排队。
+
 需要出口代理时执行：
 
 ```bash
