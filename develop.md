@@ -82,6 +82,7 @@ scripts/dev.sh reinstall
 | `scripts/dev.sh up` | 启动并等待健康；再次执行会拉最新核心镜像并重启，`WONTON_PULL=never` 时不拉 |
 | `scripts/dev.sh install [--yes] [<git 引用>]` | 预览并确认安装；引用可为 tag、分支或提交，通过本地 git 导出，私有仓库也能用 |
 | `scripts/dev.sh reinstall [--yes]` | 先卸载并保留数据，再安装工作区内容 |
+| `scripts/dev.sh rebuild` | 强制重建核心栈，再保数据重装工作区插件；其他插件的容器由核心管理，不重建 |
 | `scripts/dev.sh uninstall [--purge]` | 卸载插件；`--purge` 同时删除插件数据 |
 | `scripts/dev.sh status` | 查看开发环境服务和已装插件 |
 | `scripts/dev.sh logs [<服务>]` | 跟踪核心日志；给插件服务名则查看该服务日志 |
@@ -91,14 +92,30 @@ scripts/dev.sh reinstall
 | `scripts/dev.sh api <方法> <路径> [<curl 参数>…]` | 携带用户令牌调用核心管理接口 |
 | `scripts/dev.sh egress <地址>` | 读取当前出口代理设置，保留返回的 `restarts` 和直连网段后设置新地址 |
 | `scripts/dev.sh mcp list` | 在 Hermes gateway 容器中使用官方 SDK 列出 Bot 经 MCP 总线可调用的工具 |
-| `scripts/dev.sh mcp call <工具> [<JSON>]` | 经 MCP 总线调用工具，参数是 JSON 对象，默认 `{}` |
+| `scripts/dev.sh mcp call <工具> [<JSON>]` | 经 MCP 总线调用工具，走 Bot 权限、确认和审计；参数默认 `{}`。敏感工具等待卡片答复，另开终端运行 `approve` |
+| `scripts/dev.sh mcp --direct list` | 在插件网络内的一次性客户端中，按工作区清单的 MCP 服务、端口和路径列出原生工具 |
+| `scripts/dev.sh mcp --direct call <工具> [<JSON>]` | 直连调用原生工具名，不加 `<slug>__` 前缀；不走总线权限、确认和审计，只调试插件本身 |
+| `scripts/dev.sh approve [--watch]` | 用主人令牌批准待答确认卡片；`--watch` 持续批准，Ctrl-C 停止，只在专用开发实例调试时开启 |
 | `scripts/dev.sh smoke` | 运行一次性端到端冒烟 |
 | `scripts/dev.sh pair` | 输出供 App 扫描的配对二维码 |
 | `scripts/dev.sh down` | 停止核心、身份提供方和 Matrix，保留数据 |
 | `scripts/dev.sh reset` | 清理当前实例的插件容器和网络，保留核心和数据，不动其他实例 |
-| `scripts/dev.sh purge [--yes]` | 删除整套当前开发环境；非交互必须带 `--yes` |
+| `scripts/dev.sh purge [--yes]` | 先删本实例插件和测试客户端，再拆核心栈、网络和卷；有残留就列出、非零退出并保留设置和数据。非交互必须带 `--yes` |
 
 开发环境和正式安装使用同一份 Compose：核心、身份提供方 Ory Hydra、Matrix 服务器 Tuwunel；开发时换用独立的项目名、核心容器名和实例名。核心启动后同样预装模型网关 magpie（`ai.usemagpie.magpie`）。第一次 `up` 的设置保存到 `.wonton/.env`。
+
+`up` 保留 `.env` 已有的键、注释和额外行，只补缺项并更新解析得到的 `WONTON_CORE_IMAGE`。可手改 `WONTON_PUID`、
+`WONTON_PGID`、`WONTON_LAN_ADDRESSES`、出口代理、`TZ`、`RUST_LOG` 等，完整清单见文件头；实例名、基础域名和身份不要改。
+`WONTON_INSTALL_TIMEOUT_SECS` 没有由核心 Compose 传入，写进 `.env` 不会生效。
+
+修改设置后先 `up`；需要让核心栈和工作区插件的容器采用这些设置时执行 `rebuild`。工作区插件重装前照常预览、确认权限，
+保留数据的规则与 `reinstall` 相同；其他已装插件不卸载、不重装。核心的 `/start` 接口只启动现有容器，不能用它代替重建。
+核心重启后需要用 `session --new` 重建网页会话。
+
+MCP 两条路径都复用 Hermes 官方镜像内的 [Python MCP SDK（MIT）](https://github.com/modelcontextprotocol/python-sdk/blob/main/LICENSE)。
+直连客户端使用本实例 Hermes 的不可变镜像 ID，不在插件网络里下载依赖，不改 Hermes 容器；要求 Hermes 已安装、目标插件有独立网络。
+客户端带实例标签，`--rm` 退出即删。清单没有 `mcp` 时明确报错；模板 nginx 只提供网页，不含 MCP 工具。
+`approve` 读取和回答失败会报错，不当作“没有卡片”；要求核心支持 `GET /_wonton/api/confirmations` 和主人令牌回答接口。
 
 ### 实例隔离
 
@@ -107,6 +124,8 @@ scripts/dev.sh reinstall
 - 实例名和基础域名定下后不要改；基础域名也是 Matrix 服务器名。需要换时先清理旧实例，再创建新实例。
 - `down` 不停止由核心管理的插件容器；不再需要插件时用 `uninstall`，不再需要这套环境时用 `purge`。
 - 只用上述脚本起停和清理自己的实例。不要运行 `docker system prune`、`docker volume prune`，也不要操作其他实例的容器、网络或卷。
+- `purge` 只匹配精确实例标签、`wonton-<实例>--` 名字前缀和完整 Compose 项目名。按实例建立的出口容器与网络一起清理；
+  不带实例名的共享 `wonton-egress` 不自动删，无其他网络端点时只提示手动命令，执行前仍要确认没有实例在使用。
 - 每套环境至少使用 3 个 Docker 网络：核心、magpie、开发的插件各一个。共用主机出现 “all predefined address pools have been fully subnetted” 时，由主机维护者调整 Docker `daemon.json` 的 `default-address-pools`，例如使用更细的 `/24` 子网；不要清理其他人的网络来腾空间。
 
 ### 选择核心镜像
@@ -175,7 +194,7 @@ scripts/check.sh
 scripts/check.sh --official
 ```
 
-脚本在核心镜像里调用 `wonton-core plugin check`，不连接正在运行的开发核心；校验本身不联网，所需镜像须在本地或先拉取。输出问题、插件包文件和摘要；退出码、提醒与官方索引要求见[开发与校验](plugin-spec.md#开发与校验)。默认镜像不能读取现行 spec 时，根据错误中的版本信息用 `WONTON_CORE_IMAGE` 选择支持该规范的镜像。
+脚本在核心镜像里调用 `wonton-core plugin check`，不连接正在运行的开发核心；检查、打包和核心能力探测的临时容器都用 `--network none`，不依赖 Docker 默认 bridge。所需镜像须在本地或先拉取。输出问题、插件包文件和摘要；退出码、提醒与官方索引要求见[开发与校验](plugin-spec.md#开发与校验)。默认镜像不能读取现行 spec 时，根据错误中的版本信息用 `WONTON_CORE_IMAGE` 选择支持该规范的镜像。
 
 插件仓库的 `.github/workflows/check.yml` 在 PR 和推送 main 时调用模板的 `plugin-check.yml`：检查 shell、执行 `scripts/check.sh --official`，有 `Cargo.toml` 时还运行 Rust 格式、Clippy 和测试，并检查受 Git 管理的指定源码文件行数。CI 失败时修复问题，不跳过失败。工作流版本随[开发套件](#更新开发套件)更新；需要覆盖检查使用的核心镜像时，通过可复用工作流的 `core-image` 输入指定。
 
