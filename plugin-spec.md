@@ -154,7 +154,7 @@ configs:
 - 核心每次创建插件的容器（安装、升级、重建）时按依赖顺序先运行它，所以它必须是幂等的。
 - 安装后、核心重启后检查状态时，“已退出、退出码 0”是它的正常状态（正被重新运行着也算正常），以其他退出码
   退出或容器不见了时插件标为异常。
-- 不需要网络时写 `network_mode: none`。
+- 不需要网络时写 `network_mode: none`。用应用自己的命令行改配置的（如登记 OIDC 认证源），这类命令常要先有主服务建好的配置和数据目录，还会连发现文档：依赖主服务 `service_healthy`，不写 `network_mode: none`。
 
 应用会自己改写配置文件时（如 Hermes 的 `config.yaml`），由一次性服务在首次启动前把包里的配置复制进
 数据目录，已存在就不覆盖。这和 Kubernetes 的 init 容器是同一种做法：
@@ -343,7 +343,7 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 
 客户端可申请的 scope：`openid`、`profile`（`name`、`preferred_username`）、`email`（`email`、
 `email_verified`）、`groups`（用户为 `["owner"]`，可用来映射应用内角色）、`offline_access`。
-客户端 ID 就是插件 `id`，密钥在安装时生成，卸载时删除客户端。
+客户端 ID 就是插件 `id`，密钥在安装时生成，卸载时删除客户端。保留数据卸载后重装，密钥是新的：应用把密钥存进自己数据库的（如 Forgejo 的认证源），要在每次创建容器时用 `WONTON_OIDC_CLIENT_SECRET` 更新已有的那条，不能“已存在就跳过”。
 
 - 选型时先看应用接不接受 `http` 的 issuer：有的强制 `https`（如 BookStack），核心的 OIDC 是 `http`，
   这类应用登录走不通。
