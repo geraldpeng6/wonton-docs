@@ -61,7 +61,7 @@ scripts/dev.sh reinstall
 按下面的顺序查规范、改文件：
 
 1. **确定身份与需求。** 修改应用身份和版本，按[字段](plugin-spec.md#字段)、[对宿主的要求](plugin-spec.md#对宿主的要求)选择清单内容；商店文案按[商店信息](plugin-spec.md#商店信息)准备。
-2. **替换服务和镜像。** 先选上游官方镜像，查[镜像](plugin-spec.md#镜像)和 [Compose 子集](plugin-spec.md#compose-子集)，再改服务。查询多架构镜像摘要可用 `docker buildx imagetools inspect <镜像:标签>`，查看输出开头的 `Digest:`。自建镜像的操作见[发布](#发布)。
+2. **替换服务和镜像。** 先选上游官方镜像，查[镜像](plugin-spec.md#镜像)和 [Compose 子集](plugin-spec.md#compose-子集)，再改服务。`image:` 直接写完整的 `镜像:标签@sha256:…`，不用 YAML 锚点或别名，同一镜像在几个服务里各写一遍（自动升级镜像的机器人认不出别名里的镜像）。查询多架构镜像摘要可用 `docker buildx imagetools inspect <镜像:标签>`，查看输出开头的 `Digest:`。自建镜像的操作见[发布](#发布)。
 3. **接入网页和登录。** 按[网页入口与单点登录](plugin-spec.md#网页入口与单点登录)选择接入方式；需要时再查 [OIDC](plugin-spec.md#oidc) 或[网关代登录](plugin-spec.md#网关代登录sso-proxy)。用[安装时注入的变量](plugin-spec.md#安装时注入的变量)配置应用，不猜地址、令牌或用户身份。
 4. **安排数据与配置。** 按 [Compose 子集](plugin-spec.md#compose-子集)安排持久化，按[配置文件](plugin-spec.md#配置文件configs)交付文件。需要首次写入应用配置时，查[一次性服务与首次写配置](plugin-spec.md#一次性服务与首次写配置)；需要凭据时，查[插件密钥](plugin-spec.md#插件密钥secrets)。开发环境中的插件数据可在 `.wonton/data/apps/<slug>/` 查看。
 5. **核对网络和权限。** 一起阅读[权限](plugin-spec.md#权限)、[网络](plugin-spec.md#网络)、[局域网](plugin-spec.md#局域网networklan)与 [Compose 子集](plugin-spec.md#compose-子集)，核对应用需要的能力；需要显卡时另查[显卡](plugin-spec.md#显卡devicesgpu)。
@@ -220,6 +220,8 @@ scripts/dev.sh kit-update
 从模板复制的 `.github/workflows/plugin-check.yml` 属于套件，更新成功后会删除这份本地副本并打印说明；插件 CI 只调用模板维护的那份。
 
 ## 发布
+
+上游镜像发新版时，仓库里的 `.github/dependabot.yml`（套件经 kit 提供）会让 Dependabot 自动开升级 PR：标签和摘要一起改。升级 PR 的 CI 自动带端到端冒烟，两项检查都过了就合；升级 PR 里不改版本号和发版说明，攒到发版时一起改——`scripts/publish.sh` 会校验版本比上一个 tag 新、发版说明和上一个 tag 不同，没改会停下提示。
 
 1. 改清单版本并填写更新说明，核对许可声明及引用文件，提交插件改动；字段和版本约束查[商店信息](plugin-spec.md#商店信息)、[插件仓库](plugin-spec.md#插件仓库)和[升级](plugin-spec.md#升级)。
 2. 先完成检查和冒烟。公开仓库可在 GitHub Actions 中手动运行“发布”（`.github/workflows/publish.yml`，默认带 `--official`）。它用 `GITHUB_TOKEN` 推送镜像，本机无需登录镜像仓库。

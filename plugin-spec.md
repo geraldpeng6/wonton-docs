@@ -162,7 +162,7 @@ configs:
 ```yaml
 services:
   init:
-    image: *image
+    image: ghcr.io/example/hello:1.2.3@sha256:…
     entrypoint: ["/bin/sh", "-c", "test -f /data/config.yaml || cp /seed/config.yaml /data/config.yaml"]
     volumes:
       - ${WONTON_APP_DATA}:/data
@@ -172,7 +172,8 @@ services:
     network_mode: none
     restart: "no"
   app:
-    image: *image
+    # 同一镜像各写一遍，不用锚点别名（见“Compose 子集”）。
+    image: ghcr.io/example/hello:1.2.3@sha256:…
     depends_on:
       init:
         condition: service_completed_successfully
@@ -1344,7 +1345,9 @@ x-wonton:
   `mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”）、
   `pull_policy`（默认 `missing`）、`network_mode`（`none` 或 `host`）、`cap_add`、`devices`、`pid`、`ipc`、
   `security_opt`、`privileged`，以及 `x-` 扩展字段。`image` 既没写
-  标签也没写摘要时按 `latest` 拉取，和 compose 一致。
+  标签也没写摘要时按 `latest` 拉取，和 compose 一致。`image:` 要直接写完整的
+  `镜像:标签@sha256:…` 引用，不用 YAML 锚点或别名（`&name`、`*name`）：自动升级镜像的机器人认不出别名里的
+  镜像，升级 PR 开不出来；同一镜像在几个服务里用就各写一遍。
 - 卷：短语法和长语法（`bind`、`volume`、`tmpfs`）。宿主路径只能是 `${WONTON_APP_DATA}`（或其子目录）和
   已授权共享文件夹的根目录，不能含 `..`，不支持相对路径；同一插件的绑定挂载源不能嵌套（同一个目录可以挂进
   多个服务）；命名卷必须在顶层 `volumes` 声明。
@@ -1381,7 +1384,7 @@ x-wonton:
   知道在运行）。
 - 检查失败的插件标为异常；容器好了，核心重新核对一遍，插件恢复运行。卸载中途失败、记录损坏这些和容器无关的异常
   不会自己恢复。
-- 一次性服务不需要健康检查：复用主镜像（`image: *image`）时，镜像自带的 `HEALTHCHECK` 通不过，安装会等满
+- 一次性服务不需要健康检查：复用主镜像（几个服务写同一个镜像引用）时，镜像自带的 `HEALTHCHECK` 通不过，安装会等满
   安装超时后判失败（默认 5 分钟），写 `healthcheck: test: ["NONE"]` 关掉它。
 
 ## 网络
