@@ -147,11 +147,16 @@ configs:
 
 ### 一次性服务与首次写配置
 
-写了 `restart: "no"` 的服务是一次性服务，不需要健康检查。被其他服务以 `condition: service_completed_successfully` 依赖的服务也是：
+写了 `restart: "no"` 的服务是一次性服务，不论有没有人依赖它，都不需要健康检查。被其他服务以
+`condition: service_completed_successfully` 依赖的服务也必须写 `restart: "no"`，没写或写了别的取值时安装
+失败：否则 Docker 会在它退出后反复重启它。
 
-- 被这样依赖的服务必须写 `restart: "no"`，没写或写了别的取值时安装失败：否则 Docker 会在它退出后反复重启它。
-- 安装要等它退出。退出码为 0 算成功；非 0 时安装失败，错误里附上它的日志。装好之后才能做的收尾（比如等主服务健康后建账号）也这样写，没有别的服务依赖它也会等。
-- 核心每次创建插件的容器（安装、升级、重建）时按依赖顺序先运行它，所以它必须是幂等的。
+- 核心按依赖顺序创建并启动容器，一个服务要等它的每个依赖达到声明的条件才启动。一次性服务也可以依赖长期
+  服务的 `service_healthy`：先等应用健康，再做初始化。
+- 安装要等所有一次性服务以 0 退出才算完成，装好之后才能做的收尾（比如等主服务健康后建账号）没有人依赖也
+  照等。等待中任何一个依赖已经失败——一次性服务非 0 退出、长期服务退出或健康检查判失败——安装立即失败，
+  错误里是它的名字、退出码和日志，不等其余依赖到超时。
+- 核心每次创建插件的容器（安装、升级、重建）时都会重新运行一次性服务，所以它必须是幂等的。
 - 安装后、核心重启后检查状态时，“已退出、退出码 0”是它的正常状态（正被重新运行着也算正常），以其他退出码
   退出或容器不见了时插件标为异常。
 - 不需要网络时写 `network_mode: none`。用应用自己的命令行改配置的（如登记 OIDC 认证源），这类命令常要先有主服务建好的配置和数据目录，还会连发现文档：依赖主服务 `service_healthy`，不写 `network_mode: none`。
@@ -177,6 +182,59 @@ services:
     depends_on:
       init:
         condition: service_completed_successfully
+```
+
+其余常见的三种写法。
+
+启动前准备目录（应用要求的子目录、权限，应用起来之前就绪）：
+
+```yaml
+services:
+  init:
+    image: busybox
+    command: ["sh", "-c", "mkdir -p /data/library /data/tmp"]
+    volumes: ["${WONTON_APP_DATA}:/data"]
+    network_mode: none
+    restart: "no"
+  app:
+    image: *image
+    volumes: ["${WONTON_APP_DATA}:/data"]
+    depends_on:
+      init: {condition: service_completed_successfully}
+```
+
+等应用健康后经 HTTP 初始化（建管理员账号、导首批数据这类要应用先起来的活）：
+
+```yaml
+services:
+  app:
+    image: *image
+    healthcheck: {test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]}
+  init:
+    image: curlimages/curl
+    command: ["-fsS", "-d", "user=admin", "http://app:8080/setup"]
+    depends_on:
+      app: {condition: service_healthy}
+    restart: "no"
+```
+
+每次启动覆盖会变的值（时区、PUID 这些跟着核心走的值会变；它每次重建都会运行，必须幂等，直接覆盖写
+最新的，不要判断存在）：
+
+```yaml
+services:
+  init:
+    image: busybox
+    command: ["sh", "-c", "printf 'tz=%s\\npuid=%s\\n' \"$TZ\" \"$PUID\" > /data/owner.env"]
+    environment: ["TZ=${TZ}", "PUID=${PUID}"]
+    volumes: ["${WONTON_APP_DATA}:/data"]
+    network_mode: none
+    restart: "no"
+  app:
+    image: *image
+    volumes: ["${WONTON_APP_DATA}:/data"]
+    depends_on:
+      init: {condition: service_completed_successfully}
 ```
 
 ## 商店信息
@@ -1429,8 +1487,8 @@ x-wonton:
   知道在运行）。
 - 检查失败的插件标为异常；容器好了，核心重新核对一遍，插件恢复运行。卸载中途失败、记录损坏这些和容器无关的异常
   不会自己恢复。
-- 一次性服务不需要健康检查：复用主镜像（几个服务写同一个镜像引用）时，镜像自带的 `HEALTHCHECK` 通不过，安装会等满
-  安装超时后判失败（默认 5 分钟），写 `healthcheck: test: ["NONE"]` 关掉它。
+- 一次性服务不需要健康检查：核心只看它的退出码，镜像自带的 `HEALTHCHECK` 失败不影响它（复用主镜像
+  `image: *image` 时会一直失败，不用写 `healthcheck: test: ["NONE"]` 去关）。
 
 ## 网络
 
