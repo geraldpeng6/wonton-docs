@@ -79,7 +79,7 @@ x-wonton:
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
-| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`display`（见“全屏”）。 |
+| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`display`（见“全屏”）、`cross_origin_isolated`（见“跨源隔离”）。 |
 | `tabs` | 否 | 能放到 App 底栏的页面，要和 `webui` 一起声明，见“底栏页面”。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `tool_idle_seconds`、`tool_total_seconds`，见“工具与 MCP 总线”。 |
 | `bot` | 否 | Bot 的显示名（`display_name`，多语言）和头像（`avatar`，插件包里的文件）。只能和 `matrix.bot` 权限一起声明。 |
@@ -525,6 +525,22 @@ body {
 | --- | --- |
 | `wonton:tab-reselected` | 用户再点一次当前标签。App 会把文档滚回顶部，页面有内层滚动时自己处理 |
 | `wonton:connection` | 手机和家里服务器的连接变了，`detail.connected` 是布尔值。`navigator.onLine` 看的是手机联网，不是服务器 |
+
+### 跨源隔离
+
+页面要用 `SharedArrayBuffer` 这类要跨源隔离的能力时，在 `webui` 上写 `cross_origin_isolated: true`。默认 `false`，用不到别写。
+
+```yaml
+x-wonton:
+  webui:
+    service: web
+    port: 8080
+    cross_origin_isolated: true
+```
+
+- 网关给这个插件的网页响应加 `Document-Isolation-Policy: isolate-and-credentialless`。应用自己的 COOP/COEP 照常保留。
+- iOS 和浏览器按响应头隔离。Android 的 App 在 WebView 156 及以上为声明了的插件打开隔离；更旧的 WebView 给不了，App 打开前提示用户，用户可以选“仍然打开”。应用最好有不用 `SharedArrayBuffer` 的降级。
+- 这一项放宽了 Android 上的安全保障：页面可能和别的网页共用渲染进程。插件详情页会写明；Agent 写的插件，安装和更新的确认卡片上也会写明，更新时新加这一项要主人确认。
 
 ## 权限
 
