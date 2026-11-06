@@ -1432,7 +1432,7 @@ x-wonton:
   ```yaml
   x-wonton:
     provides:
-      egress_proxy: { service: mihomo, port: 7890 }
+      egress_proxy: { service: proxy, port: 7890 }
     permissions: [network.egress, egress.proxy]
   ```
 
