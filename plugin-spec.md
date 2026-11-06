@@ -555,7 +555,7 @@ x-wonton:
 | --- | --- | --- |
 | `storage.share.<名称>:read` / `:write` | — | 读或写某个共享文件夹，如 `photos`、`documents`、`music`、`downloads`。设备上传的文件在 `transfers` 里。 |
 | `storage.home:read` / `:write` | — | 读或写当前用户的私人空间。 |
-| `models` | — | 访问模型网关，见“模型网关”。 |
+| `models` | — | 有模型网关就用它：没接上时照样安装，见“模型网关”。 |
 | `tools` | — | 经核心的 MCP 总线调用核心和其他插件的工具，见“工具与 MCP 总线”。 |
 | `matrix.bot` | — | 以 Bot 身份收发消息，见“Matrix Bot”。 |
 | `notify` | — | 给用户发通知。 |
@@ -593,10 +593,10 @@ x-wonton:
 | `WONTON_CORE_ADDRESS` | `webui.sso: proxy` | 核心在这个插件网络里的地址（网段的最后一个可用地址，如 `172.18.255.254`），核心容器重建后不变。写进应用的“信任的代理地址”，见“网关代登录”。 |
 | `WONTON_OWNER_NAME` | `owner.identity` | 用户的用户名，装好后不变，和 OIDC 的 `sub`、`preferred_username` 以及代登录模板的 `{user}` 同值，见下文。 |
 | `WONTON_OWNER_EMAIL` | 同上，且用户填了邮箱 | 用户的邮箱，和 OIDC 的 `email`、代登录模板的 `{email}` 同值。值是建容器时的快照，见下文。 |
-| `WONTON_MODEL_BASE_URL` | `models` | 模型网关 OpenAI 兼容接口的地址，以 `/v1` 结尾，如 `http://models.wonton.internal:8080/v1`。 |
-| `WONTON_MODEL_ANTHROPIC_BASE_URL`、`WONTON_MODEL_GEMINI_BASE_URL` | `models`，且网关提供该接口 | Anthropic Messages、Gemini 接口的地址，按各自 SDK 的约定不带 `/v1`。 |
-| `WONTON_MODEL_API_KEY` | `models` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。 |
-| `WONTON_MODEL_DEFAULT` | `models` | 默认模型名，由网关决定（magpie 是路由组 `group/wonton-default`）。 |
+| `WONTON_MODEL_BASE_URL` | `models` | 模型网关 OpenAI 兼容接口的地址，以 `/v1` 结尾，如 `http://models.wonton.internal:8080/v1`。没接上网关时是空字符串。 |
+| `WONTON_MODEL_ANTHROPIC_BASE_URL`、`WONTON_MODEL_GEMINI_BASE_URL` | `models`，且网关提供该接口 | Anthropic Messages、Gemini 接口的地址，按各自 SDK 的约定不带 `/v1`。没接上网关时是空字符串。 |
+| `WONTON_MODEL_API_KEY` | `models` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。没接上网关时是空字符串。 |
+| `WONTON_MODEL_DEFAULT` | `models` | 默认模型名，由网关决定（magpie 是路由组 `group/wonton-default`）。没接上网关时是空字符串。 |
 | `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，如 `http://mcp.wonton.internal:8080/mcp`。 |
 | `WONTON_MATRIX_HOMESERVER` | `matrix.bot` | Matrix 客户端接口的地址：核心在插件网络里的别名，如 `http://matrix.wonton.internal:8080`。 |
 | `WONTON_MATRIX_USER_ID`、`WONTON_MATRIX_ACCESS_TOKEN` | `matrix.bot` | Bot 的 Matrix 用户 ID 和访问令牌。 |
@@ -662,7 +662,7 @@ x-wonton:
 - 装不上时如实标为异常、写明原因，不影响核心启动：
   - 插件包本身的问题（`invalid_input`、`unsupported`，如不支持本机架构）、本机没有可用的显卡（`gpu_unavailable`）和
     同名的网络或卷不是这个插件的（`conflict`）重试也一样，不重试，下次启动再试；
-  - 其余原因（Docker、身份提供方、Matrix、模型网关还没就绪，核心处理图片的子进程起不来，拉镜像失败，没通过健康检查）
+  - 其余原因（Docker、身份提供方、Matrix，核心处理图片的子进程起不来，拉镜像失败，没通过健康检查）
     自动重试，间隔逐次加长，最长 10 分钟；等待时原因里写着试了几次、会自动重试。拉不下镜像时原因写成“拉取镜像失败
     （镜像）：Docker 的原话”（错误类别 `image_pull_failed`）；
   - 等待重试时用户卸掉这个异常的插件，就不再重试；默认插件同样记下，不再自动装。卸载开始了就算，到点时卸载还没
@@ -688,7 +688,11 @@ x-wonton:
 - 凭据默认可以用网关里的所有模型：插件和网关在同一台机器上，能访问就该能用。凭据由核心自动签发和注入，
   插件不用配置，作用是按插件记账和单独吊销。要限定某个插件能用的模型、设额度或限定账号，用户在网关自己的
   网页里改；核心不同步这些设置。
-- 网关没装或没就绪时，安装失败（`models_unavailable`）并说明是网关的原因，不注入半套变量。
+- **网关可选。** `models` 的意思是“有网关就用”：没装、没就绪、或核心签发凭据失败，都照样安装，
+  `WONTON_MODEL_*` 照样定义、值为空字符串，用户用自己的登录或 key 设置（详情页有“没接上”的轻提示）。
+  不加“必需”档。插件在启动时按变量有没有值选路：有值走网关，没值走自己的设置。
+- 网关之后就绪（装上、起来、恢复）时，核心给没接上的使用方签发凭据并重建它们的容器，插件的启动选路在下一次
+  启动时生效；网关卸掉或坏了，使用方不动，提示变回“没接上”。
 
 > **已定：凭据默认可以用所有模型**。没选的方案是只允许默认模型：最小权限、花费
 > 可控，但需要特定模型（如视觉模型）的插件要用户去网关里放开。
