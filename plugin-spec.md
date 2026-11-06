@@ -877,7 +877,8 @@ x-wonton:
 - 隔离：Bot 服务挂载应用数据目录时只能挂自己的 `${WONTON_BOT_DATA}`，也不能用命名卷，这样一个 Bot 读不到
   别的 Bot 的记忆和凭据。
 - 依赖：Bot 服务可以依赖同一个 Bot 的服务和全插件一份的服务；全插件一份的服务不能依赖 Bot 服务。
-  `webui`、`mcp`、`provides` 不能指向 Bot 服务。
+  `mcp`、`provides` 不能指向 Bot 服务。`webui` 可以，连的是默认 Bot（`default`）那一组的容器；应用只监听回环地址时，
+  在同一个 Bot 里用 `network_mode: service:<服务名>` 配一个反向代理对外，`webui` 写被借用的服务。
 - Bot 服务在插件网络里的别名是 `<服务名>-<Bot 名>`，同一个 Bot 的服务之间也用它互访，如
   `http://sidecar-${WONTON_BOT_NAME}:8080`。
 - 全插件一份的服务引用 `WONTON_MATRIX_*` 时安装失败；引用 `WONTON_MODEL_API_KEY` 时拿到插件级的凭据
