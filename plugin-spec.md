@@ -411,10 +411,44 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 | `webui.oidc.redirect_paths` | 是 | 应用登录回调的路径（以 `/` 开头，相对插件网页地址），核心据此登记客户端的回调地址。 |
 | `webui.oidc.post_logout_paths` | 否 | 额外的登出回跳路径，默认 `[]`；与 `redirect_paths` 一样每项以 `/` 开头。核心把路径拼在插件网页地址后，登记到 `post_logout_redirect_uris`。 |
 | `webui.oidc.token_endpoint_auth_method` | 否 | 应用在令牌端点出示密钥的方式：`client_secret_basic`（默认）或 `client_secret_post`。 |
+| `webui.oidc.owner_groups` | 否 | 用户是家庭的主人时，`groups` 在 `owner` 之外再加这些组名，按组名对角色的应用（如 BookStack）用它把主人对到管理员等角色。名字 1–64 个字符，只含 ASCII 字母、数字和 `_-.:`，不重复，最多 8 个。 |
+| `webui.oidc.requires_email` | 否 | 应用用 `email` 声明认人或必填邮箱时写 `true`：用户没填邮箱就装不上，安装页让用户先填，不用等到登录才失败。 |
 
 客户端可申请的 scope：`openid`、`profile`（`name`、`preferred_username`）、`email`（`email`、
-`email_verified`）、`groups`（用户为 `["owner"]`，可用来映射应用内角色）、`offline_access`。
-客户端 ID 就是插件 `id`，密钥在安装时生成，卸载时删除客户端。保留数据卸载后重装，密钥是新的：应用把密钥存进自己数据库的（如 Forgejo 的认证源），要在每次创建容器时用 `WONTON_OIDC_CLIENT_SECRET` 更新已有的那条，不能“已存在就跳过”。
+`email_verified`）、`groups`（`owner`，声明了 `owner_groups` 再加那些组名）、`offline_access`。
+`owner_groups` 只发给声明它的这个客户端，别的插件看不到。客户端 ID 就是插件 `id`，密钥在安装时
+生成，卸载时删除客户端。
+保留数据卸载后重装，密钥是新的：应用把密钥存进自己数据库的（如 Forgejo 的认证源），要在每次创建容器时用 `WONTON_OIDC_CLIENT_SECRET` 更新已有的那条，不能“已存在就跳过”。
+
+按组名对角色的应用，声明 `owner_groups` 并让应用同步组：
+
+```yaml
+services:
+  bookstack:
+    image: ghcr.io/bookstackapp/bookstack:<版本标签或摘要>
+    environment:
+      OIDC_USER_TO_GROUPS: "true"
+      OIDC_GROUPS_CLAIM: groups
+x-wonton:
+  webui:
+    service: bookstack
+    port: 8080
+    sso: oidc
+    oidc:
+      redirect_paths: [/oidc/callback]
+      owner_groups: [admin]
+      requires_email: true
+```
+
+BookStack 把 `groups` 里的名字对到角色：先按角色显示名（大小写不敏感），再按角色设置里的“外部认证
+ID”；内置管理员角色的显示名是 `Admin`，`admin` 就对得上。BookStack 还要求 `https` 的签发方地址
+（本节末的选型项），核心现在的 `http` 签发方它不接受：环境变量名作对照用，换成同类应用时以各自文档
+为准。应用没有组同步功能时不用 `owner_groups`，按它认角色的方式在文档里写清楚怎么给主人管理员。
+
+应用不能自己注册管理员、要插件预建账号时，申请 `owner.identity`，按应用官方的引导机制用
+`WONTON_OWNER_NAME` 和 `WONTON_OWNER_EMAIL` 建（多数应用有建管理员的官方环境变量），不要装完再改
+应用的数据补邮箱：预建账号的值和 OIDC 登录给的 `sub`、`email` 声明一致，登录才对得上同一个账号。
+声明了 `requires_email` 的插件，用户装之前就填了邮箱。
 
 - 选型时先看应用接不接受 `http` 的 issuer：有的强制 `https`（如 BookStack），核心的 OIDC 是 `http`，
   这类应用登录走不通。
@@ -703,7 +737,8 @@ x-wonton:
 - 显示名和邮箱由用户在 App 里填，填过以后能改，不能改回没有。显示名没填时是用户名，所以 `name` 声明总有值；要显示
   用户的名字用 `name`，不要用 `preferred_username`。
 - 用户没填邮箱时不注入 `WONTON_OWNER_EMAIL`，OIDC 也没有 `email` 声明。应用非要邮箱时写 `${WONTON_OWNER_EMAIL:?}`，
-  App 的安装页这时让用户先填邮箱，填好才能装：OIDC 登录要 `email` 声明的应用也这样写，不要等到登录时才失败。
+  App 的安装页这时让用户先填邮箱，填好才能装：OIDC 登录要 `email` 声明的应用声明
+  `webui.oidc.requires_email`，不要等到登录时才失败。
   能没有邮箱的写 `${WONTON_OWNER_EMAIL:-}`。
 - 用户改了邮箱或显示名之后，OIDC 声明和代登录的请求头马上换成新值，容器里的 `WONTON_OWNER_EMAIL`
   还是旧值：核心重启只核对插件容器，不重建。容器重建时才拿到新值；升级或重装（可以不删数据）会重建，局域网地址变化
