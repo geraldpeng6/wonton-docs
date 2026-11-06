@@ -945,7 +945,8 @@ Bot 在的每个房间都会多一条成员事件，App 把它显示成“某某
 `states` 的键是状态，各字段：`url` 是 Matrix 媒体库里的 `mxc://` 地址，`mimetype`、`w`、`h`、`size` 照文件写，
 `duration_ms` 只有动图和视频有，`poster` 是视频的静态首帧（`mxc://`），可以不写。键只认 `idle`、`working`、
 `waiting`、`offline` 这四个，认不出的键原样保留。没写的状态用 `idle` 的，`idle` 也没有就显示静态头像。
-Agent 经 `wonton__set_profile`（见“工具与 MCP 总线”）改状态头像，会说 Matrix 的也可以直接写这个字段。
+状态头像经 `wonton__set_profile`（见“工具与 MCP 总线”）改；直接写这个字段会绕开核心的媒体检查和每小时
+10 次的改动上限，规范不提倡。
 
 四个状态什么时候出现，由核心和 App 判断（插件在运行、请求和工具调用数这些事实，加上 Matrix 的“正在输入”），
 插件不用上报：
