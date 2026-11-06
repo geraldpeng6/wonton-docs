@@ -558,7 +558,7 @@ x-wonton:
 | `models` | — | 访问模型网关，见“模型网关”。 |
 | `tools` | — | 经核心的 MCP 总线调用核心和其他插件的工具，见“工具与 MCP 总线”。 |
 | `matrix.bot` | — | 以 Bot 身份收发消息，见“Matrix Bot”。 |
-| `notify` | — | 给用户发通知。 |
+| `notify` | — | 给用户发通知，见“通知”。 |
 | `owner.identity` | — | 知道用户的用户名和邮箱，见“安装时注入的变量”。 |
 | `network.egress` | — | 能访问外网，也能访问用户的局域网，安装确认按这句写。见“网络”。 |
 | `network.lan` | 高 | 在局域网上开放 `lan.ports` 列出的端口，见“局域网”。 |
@@ -577,7 +577,7 @@ x-wonton:
 - `kind: agent`，或者声明了 `matrix.bot`、`bots` 的插件，不能申请很高和最高级权限。
 - 安装请求必须逐项确认清单里的全部权限，少一项或多一项都拒绝安装。
 
-核心兑现上表除了 `storage.home:*` 和 `notify` 的全部权限。这两项清单里可以声明，但安装时如实报“尚未支持”。共享文件夹在数据目录的 `shares/<名称>` 下，只授权读时必须以 `:ro` 挂载，而且只能整个挂载，不能挂其中的子路径。
+核心兑现上表除了 `storage.home:*` 的全部权限。`storage.home:*` 清单里可以声明，但安装时如实报“尚未支持”。共享文件夹在数据目录的 `shares/<名称>` 下，只授权读时必须以 `:ro` 挂载，而且只能整个挂载，不能挂其中的子路径。
 
 ## 安装时注入的变量
 
@@ -598,6 +598,7 @@ x-wonton:
 | `WONTON_MODEL_API_KEY` | `models` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。 |
 | `WONTON_MODEL_DEFAULT` | `models` | 默认模型名，由网关决定（magpie 是路由组 `group/wonton-default`）。 |
 | `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，如 `http://mcp.wonton.internal:8080/mcp`。 |
+| `WONTON_NOTIFY_URL` | `notify` | 发通知的地址：核心在插件网络里的别名，如 `http://notify.wonton.internal:8080/notices`，见“通知”。 |
 | `WONTON_MATRIX_HOMESERVER` | `matrix.bot` | Matrix 客户端接口的地址：核心在插件网络里的别名，如 `http://matrix.wonton.internal:8080`。 |
 | `WONTON_MATRIX_USER_ID`、`WONTON_MATRIX_ACCESS_TOKEN` | `matrix.bot` | Bot 的 Matrix 用户 ID 和访问令牌。 |
 | `WONTON_MATRIX_OWNER` | `matrix.bot` | Bot 用户的 Matrix 用户 ID，用作白名单：私人 Bot 只接受用户的指令。 |
@@ -890,6 +891,38 @@ x-wonton:
 > 的多 profile）：容器级的环境变量只作用于 Hermes 的默认 profile，其他 profile 只读自己的
 > `profiles/<名字>/.env`，核心要按插件声明的模板把每个 Bot 的凭据写成文件；省内存，但只适合同一个人的
 > 多个 Bot。
+
+## 通知（`notify`）
+
+申请了 `notify` 的插件把要告诉用户的事交给核心，核心以核心账号发进和用户的“Wonton”私聊：安装时注入
+`WONTON_NOTIFY_URL`，插件在插件网络里 `POST` 一条 JSON，不用令牌。监控、下载、备份这类插件的告警走这里，
+不用自己再接一套推送渠道。
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `title` | 是 | 一句话，最多 120 个字符 |
+| `body` | 否 | 纯文本，最多 2000 个字符 |
+| `level` | 否 | `info`（默认）、`warning`、`critical` |
+| `path` | 否 | 插件网页里的一页（以 `/` 开头，不能以 `//` 开头，不能有反斜杠和控制字符，可带 query），用户点通知时应用打开这一页；插件没有 `webui` 时不能写 |
+
+最短例子（`wget` 和 `curl` 都行）：
+
+```sh
+curl -s -o /dev/null -w '%{http_code}\n' -X POST "$WONTON_NOTIFY_URL" \
+  -H 'Content-Type: application/json' \
+  -d '{"title":"证书 7 天后到期","body":"app.example.com 的证书快到期了","level":"warning","path":"/certs"}'
+```
+
+- 级别决定推不推送：`info` 发成 Matrix 的 `m.notice`，按 Matrix 的默认推送规则不响铃，只进聊天；`warning`、
+  `critical` 发成 `m.text`，照常推送。App 里插件通知单独一个类别，用户可以只关插件通知。
+- 通知以核心账号发出，正文是“插件名：标题”加换行加正文，给其他 Matrix 客户端看；结构化的字段（插件、级别、
+  `path`）App 自己认。
+- 频率上限：每个插件每分钟 10 条、滚动 24 小时 200 条。超了的直接丢弃；第一次超限时核心在私聊里发一条说明，
+  恢复前不再重复。计数在核心内存里，核心重启后重新计。
+- 通知只发给用户本人，家人不收。
+- 状态码：发成功是 201；字段不合法是 400 `invalid_input`；没申请 `notify` 是 403 `permission_denied`；
+  插件网络以外是 403 `unauthenticated`；超了频率是 429 `rate_limited`；聊天服务不可用是 503
+  `matrix_unavailable`。
 
 ## 工具与 MCP 总线
 
@@ -1682,7 +1715,7 @@ x-wonton:
 - 插件间依赖与通信的声明方式。
 - 官方索引的签名（minisign），签名后索引也能经镜像和国内的静态托管分发。
 - 一个仓库放多个插件（`github:<owner>/<repo>/<路径>`）。
-- 快捷方式（`shortcuts`）、插件给用户发通知（`notify`）的写法。
+- 快捷方式（`shortcuts`）的写法。
 - `settings.schema.json` 支持的 JSON Schema 子集。
 - 插件升级时的数据迁移钩子。
 - 共享 Bot的白名单：多个用户，而且会在运行中变化，环境变量表达不了。
