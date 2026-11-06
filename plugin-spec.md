@@ -365,6 +365,17 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 不会到达插件；转发时去掉网关自己的 Cookie 和客户端伪造的 `X-Forwarded-*`，重新设置 `X-Forwarded-For`、
 `X-Forwarded-Host`、`X-Forwarded-Proto`，保留原始 `Host`，支持 WebSocket。
 
+`webui.path`（默认 `/`）是入口路径：App 和状态页打开插件网页时，把它拼在网页地址后面，写
+`/vnc.html?autoconnect=1&resize=remote` 就直接落到应用的远程桌面页。网关按域名转发，代理不因此改路由，
+应用收到的请求路径也不变——入口路径只决定打开时落在哪一页。
+
+入口路径的写法（`tabs` 的 `path` 同一条规则，`plugin check` 校验）：
+
+- 以 `/` 开头的绝对路径，可以带 `?query`。
+- 不能有 `#`、空白和控制字符。
+- URL 里不允许原样出现的字符（非 ASCII、`"`、`<`、`>` 等）必须已经百分号编码（如 `%20`）。核心原样
+  拼接，不再编码。
+
 `webui.sso` 决定用户怎样登进应用：
 
 | 写法 | 什么时候用 |
@@ -519,7 +530,7 @@ x-wonton:
 | `title` | 是 | 多语言，`zh` 和 `en` 都要写。建议 `zh` 不超过 4 个字，`en` 不超过 8 个字母，超了 `plugin check` 提醒。 |
 | `icon` | 是 | 单色图标，插件包里的 PNG 或 SVG。只取透明通道，颜色由 App 上色，全透明或全不透明的图标不合格。SVG 的规则见“图标和截图”。 |
 | `icon_selected` | 否 | 选中时的图标，规则相同。没写时选中只靠颜色区分。 |
-| `path` | 是 | `webui` 下的路径，以 `/` 开头，不能以 `//` 开头，不能有反斜杠和控制字符。 |
+| `path` | 是 | 入口路径，写法和 `webui.path` 相同（见“网页入口与单点登录”）。 |
 | `layout` | 否 | `inset`（默认）：页面夹在 App 的栏中间。`edge-to-edge`：页面铺满，从栏下面滚过去，作者按 `--wonton-inset-*` 留位置（见“主题”）。 |
 | `display` | 否 | `standard`（默认）或 `fullscreen`，见“全屏”。 |
 
