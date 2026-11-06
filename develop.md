@@ -96,7 +96,8 @@ scripts/dev.sh reinstall
 | `scripts/dev.sh mcp --direct list` | 在插件网络内的一次性客户端中，按工作区清单的 MCP 服务、端口和路径列出原生工具 |
 | `scripts/dev.sh mcp --direct call <工具> [<JSON>]` | 直连调用原生工具名，不加 `<slug>__` 前缀；不走总线权限、确认和审计，只调试插件本身 |
 | `scripts/dev.sh approve [--watch]` | 用主人令牌批准待答确认卡片；`--watch` 持续批准，Ctrl-C 停止，只在专用开发实例调试时开启 |
-| `scripts/dev.sh smoke` | 运行一次性端到端冒烟 |
+| `scripts/dev.sh probes [探针名…]` | 对装着的工作区插件跑冒烟探针（`web_assert`、`identity_check`、`mcp`、`data_write`、`data_check`），不起新实例；给了名字就只跑那几项 |
+| `scripts/dev.sh smoke [--upgrade-from <tag>]` | 运行一次性端到端冒烟：安装、网页、身份、Bot 工具、升级保数据、重装保数据；默认从最近的 tag 升级 |
 | `scripts/dev.sh pair` | 输出供 App 扫描的配对二维码 |
 | `scripts/dev.sh down` | 停止核心、身份提供方和 Matrix，保留数据 |
 | `scripts/dev.sh reset` | 清理当前实例的插件容器和网络，保留核心和数据，不动其他实例 |
@@ -143,12 +144,20 @@ WONTON_CORE_IMAGE=<核心镜像> scripts/dev.sh up
 合并前运行：
 
 ```bash
-scripts/dev.sh smoke
+scripts/dev.sh smoke [--upgrade-from <tag>]
 ```
 
-它把工作区复制到临时目录，起一套以 `smoke` 开头的一次性实例，通过真实请求确认安装、网页、用户身份和 Bot 工具调用。任何 FAIL 都以非零状态退出；跑完清理该实例的容器、网络、卷和临时目录，不动已有 `.wonton`。
+它把工作区复制到临时目录，起一套以 `smoke` 开头的一次性实例，通过真实请求确认安装、网页、用户身份、Bot 工具调用，以及升级和重装时用户数据还在。任何 FAIL 都以非零状态退出；跑完清理该实例的容器、网络、卷和临时目录，不动已有 `.wonton`。
 
-把插件特有的验证写在 `scripts/smoke-probes.sh`，按模板中的钩子示例改成真实业务探针；未编写的探测项会 FAIL 并显示写法。写探针时先用 `scripts/dev.sh probes [探针名…]` 在开发环境里跑通（对已装的工作区插件跑，不起新实例，给了名字就只跑那几项），都通过了再跑 smoke。这个文件属于插件，更新套件不会替换它。不要只以进程存在或 HTTP 返回成功代替身份和工具的真实验证。
+“升级保数据”“重装保数据”按这个顺序跑：装起始版本 → `data_write` → 装工作区版本 → `data_check` → `reinstall` → `data_check`。有升级起点时，装工作区版本走的是 reinstall：核心对已装插件的同 id 再安装一律拒绝，保数据升级就是卸载保留数据再装回。起始版本默认是 `git describe` 找到的最近 tag，可用 `--upgrade-from <tag>` 指定；本仓库没有 tag 时只测重装，“升级保数据”记 N/A。
+
+把插件特有的验证写在 `scripts/smoke-probes.sh`，按模板中的钩子示例改成真实业务探针；未编写的探测项会 FAIL 并显示写法。写探针时先用 `scripts/dev.sh probes [探针名…]` 在开发环境里跑通（对已装的工作区插件跑，不起新实例，给了名字就只跑那几项；数据探针名是 `data_write`、`data_check`，不给名字会连数据项一起跑），都通过了再跑 smoke。这个文件属于插件，更新套件不会替换它。不要只以进程存在或 HTTP 返回成功代替身份和工具的真实验证。
+
+数据钩子的写法（能用的东西只有这些：`SMOKE_STATE`、`SMOKE_JAR`、`SMOKE_WEB_URL`、`SMOKE_OWNER`、`SMOKE_BASE`、`SMOKE_TOKEN`、`SMOKE_INSTANCE`，助手 `web_get`、`dweb`；e2e 的 `E2E_*` 变量和套件内部函数不进钩子）：
+
+- `data_write` 用随机标记写一条数据（走 `dweb`、`web_get` 或应用自己的接口），把标记原样写进 `$SMOKE_STATE`——它是存数据标记的文件，`data_write` 覆盖写、`data_check` 读，不是目录。自己发请求要过网关时记得带核心会话 cookie（`-b "$SMOKE_JAR"`，`web_get`/`dweb` 已带上）。
+- `data_check` 从 `$SMOKE_STATE` 读回标记，去应用里查；对不上就打印看到了什么并返回非 0。
+- 应用不存用户数据时写 `DATA_NA=1`，两项记 N/A；没写钩子也没有 `DATA_NA` 时两项 FAIL 并提示写法。
 
 几个人或几个 Agent 共用一台 Docker 时，设 `WONTON_SMOKE_MAX_STACKS=<套数>` 限制同时跑的验证栈，超过就排队，
 `WONTON_SMOKE_WAIT_MINUTES`（默认 45）后放弃。不设就不排队。
