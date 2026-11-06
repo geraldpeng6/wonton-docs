@@ -879,12 +879,12 @@ x-wonton:
 同一台服务器同时只能有一个插件提供 `models`，装第二个时安装失败（`conflict`）。提供方看得到全部模型请求和
 provider 的 key，所以只有 `kind: system` 的官方插件可以声明。
 
-`/models` 列表表示路由能力，不证明服务商的 key 仍有效。`providers.list` 的 `configured` 也只表示已配置，
-不表示可用，不能用服务商数量代替默认路由检查。安装申请了 `models` 的使用方及运行时监测中，默认模型
-已列出时，核心再向 `<apis.openai>/chat/completions` 发送最小请求：`model` 为 `default_model`，一条用户
-消息，`max_tokens: 1`、`stream: false`，检查服务商连通性和 key。这会调用服务商，可能产生费用；安装预览
-不发送此请求，也不另加服务商专用的健康检查命令。核心通过现有 `credentials.issue`、`credentials.revoke`
-合同管理独立的健康检查凭据，不借用使用方的凭据。
+`/models` 和 `providers.list.configured` 只说明模型能力和已配置服务商，不证明 key 仍有效。最小补全会计费，
+不能每轮巡检发送（30 秒一次约每天 2880 次）。仅在核心启动后首轮、使用方刚安装或刚启动时各检查一次；
+服务商错误后每 5 分钟复查，恢复即停止。安装已经完成首轮检查时不重复请求；缺模型时不发补全。
+请求发到 `<apis.openai>/chat/completions`：`model` 为 `default_model`，一条用户消息，`max_tokens: 1`、
+`stream: false`。预览只查模型列表，不发补全。不新增服务商专用命令，健康检查凭据沿用 `credentials.issue`、
+`credentials.revoke` 合同，与使用方凭据和用量分开。
 
 ### 凭据的签发与吊销
 
