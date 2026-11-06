@@ -81,7 +81,7 @@ x-wonton:
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`display`（见“全屏”）、`cross_origin_isolated`（见“跨源隔离”）。 |
 | `tabs` | 否 | 能放到 App 底栏的页面，要和 `webui` 一起声明，见“底栏页面”。 |
-| `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `tool_idle_seconds`、`tool_total_seconds`，见“工具与 MCP 总线”。 |
+| `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `headers`（见“提供工具”）、`tool_idle_seconds`、`tool_total_seconds`，见“工具与 MCP 总线”。 |
 | `bot` | 否 | Bot 的显示名（`display_name`，多语言）和头像（`avatar`，插件包里的文件）。只能和 `matrix.bot` 权限一起声明。 |
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
 | `agent` | `kind=agent` 时必填 | `protocol`：`matrix`（Agent 自己登录 Matrix，须声明 `matrix.bot`）或 `acp`（经 ACP 桥接入）。可选 `login`，见“Agent 插件”。 |
@@ -905,6 +905,8 @@ x-wonton:
     port: 8080
     path: /mcp             # 默认 /mcp
     transport: streamable-http
+    headers:               # 可选；{secret:…} 要引用 secrets 里声明的项，完整例子见下
+      Authorization: Bearer {secret:app_token}
     tool_idle_seconds: 600    # 可选，见“工具调用的期限”
     tool_total_seconds: 1800  # 可选
 ```
@@ -913,6 +915,41 @@ x-wonton:
   MCP 服务器要在镜像里自带一个转成 Streamable HTTP 的桥（如 supergateway）。
 - 工具在总线上叫 `<slug>__<工具名>`，如 `app-wonton-files__search_files`。核心连插件的 MCP 服务用 `initialize` 握手
   （MCP 2025-11-25）。
+- 上游要凭据时声明 `headers`：头名 → 值模板，写法和 `webui.proxy` 相同，占位符只能用 `{secret:…}`，引用本插件
+  `secrets` 里声明的项（`generate` 或 `collect` 都行）。`{user}` 这类身份占位符不能用：MCP 调用不是主人的浏览器
+  请求，上游认的是应用签发给核心的凭据。不能加 `Host`、`Cookie`、`Forwarded`、`X-Forwarded-*`、逐跳头部和 MCP 的
+  协议头（`mcp-session-id`、`mcp-protocol-version`）。
+- 值在安装、升级和核心每次核对插件时按当时的密钥解析。核心发往 MCP 服务的每个请求都带上（包括握手），值不写进
+  日志、错误信息和审计。头引用的密钥在安装时就得有值：`collect` 的文件还没写下（比如生成它的一次性服务还没跑完）
+  就装不上，总线的头填不出来时宁可不上线。
+- 密钥的值里不能有换行或控制字符，结尾的换行也算：`echo` 写的文件末尾多一个换行就填不出头，用 `printf '%s'`
+  写。核心会报错到具体的头和密钥，值本身不出现在错误里。
+- `collect` 的密钥在核对时读到新值后，核心对这条上游的连接在条目更新后就断开重连，用新值（不需要重启插件）。
+  上游回 401/403 时总线如实报“插件的 MCP 服务拒绝了核心的凭据”，不自动重试，也不重新取密钥——换令牌是插件的事。
+- 应用只认它自己签发的令牌时（如 Memos 的 MCP 服务）：用一次性服务登录应用、签发一个个人访问令牌（PAT）写进
+  文件，核心收存后经 MCP 头带给上游。下次创建容器时先用保存的令牌试，应用拒了就重新签发、写回文件；核心在
+  核对时读到新值就用新的。
+
+  ```yaml
+  services:
+    init:
+      image: curlimages/curl
+      entrypoint: ["/bin/sh", "/init.sh"]   # 登录应用、签发 PAT，用 printf '%s' 写进 /run/token（别带结尾换行）
+      depends_on:
+        app: {condition: service_healthy}
+
+  x-wonton:
+    secrets:
+      app_token:
+        collect: {service: init, path: /run/token}
+    mcp:
+      service: app
+      port: 5230
+      transport: streamable-http
+      headers:
+        Authorization: Bearer {secret:app_token}
+  ```
+
 - 没有标 `readOnlyHint: true`（MCP 的工具注解）的工具算敏感：总线先请用户确认，确认了才转给插件。会改数据的工具
   不要标成只读。不会改数据的工具要标上，否则 Bot 每次调用都要用户确认。
 - 工具返回的内容交给 Agent，Agent 把它当不可信输入。除了下面的文件引用，总线不改内容。
