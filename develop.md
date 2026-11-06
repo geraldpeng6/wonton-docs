@@ -56,6 +56,8 @@ scripts/check.sh
 scripts/dev.sh reinstall
 ```
 
+新建仓库后先执行 `scripts/dev.sh kit-update`，把套件和 CI 固定到一个提交。
+
 按下面的顺序查规范、改文件：
 
 1. **确定身份与需求。** 修改应用身份和版本，按[字段](plugin-spec.md#字段)、[对宿主的要求](plugin-spec.md#对宿主的要求)选择清单内容；商店文案按[商店信息](plugin-spec.md#商店信息)准备。
@@ -116,20 +118,6 @@ WONTON_CORE_IMAGE=<核心镜像> scripts/dev.sh up
 ```
 
 使用本机构建的镜像时加 `WONTON_PULL=never`。已经创建的环境，修改 `.wonton/.env` 中的 `WONTON_CORE_SOURCE` 后再执行 `up`。
-
-要使用带本地官方索引的开发镜像，在核心主仓库执行：
-
-```bash
-docker build --target dev -t wonton-core:plugin-dev -f deploy/dev/core/Dockerfile .
-```
-
-然后回到插件仓库执行：
-
-```bash
-WONTON_CORE_IMAGE=wonton-core:plugin-dev WONTON_PULL=never scripts/dev.sh up
-```
-
-只有 `dev` 阶段带 `WONTON_STORE_INDEX` 指向的本地索引；默认 `:beta` 从 GitHub 获取索引。
 
 ### 冒烟和插件探针
 
@@ -204,6 +192,8 @@ scripts/dev.sh kit-update
 `scripts/kit.files` 列出的文件由模板维护，**不要在插件仓库中修改套件文件**；插件自定义命令另写脚本。`scripts/smoke-probes.sh` 是插件自己的钩子，不属于套件，继续在插件仓库中维护。
 
 `scripts/KIT` 用一行 40 位提交 SHA 记录套件来源。插件的 `.github/workflows/check.yml` 固定调用模板 `.github/workflows/plugin-check.yml@<同一 SHA>`；更新命令同时改写这条固定引用，使本地套件和 CI 对应同一来源提交，而不是让 CI 跟随浮动的 `main`。模板仓库是套件源头，在模板中执行更新只提示来源并退出，不执行更新；模板自己的检查使用本地工作流引用。
+
+从模板复制的 `.github/workflows/plugin-check.yml` 属于套件，更新成功后会删除这份本地副本并打印说明；插件 CI 只调用模板维护的那份。
 
 ## 发布
 
