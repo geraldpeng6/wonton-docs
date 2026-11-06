@@ -352,7 +352,7 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
   应用登出固定回 `/auth` 等其他路径时，应声明如 `post_logout_paths: [/auth]`。地址必须与应用发出的
   `post_logout_redirect_uri` 整串相同，包括尾斜杠和查询参数，不是路径前缀；请求的 `state` 参数由身份提供方在回跳时附加。
 - 应用走身份提供方的 end-session 时，须发送 `id_token_hint`；有回跳地址或 `state` 而没有 hint 会被拒绝。
-  没发 `post_logout_redirect_uri` 时不会自动使用客户端白名单中的地址，也不会代替应用结束会话。
+  没发 `post_logout_redirect_uri` 时回核心首页，不自动使用客户端白名单中的地址。
 - 核心启动恢复已装插件、插件重新启动或升级时，会按保存的清单和原密钥重新登记客户端，不需要卸载重装。
   新增的应用内回跳路径仍需更新插件清单；核心不会猜测路径。含新字段的插件发布前，须先升级到支持它的核心。
 
