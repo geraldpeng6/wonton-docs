@@ -337,6 +337,7 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
 | `webui.oidc.redirect_paths` | 是 | 应用登录回调的路径（以 `/` 开头，相对插件网页地址），核心据此登记客户端的回调地址。 |
+| `webui.oidc.post_logout_paths` | 否 | 额外的登出回跳路径，默认 `[]`；与 `redirect_paths` 一样每项以 `/` 开头。核心把路径拼在插件网页地址后，登记到 `post_logout_redirect_uris`。 |
 | `webui.oidc.token_endpoint_auth_method` | 否 | 应用在令牌端点出示密钥的方式：`client_secret_basic`（默认）或 `client_secret_post`。 |
 
 客户端可申请的 scope：`openid`、`profile`（`name`、`preferred_username`）、`email`（`email`、
@@ -347,6 +348,13 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
   这类应用登录走不通。
 - `webui.path` 可以指向应用的 OIDC 起点：App 打开网页时把它拼在地址后面，核心给出的网页地址
   （`WONTON_APP_URL`、安装时的探测）不带它，省掉用户先点登录按钮。
+- 核心始终登记插件根地址（有、无末尾 `/`）和 `webui.path` 作为登出回跳地址；`post_logout_paths` 是追加，不替换默认地址，重复项只登记一次。
+  应用登出固定回 `/auth` 等其他路径时，应声明如 `post_logout_paths: [/auth]`。地址必须与应用发出的
+  `post_logout_redirect_uri` 整串相同，包括尾斜杠和查询参数，不是路径前缀；请求的 `state` 参数由身份提供方在回跳时附加。
+- 应用走身份提供方的 end-session 时，须发送 `id_token_hint`；有回跳地址或 `state` 而没有 hint 会被拒绝。
+  没发 `post_logout_redirect_uri` 时不会自动使用客户端白名单中的地址，也不会代替应用结束会话。
+- 核心启动恢复已装插件、插件重新启动或升级时，会按保存的清单和原密钥重新登记客户端，不需要卸载重装。
+  新增的应用内回跳路径仍需更新插件清单；核心不会猜测路径。含新字段的插件发布前，须先升级到支持它的核心。
 
 ### 网关代登录（`sso: proxy`）
 
