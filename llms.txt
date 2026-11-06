@@ -4,6 +4,7 @@
 
 ## 写插件
 
+- [插件开发指南](https://raw.githubusercontent.com/geraldpeng6/wonton-docs/main/develop.md)：统一的开发环境、写插件、检查、套件更新和发布流程
 - [Agent 的说明](https://raw.githubusercontent.com/geraldpeng6/wonton-docs/main/skills/wonton-plugin/SKILL.md)：从需求到装好的步骤、禁区和常见报错，Agent Skills 格式
 - [插件规范](https://raw.githubusercontent.com/geraldpeng6/wonton-docs/main/plugin-spec.md)：全部字段和约定
 - [最小例子：静态页](https://github.com/geraldpeng6/wonton-docs/tree/main/skills/wonton-plugin/assets/static)
