@@ -624,6 +624,7 @@ x-wonton:
 | `storage.home:read` / `:write` | — | 读或写当前用户的私人空间。 |
 | `models` | — | 访问模型网关，见“模型网关”。 |
 | `tools` | — | 经核心的 MCP 总线调用核心和其他插件的工具，见“工具与 MCP 总线”。 |
+| `plugins.health` | — | 读所有插件的健康状态，见“插件健康探测”。 |
 | `matrix.bot` | — | 以 Bot 身份收发消息，见“Matrix Bot”。 |
 | `notify` | — | 给用户发通知。 |
 | `owner.identity` | — | 知道用户的用户名和邮箱，见“安装时注入的变量”。 |
@@ -1238,6 +1239,32 @@ Agent 自带的工具（shell、文件这类不经 MCP 总线的）要动手之�
 - 这个插件已经有 3 个确认在等用户时（和 MCP 工具的确认共用这个上限）返回 429 `too_many_pending`，卡片发不出去时返回 503 `confirmation_unavailable`。这两种都没有问到用户，不能当成同意。
 - 插件提前断开请求就是撤回，卡片随之作废。
 
+## 插件健康探测（`plugins.health`）
+
+监控类插件（如 Uptime Kuma）申请 `plugins.health` 后，经核心在插件网络里的别名
+`http://health.wonton.internal:8080` 读所有插件的健康状态，不用主人的登录凭据，也连不到任何插件的管理界面。
+按来源地址认出来源插件（同“工具与 MCP 总线”）：不在插件网络里的请求得到 403 `unauthenticated`，
+没申请 `plugins.health` 的得到 403 `permission_denied`。接口只读：不返回日志、配置和密钥，不触发任何操作。
+
+| 接口 | 返回 |
+| --- | --- |
+| `GET /plugins` | JSON 数组，每个已安装插件一项：`{id, title, state, checked_at}`。 |
+| `GET /plugins/<id>` | 同上，再加 `probe`：核心这一刻探测那个插件网页入口的结果。 |
+
+- `state` 是核心已知的状态：`running`、`stopped`、`degraded`（已安装但异常）、`installing`、`uninstalling`、
+  `upgrading`。以后核心新增的状态按 `other` 对待。
+- `checked_at` 是核心最近一次核对状态的时间（Unix 秒）。
+- `probe` 是核心从自己的位置请求目标插件网页入口（webui 声明的端口和路径，带插件公开地址的 Host，不带主人
+  身份）的结果，每次限期 5 秒，形状是 `{reachable, http_status, latency_ms, error_kind}`。连不上时
+  `error_kind` 是 `unreachable`，超时是 `timeout`，上游回了 5xx 是 `upstream_error`，三种 `reachable` 都是
+  `false`；其余状态码（包括应用自己跳登录、要鉴权的响应）`reachable` 都是 `true`。没声明网页入口的插件
+  `probe` 为 `null`，`probe_reason` 写明原因。
+- 同一个插件每秒最多请求 5 次，超了返回 429 `too_many_requests`。
+
+例子：Uptime Kuma 加一个 “HTTP(s) - Keyword” 类型的监控项，地址填
+`http://health.wonton.internal:8080/plugins/<id>`，关键字填 `"reachable":true`。目标插件正常运行时监控是绿的；
+插件停了，核心探测连不上，`reachable` 变成 `false`，监控变红。
+
 ## Agent 插件
 
 `kind: agent` 的插件是一个 Bot 的驱动。`protocol: matrix` 的 Agent 自己登录 Matrix；`protocol: acp` 的由 ACP 桥接到聊天。
@@ -1572,6 +1599,7 @@ x-wonton:
   | `models.wonton.internal` | `models` | 模型网关声明的服务和端口。 |
   | `matrix.wonton.internal` | `matrix.bot` | Tuwunel 的 Matrix 客户端接口。 |
   | `mcp.wonton.internal` | `tools` | 核心的 MCP 总线。 |
+  | `health.wonton.internal` | `plugins.health` | 只读的健康接口，见“插件健康探测”。 |
 
   不让声明 `models` 的插件直接加入模型网关的网络：那样这些插件彼此也连通了，还能访问网关容器的所有端口。
   经核心转发只多一跳（核心网关的 p50 约 0.27 ms），却守住了插件之间的隔离，核心也能按插件
