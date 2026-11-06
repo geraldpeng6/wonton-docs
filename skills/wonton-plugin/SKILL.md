@@ -9,6 +9,8 @@ description: 写一个 Wonton 插件，装到主人的服务器上，让主人�
 
 完整规范：<https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md>。
 
+有 Docker 的开发主机使用[插件开发指南](https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md)，开发环境、检查、套件更新和发布流程只在该指南维护。当前环境仍按下面的 outbox 和工具流程操作，不运行开发主机脚本，也不安装 Docker。
+
 ## 步骤
 
 1. 从 `assets/` 选一个例子复制进 outbox 下的新目录（`outbox/<名字>/`）。只有页面用 `static`，要存数据或抓外部内容用 `backend`。
@@ -21,11 +23,10 @@ description: 写一个 Wonton 插件，装到主人的服务器上，让主人�
 
 要能退回时，在 outbox 的目录里用 git 提交。要退回就再装一次旧版。
 
-## 不能写的
+## Compose 与文件
 
-`ports`、`build`、`networks`、`privileged`、`devices`、`cap_add`、`container_name`、`env_file`、`extends`，以及相对路径的卷。写了都报错。
+Compose 支持范围和高权限字段以规范的 [Compose 子集](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#compose-子集)、[权限](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#权限)和[局域网](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#局域网networklan)为准，不使用旧版禁用字段列表。当前无 Docker、不能构建镜像的环境仍使用公开镜像加 `configs`。
 
-- 网页经核心网关访问，声明 `webui` 就行，不要 `ports`。
 - 代码和页面用 `configs` 交给容器，不用卷。`configs` 的 `target` 不能在卷的挂载点里。
 - 数据放 `${WONTON_APP_DATA}`，挂成 `/data`。容器里别的地方在更新时都会丢。
 - 单个文件不超过 1 MiB，整个插件包不超过 2 MiB。依赖尽量用标准库。
@@ -57,7 +58,7 @@ description: 写一个 Wonton 插件，装到主人的服务器上，让主人�
 
 | 报错说的 | 怎么改 |
 | --- | --- |
-| `ports` 不支持 | 删掉，用 `webui.port` |
+| 端口声明不支持 | 按规范的 [Compose 子集](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#compose-子集)和[局域网](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#局域网networklan)核对；网页入口查[网页入口与单点登录](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#网页入口与单点登录) |
 | `build` 不支持 | 用公开镜像加 `configs` |
 | 未知字段 | 按报错列出的可选字段改 |
 | 引用的文件不存在 | 路径相对 compose 所在目录，不能有 `..` |
