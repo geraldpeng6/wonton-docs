@@ -664,10 +664,10 @@ x-wonton:
 | `WONTON_MODEL_ANTHROPIC_BASE_URL`、`WONTON_MODEL_GEMINI_BASE_URL` | `models`，且网关提供该接口 | Anthropic Messages、Gemini 接口的地址，按各自 SDK 的约定不带 `/v1`。 |
 | `WONTON_MODEL_API_KEY` | `models` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。 |
 | `WONTON_MODEL_DEFAULT` | `models` | 默认模型名，由网关决定（magpie 是路由组 `group/wonton-default`）。 |
-| `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，如 `http://mcp.wonton.internal:8080/mcp`。 |
+| `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，如 `http://mcp.wonton.internal:8080/mcp`。Bot 服务里带这个 Bot 的令牌，如 `…/mcp/<令牌>`。 |
 | `WONTON_MATRIX_HOMESERVER` | `matrix.bot` | Matrix 客户端接口的地址：核心在插件网络里的别名，如 `http://matrix.wonton.internal:8080`。 |
 | `WONTON_MATRIX_USER_ID`、`WONTON_MATRIX_ACCESS_TOKEN` | `matrix.bot` | Bot 的 Matrix 用户 ID 和访问令牌。 |
-| `WONTON_MATRIX_OWNER` | `matrix.bot` | Bot 用户的 Matrix 用户 ID，用作白名单：私人 Bot 只接受用户的指令。 |
+| `WONTON_MATRIX_ALLOWED_USERS` | `matrix.bot` | 这个 Bot 听的人的 Matrix 用户 ID，逗号分隔：私人 Bot 是归属人，共享 Bot 是所有家人。名单变了核心重建这个 Bot 的服务，沿用设备和令牌。 |
 | `WONTON_MATRIX_HOME_ROOM` | `matrix.bot` | Bot 的主房间：核心替用户建好的、和 Bot 的加密私聊，定时任务的结果发到这里。 |
 | `WONTON_SECRET_<名字>` | `secrets` 里由核心生成的项 | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
@@ -909,7 +909,8 @@ Bot 是一个 Matrix 身份加上驱动它的插件。核心没有接入 Matrix 
 - `WONTON_MATRIX_HOMESERVER` 是 `http://matrix.wonton.internal:<网关端口>`，核心在声明了 `matrix.bot` 的插件网络里的
   别名。网关按连接的来源地址认出请求来自哪个插件网络（不算网桥自己的地址，那是宿主那一侧），只转发声明了
   `matrix.bot` 的插件的请求，而且只转发 Matrix 客户端接口（`/_matrix/client/`、`/_matrix/media/`），管理接口和
-  联邦接口不转；其他来源得到 403 `M_FORBIDDEN`。插件不和 Tuwunel 共用网络。
+  联邦接口不转；其他来源得到 403 `M_FORBIDDEN`。插件里有多个 Bot 时，网关再按请求的访问令牌认出是插件里的
+  哪个 Bot：拿别的 Bot 或别的插件的令牌同样得到 403 `M_FORBIDDEN`。插件不和 Tuwunel 共用网络。
 - 账号和主房间建好后一直沿用：不删数据卸载后重装、安装失败后重试，都是同一个账号。Bot 还在主房间里，并且用户也在、
   或者还没交给过用户（上次安装没装完）时沿用它；用户退出过就新建一个。设备每次安装新建，安装失败回滚时吊销。
 - 插件的容器启动时，第一次安装的用户还不在主房间里。要往主房间里发消息的插件，等用户加入（`m.room.member` 事件）
@@ -987,7 +988,7 @@ Agent 设过，包括清成了空表）就不碰。所以升级到带素材的�
 
 ### 一个插件多个 Bot（`bots`）
 
-核心只发默认 Bot，家人的私人 Bot 留待以后。格式先定下，到时插件不用改结构。
+安装时核心只建默认 Bot `default`，其余 Bot 由用户（App 里加 Bot、主人建共享 Bot）经核心接口来建。
 
 ```yaml
 x-wonton:
@@ -1001,7 +1002,8 @@ x-wonton:
   `default`；用户新建 Bot 时，核心按 `bots.services` 为它再建一组容器；删掉 Bot 就删掉这组容器并吊销它的
   凭据。其余服务全插件一份。
 - 在这些服务里，`WONTON_MATRIX_*`、`WONTON_MODEL_API_KEY` 是这个 Bot 的值；`WONTON_BOT_NAME` 是 Bot 名
-  （小写字母、数字和单个 `-`），`WONTON_BOT_DATA` 是 `${WONTON_APP_DATA}/bots/<Bot 名>`。
+  （小写字母、数字和单个 `-`），`WONTON_BOT_DATA` 是 `${WONTON_APP_DATA}/bots/<Bot 名>`。Bot 服务的
+  `WONTON_MCP_URL` 带这个 Bot 的总线令牌（见“使用工具”）。
 - 隔离：Bot 服务挂载应用数据目录时只能挂自己的 `${WONTON_BOT_DATA}`，也不能用命名卷，这样一个 Bot 读不到
   别的 Bot 的记忆和凭据。
 - 依赖：Bot 服务可以依赖同一个 Bot 的服务和全插件一份的服务；全插件一份的服务不能依赖 Bot 服务。
@@ -1150,7 +1152,9 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
 
 - 申请了 `tools` 的插件得到 `WONTON_MCP_URL`，以 Streamable HTTP 连接。网关按来源地址认出调用方（同“模型网关”），
   不在插件网络里的请求得到 403 `unauthenticated`，没申请 `tools` 的得到 403 `permission_denied`。
-- 申请了 `tools` 的插件看到全部工具；按 Bot 的白名单放行留待以后（一个插件多个 Bot 时，每个 Bot 另发令牌）。
+- 一个插件多个 Bot 时，Bot 服务的 `WONTON_MCP_URL` 带这个 Bot 的总线令牌（路径 `/mcp/<令牌>`）：总线按令牌认出
+  是哪个 Bot，工具结果的 `_meta.user` 是它的归属人；拿别的 Bot 或别的插件的令牌得到 403。不带令牌的请求按来源
+  地址认出整个插件，看到的和拿到的都是插件级的。
 - 插件装上、卸掉、恢复运行时工具列表随之变化，总线给连着的客户端发 `notifications/tools/list_changed`。
 - 核心自己的工具：
 
