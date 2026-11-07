@@ -259,7 +259,7 @@ compose 里有自己数据目录的数据库服务（postgres、mariadb/mysql、
 
 ### 自建镜像
 
-把 Dockerfile 放在 `images/<名字>/`，在 Compose 中写待发布的 `ghcr.io/<你>/<名字>:<版本>` 镜像。`publish.sh` 用 `docker buildx` 构建 `linux/amd64` 和 `linux/arm64`，推送后把 Compose 镜像引用改为新摘要并提交。在本机发布前准备支持多架构构建的 buildx，并用 `docker login` 登录镜像仓库。第一次推送后，在 GitHub 包设置里确认镜像公开，保证用户主机可拉取。
+把 Dockerfile 放在 `images/<名字>/`，在 Compose 中写待发布的 `ghcr.io/<你>/<名字>:<版本>` 镜像。`publish.sh` 用 `docker buildx` 按清单的 `requirements.arch` 构建（没写时构建 `linux/amd64` 和 `linux/arm64`），推送后把 Compose 镜像引用改为新摘要并提交。在本机发布前准备支持多架构构建的 buildx，并用 `docker login` 登录镜像仓库。第一次推送后，在 GitHub 包设置里确认镜像公开，保证用户主机可拉取。
 
 开发时可先在开发主机构建同名镜像：
 
@@ -273,6 +273,6 @@ docker build -t ghcr.io/<你>/<名字>:<版本> images/<名字>
 
 1. **本机验证。** Compose 里只写标签（`ghcr.io/<你>/<名字>:<版本>`），用上面的命令在开发主机构建，再 `scripts/dev.sh install`、`smoke`。这一步证明插件在这台机器上能装能用。`scripts/check.sh` 提醒“镜像没有按摘要固定”是正常的；`--official` 因此不合格也是正常的。
 2. **交给别人审查，还没获准发布。** 别的机器拉不到你本机的镜像，审查者要自己构建。PR 说明里写清：镜像还没发布、Compose 没有摘要，构建命令（`docker build -t <镜像:标签> images/<名字>`），以及你验证时的平台（`docker version` 里的 `OS/Arch`）。不要为了让 `--official` 通过而自己推送镜像。
-3. **获准发布后。** 运行 `scripts/publish.sh`（或 GitHub Actions 的“发布”）。它构建 `linux/amd64` 和 `linux/arm64`、推送，把仓库返回的清单列表摘要写回 Compose，这时 `--official` 才能通过。
+3. **获准发布后。** 运行 `scripts/publish.sh`（或 GitHub Actions 的“发布”）。它按 `requirements.arch` 构建、推送，把仓库返回的清单列表摘要写回 Compose，这时 `--official` 才能通过。
 
 摘要只能来自推送到镜像仓库后返回的结果或 `docker buildx imagetools inspect`。本机的镜像 ID（`docker images` 里的 `IMAGE ID`、`docker inspect` 的 `Id`）不是镜像仓库里的摘要，不能写成 `@sha256:…`：别人按它拉不到镜像。
