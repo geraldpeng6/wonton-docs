@@ -289,7 +289,7 @@ services:
 **0.7**
 
 - `x-wonton`：`webui.cross_origin_isolated`（见“跨源隔离”）；`webui.oidc.post_logout_paths`、`webui.oidc.owner_groups`、
-  `webui.oidc.requires_email`（见“OIDC”）；`mcp.headers`、`mcp.tools`（见“工具与 MCP 总线”）；`bot.avatars`（见“Matrix Bot”）；
+  `webui.oidc.requires_email`（见“OIDC”）；`mcp.headers`、`mcp.tools`（见“工具与 MCP 总线”）；`bot.avatars`、`bot.chat_layout`（见“Matrix Bot”）；
   `provides.egress_proxy`（见“网络”的“代理插件”）；`provides.models.providers`，含 `custom`（见“模型网关”）。
 - 权限：`egress.proxy`、`plugins.health`。
 - Compose 的服务：`mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”），`cap_drop`，
