@@ -289,6 +289,7 @@ services:
 **0.8**
 
 - `x-wonton.optional_permissions`（见“可选权限”）。
+- `secrets.<名字>.show_owner`（见“插件密钥”），声明了的 `generate` 项主人能在 App 里查看。
 - 安装时注入的变量：`WONTON_PERMISSION_*`，可选权限开着时才有（见“安装时注入的变量”）。
 
 **0.7**
