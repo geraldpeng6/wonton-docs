@@ -476,6 +476,14 @@ ID”；内置管理员角色的显示名是 `Admin`，`admin` 就对得上。Bo
 应用的数据补邮箱：预建账号的值和 OIDC 登录给的 `sub`、`email` 声明一致，登录才对得上同一个账号。
 声明了 `requires_email` 的插件，用户装之前就填了邮箱。
 
+- 签发方和后台端点的地址只在插件网络里解析：`WONTON_OIDC_ISSUER` 是 `http://auth.wonton.internal:<端口>`，
+  `WONTON_OIDC_TOKEN_URL`、`WONTON_OIDC_USERINFO_URL` 同样用这个内部名字；`WONTON_OIDC_AUTH_URL` 是浏览器地址，
+  应用把浏览器送到那里授权。发现文档经网关给出时已经替你分好：`authorization_endpoint`、
+  `end_session_endpoint` 是浏览器地址，`token_endpoint`、`userinfo_endpoint`、`jwks_uri`、`revocation_endpoint`
+  是内部地址。签发方本身浏览器不访问，用哪个应用都一样写进配置。
+- 插件自己的网页地址在自己的网络里也解析得到，插件后端可以访问自己（比如给浏览器签发地址的应用回自己取东西）。
+  但把 `*.localhost` 直接当回环、不发 DNS 查询的库（curl、hickory-resolver）访问这个地址会绕过解析，得不到
+  核心的网关，这类应用要另外绕开：让浏览器那一侧去取，或改用 `WONTON_SERVICE_DOMAIN` 下的内部地址。
 - 选型时先看应用接不接受 `http` 的 issuer：有的强制 `https`（如 BookStack），核心的 OIDC 是 `http`，
   这类应用登录走不通。
 - `webui.path` 可以指向应用的 OIDC 起点：App 打开网页时把它拼在地址后面，核心给出的网页地址
@@ -737,8 +745,8 @@ x-wonton:
 | `WONTON_SHARE_<名称>` | 授权了该共享文件夹 | 共享文件夹路径（大写，`-` 换成 `_`，如 `WONTON_SHARE_PHOTOS`）。 |
 | `TZ`、`PUID`、`PGID` | 总是 | 时区与运行用户。`TZ` 是 IANA 时区名，如 `Asia/Shanghai`、`UTC`。 |
 | `WONTON_APP_URL` | 声明了 `webui` | 插件网页的公开地址，不带末尾 `/`。应用生成回调地址、外部链接时使用。 |
-| `WONTON_OIDC_ISSUER`、`WONTON_OIDC_CLIENT_ID`、`WONTON_OIDC_CLIENT_SECRET` | `webui.sso: oidc` | OIDC 客户端配置。 |
-| `WONTON_OIDC_AUTH_URL`、`WONTON_OIDC_TOKEN_URL`、`WONTON_OIDC_USERINFO_URL` | `webui.sso: oidc` | 各端点地址，给不支持发现文档的应用（如 Grafana）。 |
+| `WONTON_OIDC_ISSUER`、`WONTON_OIDC_CLIENT_ID`、`WONTON_OIDC_CLIENT_SECRET` | `webui.sso: oidc` | OIDC 客户端配置。签发方是核心在插件网络里的别名 `http://auth.wonton.internal:<端口>`。 |
+| `WONTON_OIDC_AUTH_URL`、`WONTON_OIDC_TOKEN_URL`、`WONTON_OIDC_USERINFO_URL` | `webui.sso: oidc` | 各端点地址，给不支持发现文档的应用（如 Grafana）。`AUTH_URL` 是浏览器地址（`auth.<基础域名>`），另外两个在插件网络里。 |
 | `WONTON_CORE_ADDRESS` | `webui.sso: proxy` | 核心在这个插件网络里的地址（网段的最后一个可用地址，如 `172.18.255.254`），核心容器重建后不变。写进应用的“信任的代理地址”，见“网关代登录”。 |
 | `WONTON_OWNER_NAME` | `owner.identity` | 用户的用户名，装好后不变，和 OIDC 的 `sub`、`preferred_username` 以及代登录模板的 `{user}` 同值，见下文。 |
 | `WONTON_OWNER_EMAIL` | 同上，且用户填了邮箱 | 用户的邮箱，和 OIDC 的 `email`、代登录模板的 `{email}` 同值。值是建容器时的快照，见下文。 |
@@ -1742,7 +1750,8 @@ x-wonton:
 
   | 别名 | 出现条件 | 转发到 |
   | --- | --- | --- |
-  | `auth.<基础域名>` | `webui.sso: oidc` | 身份提供方的公开端点；浏览器和插件看到同一个签发方地址。 |
+  | `auth.wonton.internal` | `webui.sso: oidc` | 身份提供方的公开端点。签发方和后台端点用它，浏览器走 `auth.<基础域名>`，见“OIDC”。 |
+  | `<slug>.<基础域名>` | 声明了 `webui` | 这个插件自己的网页地址：插件网络里的容器访问它时网关不要会话，直接转给它的网页服务，也不带身份。别的来源照旧要会话。 |
   | `models.wonton.internal` | `models` | 模型网关声明的服务和端口。 |
   | `matrix.wonton.internal` | `matrix.bot` | Tuwunel 的 Matrix 客户端接口。 |
   | `mcp.wonton.internal` | `tools` | 核心的 MCP 总线。 |
@@ -1771,7 +1780,7 @@ x-wonton:
 - 走代理：要走代理才能出网的主机，用户配一次代理地址，插件不用管。出口容器 `wonton-egress` 接在每个出网插件的网络上，别名 `egress.wonton.internal`，是这些网络里除核心和插件服务之外唯一的容器。连宿主时用网关地址或局域网地址都行，和不配代理时一样。
   - 核心给声明了 `network.egress` 的插件的每个服务（写了 `network_mode: none` 或 `host` 的除外：`none` 不出网，`host` 走宿主自己的路由，不经出口容器；`service:<服务名>` 照常写）写好 `HTTP_PROXY`、`HTTPS_PROXY`、`http_proxy`、`https_proxy`、`NO_PROXY`、
     `no_proxy` 和 `NODE_USE_ENV_PROXY=1`。地址是出口容器 `http://egress.wonton.internal:3128`，插件看不到用户的代理。`NO_PROXY` 已经包含回环、
-    `.wonton.internal`、`auth.<基础域名>`、本插件的服务名和 IPv4 私有网段（10/8、100.64/10、169.254/16、172.16/12、192.168/16；插件网络和
+    `.localhost`、`.wonton.internal`、本插件的服务名和 IPv4 私有网段（10/8、100.64/10、169.254/16、172.16/12、192.168/16；插件网络和
     `--lan` 网络的网段都在这些私有网段里。IPv6 网段条目会把 httpx 这类读了 `NO_PROXY` 的客户端建连接时弄崩，所以不写）。没配代理时这些变量都不写。这是核心唯一直接写进容器环境的一组变量。
   - compose 里写了同名代理变量时以 compose 为准，写成空就是这个服务不走代理。写了 `NO_PROXY` 或 `no_proxy` 时核心不覆盖，把自己名单里缺的条目并到后面：作者写的名单常常只有自己的服务，少了核心的条目，插件内部的请求会被送去用户的代理，上游解析不了插件的服务名，得到 502 一类的错。不要写具体的代理地址：官方索引不收，换一台主机也用不了。
   - 镜像自己带了代理变量（`docker inspect --format '{{.Config.Env}}' <镜像>` 能看到）时，在 compose 里把它们写成空（`HTTP_PROXY: ""` 这样，核心不注入的名字也一样），或者从镜像里去掉。不然这些变量原样进容器：没配代理、或插件没声明 `network.egress` 时核心什么都不注入，应用照着镜像里的地址走，同插件的内部请求也发给那个代理。声明了 `network.egress` 且配了代理时，核心注入的变量盖掉镜像里同名的，核心不管的名字（如 `ALL_PROXY`）原样保留。
