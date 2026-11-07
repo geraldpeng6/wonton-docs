@@ -1,0 +1,9 @@
+{
+  "client_id": "https://geraldpeng6.github.io/wonton-docs/oauth/client.json",
+  "client_name": "Wonton",
+  "client_uri": "https://github.com/geraldpeng6/wonton-docs",
+  "redirect_uris": ["https://geraldpeng6.github.io/wonton-docs/oauth/callback/"],
+  "grant_types": ["authorization_code", "refresh_token"],
+  "response_types": ["code"],
+  "token_endpoint_auth_method": "none"
+}

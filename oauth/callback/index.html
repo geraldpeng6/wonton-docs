@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Wonton</title>
+<style>body{font:16px system-ui,sans-serif;margin:3em 1.5em;text-align:center}a{color:inherit}</style>
+</head>
+<body>
+<p id="msg">Returning to Wonton…</p>
+<p><a id="open" href="wonton://oauth/callback">Open Wonton</a></p>
+<script>
+// The provider redirects here with ?code=&state= (or ?error=). Nothing is stored or sent anywhere:
+// the query is handed to the app, which passes it to the connector on the user's own server.
+// The code is useless without the PKCE verifier, which never leaves that connector.
+(function () {
+  var q = location.search;
+  if (!q) { document.getElementById("msg").textContent = "Nothing to do here."; return; }
+  var target = "wonton://oauth/callback" + q;
+  document.getElementById("open").href = target;
+  history.replaceState(null, "", location.pathname);
+  location.replace(target);
+})();
+</script>
+</body>
+</html>
