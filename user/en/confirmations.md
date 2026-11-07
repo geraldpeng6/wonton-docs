@@ -31,6 +31,8 @@ Cards for plugin tools can be relaxed. Installing and uninstalling a plugin alwa
 - **“一律允许” (Allow everything)**: on the bot's details page. This bot can use the tools of every plugin without asking, including plugins you install later. A prompt injection could make it change data, delete things or send content out with no confirmation, so turn it on only if you accept that risk.
 - **Mark as read-only**: on the plugin details page, expand “工具” (Tools). A tool you turn on counts as read-only, and no bot is asked about it.
 
+A plugin with a highest-level permission turned on (such as “控制 Docker”, Control Docker) is the exception: every call to its tools asks, none of the above applies, and its cards have no “30 分钟内都允许”.
+
 ## When a card is expected
 
 If you are unsure, choose “拒绝” (Reject) and ask the agent what it will change and which data it will affect.
