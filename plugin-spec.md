@@ -1,4 +1,4 @@
-# 插件规范 `x-wonton`（草案 v0.6）
+# 插件规范 `x-wonton`（草案 v0.7）
 
 > 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
@@ -27,7 +27,7 @@ services:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
 
 x-wonton:
-  spec: "0.6"
+  spec: "0.7"
   id: app.immich.photos
   version: 2.0.0
   kind: app
@@ -244,7 +244,7 @@ services:
 
 | 字段 | 说明 |
 | --- | --- |
-| `spec` | 必填。清单按哪一版规范写成，字符串，如 `"0.6"`（YAML 里要加引号，不然读成数字）。没写时安装失败。核心先读它：比核心支持的版本新时安装失败（`unsupported`），提示先升级核心，不再逐项报未知字段。 |
+| `spec` | 必填。清单按哪一版规范写成，字符串，如 `"0.7"`（YAML 里要加引号，不然读成数字）。没写时安装失败。核心先读它：比核心支持的版本新时安装失败（`unsupported`），提示先升级核心，不再逐项报未知字段。用到“各版本新增的字段”里某一版的字段时，至少写那一版，旧核心才会如实提示升级。 |
 | `icon` | 图标，见下节。 |
 | `screenshots` | 截图：仓库里的 PNG 或 JPEG（路径规则同插件包里的文件），1 到 6 张，按顺序显示。截图不算插件包的一部分：不参与插件包摘要，安装时不取，上传插件包时忽略；商店的详情页要显示时，核心按同一个提交去取。 |
 | `author` | 插件包的作者：`name`（必填）、`url`（HTTPS，可选）。不一定是应用的作者。 |
@@ -281,6 +281,19 @@ services:
 `title` 写产品原名，如 Immich、Syncthing，不要翻译成用途，用途交给 `tags`。原名不译时只写 `en`，如 `title: { en: Immich }`。插件自己就是产品、没有上游时才用功能名，`zh` 和 `en` 都写。
 
 `description` 和 `about` 写给普通用户：`description` 一句话说清它能帮你做什么，不写技术实现，读者称呼“你”。
+
+### 各版本新增的字段
+
+清单用到下面某一版新增的字段时，`spec` 至少写那一版。
+
+**0.7**
+
+- `x-wonton`：`webui.cross_origin_isolated`（见“跨源隔离”）；`webui.oidc.post_logout_paths`、`webui.oidc.owner_groups`、
+  `webui.oidc.requires_email`（见“OIDC”）；`mcp.headers`、`mcp.tools`（见“工具与 MCP 总线”）；`bot.avatars`（见“Matrix Bot”）；
+  `provides.egress_proxy`（见“网络”的“代理插件”）；`provides.models.providers`，含 `custom`（见“模型网关”）。
+- 权限：`egress.proxy`、`plugins.health`。
+- Compose 的服务：`mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”），`cap_drop`，
+  `network_mode: "service:<服务名>"`（见“网络”）；`security_opt` 只写 `no-new-privileges:false` 时不用申请 `security.opt`。
 
 ### 图标和截图
 
