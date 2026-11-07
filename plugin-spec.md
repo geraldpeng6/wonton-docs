@@ -289,6 +289,7 @@ services:
 **0.8**
 
 - `x-wonton.optional_permissions`（见“可选权限”）。
+- `secrets.<名字>.show_owner`（见“插件密钥”），声明了的 `generate` 项主人能在 App 里查看。
 - 安装时注入的变量：`WONTON_PERMISSION_*`，可选权限开着时才有（见“安装时注入的变量”）。
 
 **0.7**
@@ -1461,6 +1462,9 @@ x-wonton:
   secrets:
     web_key:                          # 核心生成，注入为 WONTON_SECRET_WEB_KEY
       generate: { bytes: 32 }
+    admin_password:                   # 核心生成，主人在 App 里查看
+      generate: { bytes: 32 }
+      show_owner: { label: { zh: 管理员密码, en: Admin password, zh-Hant: 管理員密碼, ja: 管理者パスワード } }
     matrix_recovery_key:              # 插件运行中生成，交给核心保管
       collect: { service: gateway, path: /opt/data/platforms/matrix/recovery-key.txt }
 ```
@@ -1477,7 +1481,11 @@ x-wonton:
   不随 `bytes`、`encoding` 的修改重新生成。
 - 做法同 Runtipi 的 `random` 字段：随机生成后保存，不像 Umbrel 的 `APP_SEED` 那样从主种子派生——只恢复了
   应用数据、没恢复种子时，派生出的值就对不上。
-- v0.1 不轮换，也不在 App 里显示（待定）。
+- v0.1 不轮换。
+- `show_owner` 可选：`label` 是 App 里这一行的名字（多语言，至少 `zh` 和 `en`）。声明了的项，主人能在
+  App 的插件详情页查看值：默认收起，点开再取值；每次取值核心记一条审计（谁、哪个插件、哪个密钥，不记值）。
+  只能加在 `generate` 项上——Uptime Kuma 这类首次启动就预建管理员账号的应用，管理员密码用它，主人换设备
+  后照样能登录；`collect` 项是插件交给核心保管的凭据（如恢复密钥），不给人看，写了 `show_owner` 报清单错误。
 
 **插件生成、核心保管（`collect`）**
 
