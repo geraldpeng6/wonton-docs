@@ -399,7 +399,7 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 - 应用能关自助注册时，默认关掉第一个账号以外的注册。
 - 应用的登录页关不掉就留着，局域网浏览器里用户登两次。不要为了去掉它去改应用。
 - 插件自己的服务要访问应用（比如 MCP 服务调应用的接口）时，用 `secrets` 里的密钥，不要用用户的账号。
-- 要用户的用户名或邮箱时（比如拿用户名建系统账号），申请 `owner.identity`，不要为此声明 `sso: proxy`。
+- 要用户的用户名或邮箱时（比如拿用户名建系统账号），或者要知道家人用什么语言时，申请 `owner.identity`，不要为此声明 `sso: proxy`。
 - 忘了密码按应用自己的办法找回。不删数据重装还是原来的账号，删了数据就要重新注册。
 
 ### OIDC
@@ -693,7 +693,7 @@ x-wonton:
 | `plugins.health` | — | 读所有插件的健康状态，见“插件健康探测”。 |
 | `matrix.bot` | — | 以 Bot 身份收发消息，见“Matrix Bot”。 |
 | `notify` | — | 给用户发通知，见“通知”。 |
-| `owner.identity` | — | 知道用户的用户名和邮箱，见“安装时注入的变量”。 |
+| `owner.identity` | — | 知道用户的用户名和邮箱，还能查家人用什么语言，见“安装时注入的变量”。 |
 | `network.egress` | — | 能访问外网，也能访问用户的局域网，安装确认按这句写。见“网络”。 |
 | `network.lan` | 高 | 在局域网上开放 `lan.ports` 列出的端口，见“局域网”。 |
 | `egress.proxy` | 高 | 做出网代理：选它以后，所有出网插件的请求都经过它，它能看到这些插件访问了哪些网站，也能改写不加密的内容。和 `provides.egress_proxy` 成对，见“网络”的“代理插件”。 |
@@ -1283,7 +1283,7 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
   | `wonton__save_file` | 按路径授权 | 把 outbox 里的文件存进共享文件夹，见下面的“Bot 存文件”。 |
   | `wonton__get_profile` | 否 | 读你自己的 Bot 的资料：实际名字、有没有静态头像、哪些状态设了状态头像，和“名字和头像”里的状态与限制。只作用于调用方自己的 Bot，不接受参数。 |
   | `wonton__set_profile` | 否 | 改你自己的 Bot 的名字或头像，不需要用户确认。`name`：新名字，去掉首尾空白后 1 到 32 个字符，不含控制字符，不能用核心（Wonton、云吞、雲吞）或用户的名字，不分大小写。`avatar`：静态头像在 outbox 里的相对路径。`avatars`：要改的状态，每项是相对 outbox 的路径，写 `null` 清掉这个状态，没写的不动。不收 `mxc://`。成功后删掉用过的 outbox 文件，失败时保留。每个 Bot 每小时最多成功改 10 次，超了返回 `rate_limited` 和还要等的秒数。 |
-  | `wonton__user_locale` | 否 | 某人用的语言。`user_id` 是这台服务器上的 Matrix ID，省略时是主人。返回 `locale`（他最近一次请求的第一个语言标签，BCP 47 原样）和按偏好排的 `languages`（`*` 去掉）；没有记录时 `locale` 是 `null`、`languages` 是空数组。核心不替插件选默认语言。查主人以外的人要申请 `owner.identity`，没申请时一律 `permission_denied`（存在的人和陌生人是同一个错，不申请就探不出家里有谁）；不是本服务器的 ID 是 `not_this_server`，本服务器上不认识的人（含 Bot、已移除的家人）是 `not_found`。 |
+  | `wonton__user_locale` | 否 | 某人用的语言。`user_id` 是这台服务器上的 Matrix ID，省略时是主人；替某个人发言时一定要传他的 `user_id`，省了会拿到主人的语言。返回 `locale`（他最近一次请求的第一个语言标签，BCP 47 原样）和按偏好排的 `languages`（`*` 去掉）；没有记录时 `locale` 是 `null`、`languages` 是空数组。核心不替插件选默认语言。查主人以外的人要申请 `owner.identity`，没申请时一律 `permission_denied`（存在的人和陌生人是同一个错，不申请就探不出家里有谁）；不是本服务器的 ID 是 `not_this_server`，本服务器上不认识的人（含 Bot、已移除的家人）是 `not_found`。 |
   | `wonton__help` | 否 | Wonton 和 App 的帮助文档，见下面的“帮助文档”。 |
 
 - 插件目录就是官方索引（见“发布与来源”）。Bot 能装官方索引里的插件和自己写的插件（见“Agent 写插件”），不能装社区插件。
