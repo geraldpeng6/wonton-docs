@@ -61,7 +61,7 @@ scripts/dev.sh reinstall
 按下面的顺序查规范、改文件：
 
 1. **确定身份与需求。** 修改应用身份和版本，按[字段](plugin-spec.md#字段)、[对宿主的要求](plugin-spec.md#对宿主的要求)选择清单内容；商店文案按[商店信息](plugin-spec.md#商店信息)准备。
-2. **替换服务和镜像。** 先选上游官方镜像，查[镜像](plugin-spec.md#镜像)和 [Compose 子集](plugin-spec.md#compose-子集)，再改服务。`image:` 不用 YAML 锚点，见 [Compose 子集](plugin-spec.md#compose-子集)。查询多架构镜像摘要可用 `docker buildx imagetools inspect <镜像:标签>`，查看输出开头的 `Digest:`。自建镜像的操作见[发布](#发布)。
+2. **替换服务和镜像。** 先选上游官方镜像，上游没有时按[镜像](plugin-spec.md#镜像)的规矩自建，查[镜像](plugin-spec.md#镜像)和 [Compose 子集](plugin-spec.md#compose-子集)，再改服务。`image:` 不用 YAML 锚点，见 [Compose 子集](plugin-spec.md#compose-子集)。查询多架构镜像摘要可用 `docker buildx imagetools inspect <镜像:标签>`，查看输出开头的 `Digest:`。自建镜像的操作见[发布](#发布)。
 3. **接入网页和登录。** 按[网页入口与单点登录](plugin-spec.md#网页入口与单点登录)选择接入方式；需要时再查 [OIDC](plugin-spec.md#oidc) 或[网关代登录](plugin-spec.md#网关代登录sso-proxy)。用[安装时注入的变量](plugin-spec.md#安装时注入的变量)配置应用，不猜地址、令牌或用户身份。
 4. **安排数据与配置。** 按 [Compose 子集](plugin-spec.md#compose-子集)安排持久化，按[配置文件](plugin-spec.md#配置文件configs)交付文件。需要首次写入应用配置时，查[一次性服务与首次写配置](plugin-spec.md#一次性服务与首次写配置)；需要凭据时，查[插件密钥](plugin-spec.md#插件密钥secrets)。开发环境中的插件数据可在 `.wonton/data/apps/<slug>/` 查看。
 5. **核对网络和权限。** 一起阅读[权限](plugin-spec.md#权限)、[网络](plugin-spec.md#网络)、[局域网](plugin-spec.md#局域网networklan)与 [Compose 子集](plugin-spec.md#compose-子集)，核对应用需要的能力；需要显卡时另查[显卡](plugin-spec.md#显卡devicesgpu)。
