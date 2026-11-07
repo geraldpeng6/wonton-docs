@@ -85,7 +85,8 @@ x-wonton:
 | `bot` | 否 | Bot 的显示名（`display_name`，多语言）、静态头像（`avatar`）和状态头像（`avatars`：`idle`、`working`、`waiting`、`offline` 四个状态各一个文件），都是插件包里的文件。只能和 `matrix.bot` 权限一起声明，见“Matrix Bot”。 |
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
 | `agent` | `kind=agent` 时必填 | `protocol`：`matrix`（Agent 自己登录 Matrix，须声明 `matrix.bot`）或 `acp`（经 ACP 桥接入）。可选 `login`，见“Agent 插件”。 |
-| `provides` | 否 | 向其他插件提供的能力，v0.1 只有 `models`（见“模型网关”）。只有 `kind: system` 的插件可以声明。 |
+| `provides` | 否 | 向其他插件提供的能力：`models`（见“模型网关”，只能 `kind: system` 的插件声明）、`egress_proxy`（见“网络”的“代理插件”），以及其他能力，键是能力名，见“能力依赖”。 |
+| `requires`、`wants` | 否 | 依赖的能力名列表：`requires` 的能力没有提供方装不上，`wants` 有提供方就用、没有照装。见“能力依赖”。 |
 | `gpu` | 否 | 拿到显卡的服务（`services`）。要和 `devices.gpu` 权限一起声明，见“显卡”。 |
 | `lan` | 否 | 在局域网上开放的端口（`ports`）。要和 `network.lan` 权限一起声明，见“局域网”。 |
 | `secrets` | 否 | 插件自己的密钥：核心生成后注入，或插件运行中生成、交给核心保管（见“插件密钥”）。 |
@@ -777,6 +778,8 @@ x-wonton:
 | `WONTON_MODEL_ANTHROPIC_BASE_URL`、`WONTON_MODEL_GEMINI_BASE_URL` | `models`，且网关提供该接口 | Anthropic Messages、Gemini 接口的地址，按各自 SDK 的约定不带 `/v1`。没接上网关时是空字符串。 |
 | `WONTON_MODEL_API_KEY` | `models` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。没接上网关时是空字符串。 |
 | `WONTON_MODEL_DEFAULT` | `models` | 默认模型名，由网关决定（magpie 是路由组 `group/wonton-default`）。没接上网关时是空字符串。 |
+| `WONTON_<能力名大写>_URL` | `requires` 或 `wants` 了某个能力 | 使用方访问提供方的地址：核心在插件网络里的别名 `<能力名>.wonton.internal`。名字转大写、非字母数字换成 `_`，如 `WONTON_TORRENT_CLIENT_URL`。见“能力依赖”。 |
+| `WONTON_<能力名大写>_KEY` | 同上，且提供方声明了 `credentials` | 只属于本插件的凭据。见“能力依赖”。 |
 | `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，如 `http://mcp.wonton.internal:8080/mcp`。 |
 | `WONTON_NOTIFY_URL` | `notify` | 发通知的地址：核心在插件网络里的别名，如 `http://notify.wonton.internal:8080/notices`，见“通知”。 |
 | `WONTON_MATRIX_HOMESERVER` | `matrix.bot` | Matrix 客户端接口的地址：核心在插件网络里的别名，如 `http://matrix.wonton.internal:8080`。 |
@@ -827,6 +830,110 @@ x-wonton:
 
 能以任意 uid 运行的镜像优先写 `user: "${PUID}:${PGID}"`，宿主上的文件就归用户的用户。这里不另设清单
 字段：compose 的 `user` 已经说明了容器以谁运行。
+
+## 能力依赖（`requires`、`wants`）
+
+一个插件要用另一个插件提供的服务（Seerr 用 Jellyfin 的接口、Prowlarr 往下载器喂种子）时，在清单里按**能力**写
+依赖，不按插件名写：提供方可以换成任何提供同一能力的插件，使用方不用改。
+
+核心不支持插件间依赖时，安装和升级含非空 `requires`、`wants`，或声明 `torrent_client`、`jellyfin`、第三方能力的
+`provides` 的插件均报 `unsupported`，提示升级核心；`plugin check` 仍校验这些声明，作者可以先写好清单。
+`models` 权限、`provides.models` 和 `provides.egress_proxy` 不受这道拦截影响。下面的连接和生命周期规则仅适用于
+支持这些能力的核心；字段的最低规范版本以“各版本新增的字段”收录为准。
+
+```yaml
+x-wonton:
+  provides:
+    torrent_client: { service: qbittorrent, port: 8080 }
+  requires: [torrent_client]   # 没有提供方就装不上
+  wants: [jellyfin]            # 有提供方就用，没有照装
+```
+
+### 能力名
+
+能力名有两种：
+
+- **核心定义的**：小写字母加下划线。核心维护能力表，只有表里的名字能用：
+
+  | 能力 | 接口 | 凭据 | 高权限 |
+  | --- | --- | --- | --- |
+  | `models` | OpenAI 兼容 API（`provides.models.apis`），凭据按使用方隔离。使用方照旧申请 `models` 权限，不经 `wants` 声明 | 要，在 `provides.models.credentials` 里 | 否 |
+  | `egress_proxy` | HTTP 代理，出口设置在提供方。没有使用方声明，不能写在 `requires`/`wants` 里 | 不用 | 否（风险由 `egress.proxy` 高权限管） |
+  | `torrent_client` | qBittorrent Web API v2（`/api/v2/`） | 不用 | 否 |
+  | `jellyfin` | Jellyfin 的 HTTP API | 要，在 `provides.jellyfin.credentials` 里 | 否 |
+
+  接口有不兼容的变化时换一个新名字（如 `search2`），能力名不带版本号。高权限能力见下面的“高权限能力”。
+- **第三方定义的**：`x-<作者>.<名字>`，作者和名字都用小写字母、数字、连字符，如 `x-acme.ledger`。核心只按名字
+  配对提供方和使用方，不保证两边的接口对得上，对不上时是使用方自己报错。商店和确认页把它标成
+  “第三方定义的能力”。
+
+写了不带 `x-` 又不在表里的能力名，安装失败并说明“这份核心不认识能力 X，升级核心后再装”。同一个能力不能既在
+`requires` 又在 `wants`；提供能力的插件不能再 `requires` 别的能力（可以 `wants`）。
+
+### 使用方
+
+- 访问地址是核心在插件网络里的别名 `<能力名>.wonton.internal`（第三方的如
+  `x-acme.ledger.wonton.internal`），核心认出来源、转发给它选用的提供方，并注入
+  `WONTON_<能力名大写>_URL`。插件和提供方不在同一个网络里，只能经这个别名访问。
+- 核心转发时带上 `X-Wonton-Plugin: <使用方 ID>`，提供方据此区分是谁。没声明这个能力的插件访问别名得到
+  403，提供方没在运行时得到 503。
+- 提供方没在运行（停了、异常、记录读不懂）时，`requires` 它的插件标为异常并写明是哪个提供方，提供方恢复后
+  核心重新核对，使用方回到运行中；只 `wants` 它的插件状态不变，详情页一条轻提示（带提供方的插件 ID 和名字，
+  文字由 App 按类别写）。
+
+### 提供方
+
+`provides` 里按能力名声明监听的服务和端口，要声明凭据的能力再写 `credentials`：
+
+```yaml
+x-wonton:
+  provides:
+    jellyfin:
+      service: jellyfin
+      port: 8096
+      credentials:
+        issue: [sh, /wonton/credentials.sh, issue, "{name}"]
+        revoke: [sh, /wonton/credentials.sh, revoke, "{name}"]
+```
+
+- `service` 是 compose 里的服务，`port` 是它监听的端口；核心只转发到这个端口。
+- `credentials` 的形状和执行方式同模型网关的凭据命令（见“模型网关”的“凭据的签发与吊销”）：核心给每个使用方
+  签一个只属于它的凭据，注入 `WONTON_<能力名大写>_KEY`。能力表标了“不用凭据”的能力不声明它，提供方只认经
+  核心转发来的请求。
+- 同一能力可以装几个提供方。设置里每种能力有一个全局默认的提供方（装上第一个时它就是默认；默认的被卸掉时，
+  核心换成装得最早的），使用方可以在自己的详情页里单独指定另一个，不跟默认走。
+
+### 高权限能力
+
+有的能力让使用方能借提供方做很多事（比如能跑命令、改文件的 Agent）：使用方连上它，就拿到了提供方的大部分
+本事，所以“谁连上了谁”要主人点头，不能跟着依赖关系自动发生。
+
+- 哪些算高权限：核心定义的看能力表（上面的“高权限”列）；第三方能力（`x-` 前缀）核心读不懂接口，看提供方——
+  提供方申请了任一级高权限（`network.host`、`privileged` 这些），或者它是 Agent 插件，这个能力就按高权限
+  处理。确认页把提供方这一项醒目标出来。
+- 三个时刻要主人确认，确认页写明“X 能经 Y 使用 <能力>”：装使用方（含一起装的提供方）时；换提供方时（详情页
+  里换、设置里改默认、默认的被卸掉改用别的）；提供方后装时，已装、`wants` 这个能力的插件不自动接上——提供方
+  的安装确认页列出它们，主人勾选的才接上，没勾的详情页留一条轻提示，以后可以在那里接上。Bot 发起的一律走
+  确认卡片。
+- 核心按“使用方—提供方—能力”的确认记录转发：没有记录的请求得到 403 `permission_denied`，和没声明这个能力
+  的插件一样。同一对确认过一次，重启、升级都不再问（升级多申请的权限照常在升级确认页列出）；卸掉使用方或
+  提供方时记录一起删，重装要重新确认。
+- 核心只管连不连；连上以后使用方能让提供方做什么（比如 Agent 的工具确认），由提供方自己管，核心不在中间拦
+  单个请求。
+
+### 装、卸、停、升级
+
+- 装使用方时，缺的 `requires` 能力连同索引里提供它的插件（含各自的安装来源）一起列在确认页上，用户选一个、
+  确认一次：核心先装提供方、等它就绪，再装使用方；提供方装失败时使用方不装，错误写明是哪一个。索引里没有
+  提供这个能力的插件时装不上。
+- 缺 `wants` 的能力照装，详情页一条轻提示。
+- 卸载提供方时，有使用方 `requires` 它、又没有别的提供方能接上，就拦下并列出这些插件（插件 ID 和名字）；有别的
+  提供方时，这些使用方改用默认的那个。只被 `wants` 的照卸，确认页写明哪些插件会用不上它。
+- 卸载使用方后，有提供方再没有别的插件在用，问用户要不要一起卸，不自动卸。
+- 停止提供方不拦，确认页写明谁会受影响。
+- 升级提供方时，新版本不再提供某个有人 `requires` 的能力、又没有别的提供方能接上，拦下这次升级并写明是谁
+  在用。
+- 启动 `requires` 了某能力的插件时，它选用的提供方停着就先启动提供方。
 
 ## 预装插件
 
@@ -929,8 +1036,8 @@ x-wonton:
 
 命令都在 `credentials.service`（默认 `service`）的容器里执行，以容器默认用户运行。核心不经 shell 拼接或解释 argv。
 
-同一台服务器同时只能有一个插件提供 `models`，装第二个时安装失败（`conflict`）。提供方看得到全部模型请求和
-provider 的 key，所以只有 `kind: system` 的官方插件可以声明。
+同一能力可以同时装几个提供 `models` 的插件，用户在设置里选全局默认的，使用方可以在自己的详情页里单独指定
+（见“能力依赖”）。提供方看得到全部模型请求和 provider 的 key，所以只有 `kind: system` 的官方插件可以声明。
 
 `/models` 和 `providers.list.configured` 只说明模型能力和已配置服务商，不证明 key 仍有效。最小补全会计费，
 不能每轮巡检发送（30 秒一次约每天 2880 次）。仅在核心启动后首轮、使用方刚安装或刚启动时各检查一次；
@@ -1976,7 +2083,8 @@ x-wonton:
   检出（核心不连 Git，不核对），条目的 JSON 写到标准输出；加 `--index <索引目录>` 时直接写进本地的索引目录，同一个
   来源的旧条目换掉。
 - 收录要求：`wonton-core plugin check --official` 通过，即有 `icon`、`tags`、`license`、`author`、`notices`，`description`、`tags`、`about`、`release_notes` 都写了 `zh` 和 `en`，所有服务的 `image`
-  按摘要固定，长期运行的服务都有健康检查；申请的权限和插件做的事相符；镜像来自上游官方或作者可复现的构建。
+  按摘要固定，长期运行的服务都有健康检查；申请的权限和插件做的事相符；镜像来自上游官方或作者可复现的构建；
+  清单里 `requires` 的每个能力，索引里至少要有一个插件提供，否则这个条目不收录。
 - 核心不内置索引，从 GitHub 取，取不到时用磁盘上次成功的那份，并说明列表是什么时候的、为什么没更新。开发镜像和测试用本地的索引目录代替（`WONTON_STORE_INDEX`）：`index.json`
   加上按 sha256 存放的文件（`blobs/<sha256 的十六进制>`）。
 
