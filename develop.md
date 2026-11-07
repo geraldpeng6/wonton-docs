@@ -230,7 +230,17 @@ scripts/dev.sh kit-update
 
 ## 发布
 
-上游镜像发新版时，仓库里的 `.github/dependabot.yml`（套件经 kit 提供）会让 Dependabot 自动开升级 PR：标签和摘要一起改。升级 PR 的 CI 自动带端到端冒烟，两项检查都过了就合；升级 PR 里不改版本号和发版说明，攒到发版时一起改——`scripts/publish.sh` 会校验版本比上一个 tag 新、发版说明和上一个 tag 不同，没改会停下提示。
+上游镜像发新版时，仓库里的 `.github/dependabot.yml` 会让 Dependabot 自动开升级 PR：标签和摘要一起改。这个文件从模板来，之后归插件自己维护，`dev.sh kit-update` 不覆盖它。
+
+compose 里有自己数据目录的数据库服务（postgres、mariadb/mysql、mongo、elasticsearch、meilisearch 等），在 `dependabot.yml` 里忽略它的大版本升级：大版本之间常要迁移数据，自动升上去会让主人的数据读不出来。大版本升级手动做，在发版说明里写清迁移步骤。
+
+```yaml
+    ignore:
+      - dependency-name: "postgres"
+        update-types: ["version-update:semver-major"]
+```
+
+升级 PR 的 CI 自动带端到端冒烟，两项检查都过了就合；升级 PR 里不改版本号和发版说明，攒到发版时一起改——`scripts/publish.sh` 会校验版本比上一个 tag 新、发版说明和上一个 tag 不同，没改会停下提示。
 
 1. 改清单版本并填写更新说明，核对许可声明及引用文件，提交插件改动；字段和版本约束查[商店信息](plugin-spec.md#商店信息)、[插件仓库](plugin-spec.md#插件仓库)和[升级](plugin-spec.md#升级)。
 2. 先完成检查和冒烟。公开仓库可在 GitHub Actions 中手动运行“发布”（`.github/workflows/publish.yml`，默认带 `--official`）。它用 `GITHUB_TOKEN` 推送镜像，本机无需登录镜像仓库。
