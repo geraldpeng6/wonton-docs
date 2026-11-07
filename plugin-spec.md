@@ -82,7 +82,7 @@ x-wonton:
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`display`（见“全屏”）、`cross_origin_isolated`（见“跨源隔离”）。 |
 | `tabs` | 否 | 能放到 App 底栏的页面，要和 `webui` 一起声明，见“底栏页面”。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `headers`（见“提供工具”）、`tool_idle_seconds`、`tool_total_seconds`、`tools`（只提供列出的工具），见“工具与 MCP 总线”。 |
-| `bot` | 否 | Bot 的显示名（`display_name`，多语言）、静态头像（`avatar`）和状态头像（`avatars`：`idle`、`working`、`waiting`、`offline` 四个状态各一个文件），都是插件包里的文件。只能和 `matrix.bot` 权限一起声明，见“Matrix Bot”。 |
+| `bot` | 否 | Bot 的显示名（`display_name`，多语言）、静态头像（`avatar`）和状态头像（`avatars`：`idle`、`working`、`waiting`、`offline` 四个状态各一个文件），都是插件包里的文件；聊天页的默认显示方式（`chat_layout`、`chat_path`，见“聊天页的显示方式”）。只能和 `matrix.bot` 权限一起声明，见“Matrix Bot”。 |
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
 | `agent` | `kind=agent` 时必填 | `protocol`：`matrix`（Agent 自己登录 Matrix，须声明 `matrix.bot`）或 `acp`（经 ACP 桥接入）。可选 `login`，见“Agent 插件”。 |
 | `provides` | 否 | 向其他插件提供的能力，v0.1 只有 `models`（见“模型网关”）。只有 `kind: system` 的插件可以声明。 |
@@ -1052,6 +1052,25 @@ Agent 设过，包括清成了空表）就不碰。所以升级到带素材的�
 - 格式：静态头像只能是 PNG、JPEG、WebP 的静态图；状态头像另可 GIF、动图 WebP、H.264 的 MP4（不要声音）。
 - 核心按文件内容判断格式和尺寸，不看扩展名。清单的静态头像 `bot.avatar` 例外：安装时只按扩展名认
   png、jpg、gif、webp（见上面安装的第 3 步）。
+
+### 聊天页的显示方式（`chat_layout`）
+
+和 Bot 私聊时 App 怎么画聊天页，插件只能在三种形态里选一个默认值，用户可以按 Bot 改：
+
+```yaml
+x-wonton:
+  bot:
+    chat_layout: document   # bubbles（默认）| document | web
+    chat_path: /chat        # 只给 web：webui 下的哪一页，不写是 webui 的首页
+```
+
+- `bubbles`：即时消息的气泡。适合聊天型的 Bot。
+- `document`：Bot 的回复不装气泡、铺满宽度，Markdown 按文章排版，适合 Agent 的长回答、表格和代码。
+- `web`：不画聊天记录，在 App 里直接打开插件自己的网页（`webui` 加 `chat_path`），适合自带好用网页界面的 Agent。
+  要有 `webui`；`chat_path` 以 `/` 开头，规则同 `webui.path`。`webui.service` 指向 Bot 服务时，打开的是这个 Bot 的那份网页。
+  对话走插件自己的网页，不经 Matrix：要让用户在 Agent 回完话时收到推送，申请 `notify`，回完发一条通知，`path` 指回聊天页。
+
+插件带不进样式或代码，字号、代码折行这些由用户在 App 里选。不认识这个字段的旧 App 按气泡画。
 
 ### 一个插件多个 Bot（`bots`）
 
