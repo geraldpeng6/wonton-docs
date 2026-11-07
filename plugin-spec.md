@@ -1,4 +1,4 @@
-# 插件规范 `x-wonton`（草案 v0.7）
+# 插件规范 `x-wonton`（草案 v0.8）
 
 > 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
@@ -27,7 +27,7 @@ services:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
 
 x-wonton:
-  spec: "0.7"
+  spec: "0.8"
   id: app.immich.photos
   version: 2.0.0
   kind: app
@@ -244,7 +244,7 @@ services:
 
 | 字段 | 说明 |
 | --- | --- |
-| `spec` | 必填。清单按哪一版规范写成，字符串，如 `"0.7"`（YAML 里要加引号，不然读成数字）。没写时安装失败。核心先读它：比核心支持的版本新时安装失败（`unsupported`），提示先升级核心，不再逐项报未知字段。用到“各版本新增的字段”里某一版的字段时，至少写那一版，旧核心才会如实提示升级。 |
+| `spec` | 必填。清单按哪一版规范写成，字符串，如 `"0.8"`（YAML 里要加引号，不然读成数字）。没写时安装失败。核心先读它：比核心支持的版本新时安装失败（`unsupported`），提示先升级核心，不再逐项报未知字段。用到“各版本新增的字段”里某一版的字段时，至少写那一版，旧核心才会如实提示升级。 |
 | `icon` | 图标，见下节。 |
 | `screenshots` | 截图：仓库里的 PNG 或 JPEG（路径规则同插件包里的文件），1 到 6 张，按顺序显示。截图不算插件包的一部分：不参与插件包摘要，安装时不取，上传插件包时忽略；商店的详情页要显示时，核心按同一个提交去取。 |
 | `author` | 插件包的作者：`name`（必填）、`url`（HTTPS，可选）。不一定是应用的作者。 |
@@ -285,6 +285,11 @@ services:
 ### 各版本新增的字段
 
 清单用到下面某一版新增的字段时，`spec` 至少写那一版，`plugin check` 会逐项检查。
+
+**0.8**
+
+- `x-wonton.optional_permissions`（见“可选权限”）。
+- 安装时注入的变量：`WONTON_PERMISSION_*`，可选权限开着时才有（见“安装时注入的变量”）。
 
 **0.7**
 
@@ -717,12 +722,38 @@ x-wonton:
 | `host.pid`、`host.ipc` | 最高 | 共享宿主的进程空间或 IPC。 |
 | `security.opt` | 最高 | 修改容器的安全选项。 |
 | `privileged` | 最高 | 以 Docker 特权模式运行服务。 |
-| `docker.socket` | 最高 | 访问 Docker socket，等于把主机的 root 交给插件。 |
+| `docker.socket` | 最高 | 访问 Docker socket，等于把主机的 root 交给插件。可以声明成可选、默认关，见“可选权限”。 |
 
 - 高权限和对应的 Compose 字段必须成对出现（见“Compose 子集”）：只写一边时清单不合法，错误写明缺少哪一项。插件不声明的能力一律不给。
 - 风险级别和给用户看的提示由核心决定，安装确认时醒目展示。插件改不了。
 - `kind: agent`，或者声明了 `matrix.bot`、`bots` 的插件，不能申请很高和最高级权限。
-- 安装请求必须逐项确认清单里的全部权限，少一项或多一项都拒绝安装。
+- 安装请求必须逐项确认清单里的全部必需权限；可以带上可选项（老客户端会这么做），但它们不算打开，打开只看 `enabled_permissions`；多出清单里没声明的项拒绝安装。
+
+### 可选权限
+
+四种权限可以标成可选、默认关：`docker.socket`、`devices.gpu`、`devices.serial`、`devices.usb`。关着时核心拿掉对应的 Compose 字段（`docker.socket` 的卷、`gpu.services` 里服务的显卡设备、`devices.*` 交给服务的设备节点），服务照常起，数据不动。别的权限写进 `optional_permissions` 是清单错误。
+
+```yaml
+x-wonton:
+  spec: "0.8"
+  permissions: [network.egress]
+  optional_permissions:
+    docker.socket:
+      off_loss: { zh: 看不到每个容器的占用，主机指标照常, en: No per-container usage; host metrics still work }
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| 键 | 上面四种之一。不能同时写进 `permissions`。 |
+| `off_loss` | 关着时少了什么，给用户看，必写，中文和英文都要写（和 `title` 的要求一样）。 |
+
+- 对应的 Compose 字段照旧写在清单里（`docker.socket` 的卷、`gpu.services` 的服务名），说的是“开着时谁拿到什么”，核心按开关决定渲染不渲染。
+- 可选的 `docker.socket` 至少要有一个服务写那个卷；可选的 `devices.gpu` 的 `gpu.services` 也不能空。
+- `devices.gpu` 可选时 `requirements.gpu.need` 只能写 `optional` 或不写：用户能关掉，就不可能是必需。
+- 关闭的插件也必须能用主要功能，`off_loss` 要和 README 说的是一回事。
+- 打开开关时，最高级（`docker.socket`）照安装时那样多确认一步；关掉是收权限，一次确认就行。
+- 核心给这个插件的**所有**服务注入 `WONTON_PERMISSION_<名字>=1`（开着时才有，见“安装时注入的变量”），服务据此切换行为。NVIDIA 显卡在容器里没有设备节点可看，串口路径也不固定，所以别只看文件在不在。
+- 开关只重建渲染结果变了的服务（拿到或失去字段、变量变了），数据不动。
 
 核心兑现上表除了 `storage.home:*` 的全部权限。`storage.home:*` 清单里可以声明，但安装时如实报“尚未支持”。共享文件夹在数据目录的 `shares/<名称>` 下，只授权读时必须以 `:ro` 挂载，而且只能整个挂载，不能挂其中的子路径。
 
@@ -754,6 +785,7 @@ x-wonton:
 | `WONTON_MATRIX_HOME_ROOM` | `matrix.bot` | Bot 的主房间：核心替用户建好的、和 Bot 的加密私聊，定时任务的结果发到这里。 |
 | `WONTON_SECRET_<名字>` | `secrets` 里由核心生成的项 | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
+| `WONTON_PERMISSION_DOCKER_SOCKET`、`_DEVICES_GPU`、`_DEVICES_SERIAL`、`_DEVICES_USB` | 对应的可选权限开着 | 值是 `1`。关着时不定义（不是空串），用 `${VAR:+x}` 或 `[ -n "$VAR" ]` 判断。给这个插件的所有服务，不只拿到字段的那个。 |
 | `WONTON_LAN_ADDRESSES` | `network.lan` | 局域网端口开在哪些地址上，逗号分隔，如 `192.0.2.10`。地址变化时的重建规则见“局域网”。 |
 | `WONTON_PROXY_URL` | `network.egress` | 出口容器的地址 `http://egress.wonton.internal:3128`，用户没配代理时是空串。给有自己代理设置、不读 `HTTP_PROXY` 的程序用，见“网络”。 |
 
@@ -1548,6 +1580,9 @@ x-wonton:
 三者缺一不可：写了 `gpu` 或 `requirements.gpu` 却没申请 `devices.gpu`，或者申请了 `devices.gpu` 却没写 `gpu.services`，
 清单都不合法。
 
+`devices.gpu` 可以做成可选、默认关（见“可选权限”），没显卡或用户不想给时照常按 CPU 跑。这时 `requirements.gpu.need`
+只能写 `optional` 或不写：用户能关掉，就不可能“必需”。关闭时的原生损失写进 `off_loss`。
+
 核心按宿主的显卡交给这些服务，容器里的路径和宿主相同：
 
 | 宿主 | 交给容器什么 |
@@ -1867,6 +1902,8 @@ x-wonton:
 
 ### 官方索引
 
+可选权限照常审：最高级（`docker.socket`）即使是可选的，也要写清为什么要；插件关着也必须能用主要功能，`off_loss` 和 README 说的要是一回事；README 的权限一节把可选项单列，`about` 不把可选能力说成自带。
+
 公开仓库 `geraldpeng6/wonton-store` 的 `index.json`：
 
 ```json
@@ -1975,6 +2012,7 @@ x-wonton:
 - 新版本的镜像先拉好再动旧容器，拉不下来旧版本不受影响。换容器之后新版本起不来、没通过健康检查，就回滚到旧版本的容器，
   错误里写明退回了哪个版本。
 - 新版本申请的权限和装着的不同时，用户要重新确认全部权限，新增的标出来。
+- 可选权限（见“可选权限”）：原样保留的沿用开关、打开的时间和发起人；改成必需而之前关着的，当新增必需权限处理（标出来、必须确认，最高级照样多确认一步）；去掉了的关掉开关，开着的也一起失效；新加的可选项默认关。
 - 数据迁移由应用自己在启动时做；不可逆的迁移要在 `release_notes` 里写明，回滚后旧版本可能读不了迁移过的数据。
 - Bot 更新自己写的插件不一定要用户确认，见“Agent 写插件”。
 
