@@ -1186,6 +1186,8 @@ x-wonton:
   列表里的工具和调用不存在的工具一样报错。
 - 没有标 `readOnlyHint: true`（MCP 的工具注解）的工具算敏感：总线先请用户确认，确认了才转给插件。会改数据的工具
   不要标成只读。不会改数据的工具要标上，否则 Bot 每次调用都要用户确认。
+- 用户可以放宽确认：卡片上放行一段时间、对某个 Bot 始终允许、对某个 Bot 一律允许，或者把某个工具标成只读。这些都在总线
+  上判定，插件看不到，也不用为此做什么。始终允许在插件升级后还在，新版本多出来的工具也算在内。
 - 工具返回的内容交给 Agent，Agent 把它当不可信输入。除了下面的文件引用，总线不改内容。
 
 **列工具**
@@ -1972,6 +1974,8 @@ x-wonton:
 - 模板仓库 `geraldpeng6/wonton-plugin-template` 带开发环境和检查、发布的脚本。开发环境用发布的核心镜像在本机起一套
   核心，和正式安装是同一份 compose，换掉项目名、核心的容器名（`WONTON_CORE_CONTAINER`）和实例名
   （`WONTON_INSTANCE`），几套开发环境可以共用一台 Docker，同一个插件也能同时装在几套里。
+- 没有配对设备也能走完会改数据的工具：`scripts/dev.sh approve` 批准等回答的卡片，`--watch` 一直批准。它用主人令牌请求
+  `GET /_wonton/api/confirmations` 和 `POST /_wonton/confirmations/{id}`。
 
 ### Agent 写插件
 
