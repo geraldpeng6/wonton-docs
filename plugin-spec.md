@@ -295,6 +295,10 @@ services:
 - Compose 的服务：`mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”），`cap_drop`，
   `network_mode: "service:<服务名>"`（见“网络”）；`security_opt` 只写 `no-new-privileges`（任何一种写法）时不用申请 `security.opt`。
 
+**0.8**
+
+- `x-wonton.secrets.<名字>.input`（见“插件密钥”的“用户填写”）。
+
 ### 图标和截图
 
 - 图标是插件包里的 PNG 或 SVG，正方形：
