@@ -419,6 +419,10 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 `email_verified`）、`groups`（`owner`，声明了 `owner_groups` 再加那些组名）、`offline_access`。
 `owner_groups` 只发给声明它的这个客户端，别的插件看不到。客户端 ID 就是插件 `id`，密钥在安装时
 生成，卸载时删除客户端。
+
+认人用 `sub`（`preferred_username` 同值），邮箱只当资料：应用有用户名概念就用 `sub` 或
+`preferred_username` 找账号，不要拿 `email` 认人，邮箱会变。应用确实只有邮箱一种登录名时才用 `email`
+认人，这时写 `requires_email`。
 保留数据卸载后重装，密钥是新的：应用把密钥存进自己数据库的（如 Forgejo 的认证源），要在每次创建容器时用 `WONTON_OIDC_CLIENT_SECRET` 更新已有的那条，不能“已存在就跳过”。
 
 按组名对角色的应用，声明 `owner_groups` 并让应用同步组：
@@ -499,6 +503,9 @@ webui:
 值模板里可以用 `{user}`（用户名，同 OIDC 的 `preferred_username`）、`{name}`、`{email}`，以及
 `{secret:<名字>}`，其余文字原样保留，如 `"Bearer {secret:api_token}"`；`{`、`}` 只能用来写占位符。用户没填邮箱时，
 用了 `{email}` 的插件装不上。
+
+应用认人用 `{user}`：它装好后不变。只有应用确实只能按邮箱认人、没有用户名概念时，才用 `{email}` 认人；
+邮箱会变。
 
 上游没有可信代理白名单（对所有来源都信任 `Remote-User` 这类头）时，申请了 `network.egress` 的插件
 过不了 `plugin check --official`，这种应用改用 OIDC。
@@ -735,7 +742,8 @@ x-wonton:
   个人信息，引用了就装不上，错误写明“插件没申请 `owner.identity`”。应用登录时从 OIDC 或代登录模板拿到的身份不归这项权限管，
 - 用户名是固定 ID，装好后不变，插件不用处理它变化的情况。它只含小写字母、数字、`_` 和 `-`，以字母开头，最长 32 个
   字符，不是常见的系统用户名，可以直接用来建系统账号；镜像里自带的用户（`postgres`、`node`）可能重名，要插件自己
-  处理。应用按用户名或 OIDC 的 `sub` 认人，不要按邮箱认：邮箱会变。
+  处理。应用认人一律用 OIDC 的 `sub`（和 `preferred_username` 同值）或代登录的 `{user}`，不要按邮箱认：
+  **邮箱只是资料，会变**。应用确实只有邮箱一种登录名、没有用户名概念时，才用 `email` 声明或 `{email}`。
 - 显示名和邮箱由用户在 App 里填，填过以后能改，不能改回没有。显示名没填时是用户名，所以 `name` 声明总有值；要显示
   用户的名字用 `name`，不要用 `preferred_username`。
 - 用户没填邮箱时不注入 `WONTON_OWNER_EMAIL`，OIDC 也没有 `email` 声明。应用非要邮箱时写 `${WONTON_OWNER_EMAIL:?}`，
@@ -1611,7 +1619,7 @@ x-wonton:
 | 字段 | 说明 |
 | --- | --- |
 | `lan.client.address` | 客户端填的地址，必须写 `{host}`，核心换成端口开着的局域网地址（IPv6 带方括号）。开在几个地址上就给几个。 |
-| `lan.client.username`、`password` | 值模板，写法和 `webui.proxy` 相同（`{user}`、`{email}`、`{secret:…}`，不能用 `{name}`）；`{secret:…}` 要引用核心生成、至少 16 字节的密钥。 |
+| `lan.client.username`、`password` | 值模板，写法和 `webui.proxy` 相同（`{user}`、`{email}`、`{secret:…}`，不能用 `{name}`）；`{secret:…}` 要引用核心生成、至少 16 字节的密钥。账号用 `{user}`，只有应用确实只能按邮箱认人时才写 `{email}`。 |
 
 - 写了 `lan.client` 的插件，`lan.ports` 全部受开关 `lan_webui` 管：默认关，服务也不接 `--lan` 网络。
 - 开关打开后，插件详情里显示地址和账号，可以复制。详情接口只给用户本人，Bot 和其他插件拿不到。
