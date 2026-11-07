@@ -208,7 +208,9 @@ scripts/check.sh --official
 
 脚本在核心镜像里调用 `wonton-core plugin check`，不连接正在运行的开发核心；检查、打包和核心能力探测的临时容器都用 `--network none`，不依赖 Docker 默认 bridge。所需镜像须在本地或先拉取。输出问题、插件包文件和摘要；退出码、提醒与官方索引要求见[开发与校验](plugin-spec.md#开发与校验)。默认镜像不能读取现行 spec 时，根据错误中的版本信息用 `WONTON_CORE_IMAGE` 选择支持该规范的镜像。
 
-插件仓库的 `.github/workflows/check.yml` 在 PR 和推送 main 时调用模板的 `plugin-check.yml`：检查 shell、执行 `scripts/check.sh --official`，有 `Cargo.toml` 时还运行 Rust 格式、Clippy 和测试，并检查受 Git 管理的指定源码文件行数。CI 失败时修复问题，不跳过失败。工作流版本随[开发套件](#更新开发套件)更新；需要覆盖检查使用的核心镜像时，通过可复用工作流的 `core-image` 输入指定。
+插件仓库的 `.github/workflows/check.yml` 在 PR 和推送 main 时调用模板的 `plugin-check.yml`：检查 shell、执行 `scripts/check.sh`，有 `Cargo.toml` 时还运行 Rust 格式、Clippy 和测试，并检查受 Git 管理的指定源码文件行数。CI 失败时修复问题，不跳过失败。工作流版本随[开发套件](#更新开发套件)更新；需要覆盖检查使用的核心镜像时，通过可复用工作流的 `core-image` 输入指定。
+
+PR 上不跑 `--official`：重建自家镜像（`images/` 下有 Dockerfile）的 PR 在发布前拿不到新摘要，这类 PR 会永远红着。官方索引的要求由发布流程统一查——`publish.yml` 调 `scripts/publish.sh --official`，在构建推送镜像、把摘要写回 Compose 之后执行，这时摘要才存在。
 
 ## 更新开发套件
 
