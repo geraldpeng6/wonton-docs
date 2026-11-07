@@ -284,7 +284,7 @@ services:
 
 ### 各版本新增的字段
 
-清单用到下面某一版新增的字段时，`spec` 至少写那一版。
+清单用到下面某一版新增的字段时，`spec` 至少写那一版，`plugin check` 会逐项检查。
 
 **0.7**
 
@@ -293,7 +293,7 @@ services:
   `provides.egress_proxy`（见“网络”的“代理插件”）；`provides.models.providers`，含 `custom`（见“模型网关”）。
 - 权限：`egress.proxy`、`plugins.health`。
 - Compose 的服务：`mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”），`cap_drop`，
-  `network_mode: "service:<服务名>"`（见“网络”）；`security_opt` 只写 `no-new-privileges:false` 时不用申请 `security.opt`。
+  `network_mode: "service:<服务名>"`（见“网络”）；`security_opt` 只写 `no-new-privileges`（任何一种写法）时不用申请 `security.opt`。
 
 ### 图标和截图
 
