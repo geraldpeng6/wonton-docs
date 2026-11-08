@@ -172,6 +172,9 @@ WONTON_DEV_EGRESS_PROXY=http://<代理地址> scripts/dev.sh smoke
 
 ### 排错
 
+- 手工 `docker compose up -d` 判断不了插件好坏：一次性服务退出 1 也不报错（compose 只在别的服务声明了
+  `service_completed_successfully` 依赖时才等它）。判断插件要走核心装一遍：`scripts/dev.sh install`，
+  所有一次性服务以 0 退出才算装完。
 - 安装失败的错误包含原因和失败容器的最近日志。安装后用 `scripts/dev.sh logs <服务>`，或进入自己的实例容器：`docker exec -it wonton-<实例名>--<slug>--<服务> sh`。
 - `scripts/dev.sh status` 中的 `running healthy` 表示长期服务的健康检查都通过；`running unknown` 表示健康尚未知；`degraded` 后附原因。核心在安装和启动时检查，两次检查之间不会持续监控，容器停止时还要查看 `docker ps`。
 - 调管理接口优先用 `scripts/dev.sh api GET /_wonton/api/plugins`；也可使用 `up` 输出的核心地址直接请求：
