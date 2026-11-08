@@ -287,10 +287,19 @@ services:
 
 清单用到下面某一版新增的字段时，`spec` 至少写那一版，`plugin check` 会逐项检查。
 
+**0.9**
+
+- 安装时注入的变量：`WONTON_MATRIX_OWNER` 改名为 `WONTON_MATRIX_ALLOWED_USERS`，值是逗号分隔的一个人或一家人（见“安装时
+  注入的变量”）。旧核心只注入旧名；要让新旧核心都装得上，写成 `${WONTON_MATRIX_ALLOWED_USERS:-${WONTON_MATRIX_OWNER}}`，
+  `spec` 保持旧版本。写 `spec: "0.9"` 的清单只有支持 0.9 的核心才装。
+- `bots.services` 里的服务每个 Bot 一组容器，各自注入 `WONTON_BOT_NAME`、这个 Bot 的 `WONTON_BOT_DATA`、模型凭据，以及
+  带这个 Bot 总线令牌的 `WONTON_MCP_URL`（见“一个插件多个 Bot”）。
+
 **0.8**
 
 - `x-wonton.optional_permissions`（见“可选权限”）。
 - `secrets.<名字>.show_owner`（见“插件密钥”），声明了的 `generate` 项主人能在 App 里查看。
+- `secrets.<名字>.input`（见“插件密钥”的“用户填写”）。
 - 安装时注入的变量：`WONTON_PERMISSION_*`，可选权限开着时才有（见“安装时注入的变量”）。
 
 **0.7**
@@ -301,10 +310,6 @@ services:
 - 权限：`egress.proxy`、`plugins.health`。
 - Compose 的服务：`mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”），`cap_drop`，
   `network_mode: "service:<服务名>"`（见“网络”）；`security_opt` 只写 `no-new-privileges`（任何一种写法）时不用申请 `security.opt`。
-
-**0.8**
-
-- `x-wonton.secrets.<名字>.input`（见“插件密钥”的“用户填写”）。
 
 ### 图标和截图
 
