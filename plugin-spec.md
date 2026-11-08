@@ -262,6 +262,7 @@ services:
 | `tags` | 标签，插件自己写，按语言分开，如 `{ zh: [相册, AI], en: [Photos, AI] }`。每种语言最多 8 个，每个 1 到 24 个字符，不能重复。商店按出现过的标签筛选，所以写用途，不写技术词；也用来搜索。 |
 | `about` | 详细介绍：多语言，纯文本，空行分段，每种语言不超过 4000 个字符。没写时详情页只显示 `description`。 |
 | `release_notes` | 这个版本的更新说明：多语言，纯文本，每种语言不超过 2000 个字符，升级提示里显示。数据迁移不可逆时要写明。 |
+| `setup` | 装好后要用户自己做的一步：多语言，纯文本，每种语言不超过 400 个字符。安装和更新的确认页排在最前面、醒目显示，详情页也有。写一句人话和一条能照抄的命令，不要写成长篇说明（见下节）。 |
 
 标签不是固定的一组，下面这些是推荐的词，大家用同一个词，筛选时才归得到一起。没有合适的可以自己写。
 
@@ -298,6 +299,7 @@ services:
 **0.11**
 
 - `x-wonton.tunnel.ports`（见“隧道端口”）。使用此字段的清单至少写 `spec: "0.11"`；声明端口不等于核心和 App 已支持运行时映射。
+- `x-wonton.setup`（见“商店信息”的“装好后要做的一步”）。
 
 **0.10**
 
@@ -328,6 +330,21 @@ services:
 - 权限：`egress.proxy`、`plugins.health`。
 - Compose 的服务：`mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”），`cap_drop`，
   `network_mode: "service:<服务名>"`（见“网络”）；`security_opt` 只写 `no-new-privileges`（任何一种写法）时不用申请 `security.opt`。
+
+### 装好后要做的一步（`setup`）
+
+应用要用户先在自己的机器上做一步才能用（把公钥加到某处、在路由器上开一个口、去应用里注册一个账号）时，写 `setup`：
+
+```yaml
+x-wonton:
+  setup:
+    zh: 把公钥加到目标机器的 ~/.ssh/authorized_keys：curl -fsS http://…/key | ssh root@192.0.2.10 'cat >> ~/.ssh/authorized_keys'
+    en: Add the public key to the target machine's ~/.ssh/authorized_keys: curl -fsS http://…/key | ssh root@192.0.2.10 'cat >> ~/.ssh/authorized_keys'
+```
+
+- 一句话说清「把什么、加到哪里」，再给一条能照抄的命令；参数放不下的细节写进 `about`。
+- 只有确实需要才写。安装和更新的确认页把它排在提示的第一条、和权限一样醒目；详情页也一直显示。
+- 写 `setup` 的清单 `spec` 至少写 `"0.11"`。
 
 ### 图标和截图
 
