@@ -78,7 +78,7 @@ x-wonton:
 | `runtime` | 否 | 运行形态：`compose`、`remote_mcp` 或 `skills`，省略时为 `compose`。`compose` 必须有非空的顶层 `services`；其他运行形态不允许出现 `services`，即使为空也不行。与 `kind` 独立。 |
 | `title`、`description` | 是 | 多语言文本，至少写一种语言。怎么写见“商店信息”。 |
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
-| `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
+| `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes`、`setup` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`friends`（默认 `false`，见“好友分享”）、`display`（见“全屏”）、`cross_origin_isolated`（见“跨源隔离”）。 |
 | `tabs` | 否 | 能放到 App 底栏的页面，要和 `webui` 一起声明，见“底栏页面”。 |
@@ -249,7 +249,7 @@ services:
 
 ## 商店信息
 
-商店、安装确认页和 App 主屏用到的信息写在清单里，随插件包按提交固定。给用户看的文字都按语言写，语言是键，至少写一种。键是 BCP 47 语言标签：`en`（英文）、`zh`（简体中文）、`zh-Hant`（繁体中文）、`ja`（日文）等。App 按用户在用的语言挑：先找完全一样的，再按文字系统找，`zh-TW`、`zh-HK` 用 `zh-Hant`，没写 `zh-Hant` 时用 `zh`；都没有时回退到 `en`，再回退到写了的任意一种。繁体中文和日文的用户看到的是你写的 `zh-Hant`、`ja`，没写就是简体或英文，建议补上。官方索引要求 `description`、`tags`、`about`、`release_notes` 都写 `zh` 和 `en`。
+商店、安装确认页和 App 主屏用到的信息写在清单里，随插件包按提交固定。给用户看的文字都按语言写，语言是键，至少写一种。键是 BCP 47 语言标签：`en`（英文）、`zh`（简体中文）、`zh-Hant`（繁体中文）、`ja`（日文）等。App 按用户在用的语言挑：先找完全一样的，再按文字系统找，`zh-TW`、`zh-HK` 用 `zh-Hant`，没写 `zh-Hant` 时用 `zh`；都没有时回退到 `en`，再回退到写了的任意一种。繁体中文和日文的用户看到的是你写的 `zh-Hant`、`ja`，没写就是简体或英文，建议补上。官方索引要求 `description`、`tags`、`about`、`release_notes`、`setup` 都写 `zh` 和 `en`。
 
 | 字段 | 说明 |
 | --- | --- |
@@ -2311,7 +2311,7 @@ x-wonton:
 - 条目用 `wonton-core plugin index-entry <插件包目录> github:<owner>/<repo> <提交号>` 生成，不手写：目录是那个提交的
   检出（核心不连 Git，不核对），条目的 JSON 写到标准输出；加 `--index <索引目录>` 时直接写进本地的索引目录，同一个
   来源的旧条目换掉。
-- 收录要求：`wonton-core plugin check --official` 通过，即有 `icon`、`tags`、`license`、`author`、`notices`，`description`、`tags`、`about`、`release_notes` 都写了 `zh` 和 `en`，所有服务的 `image`
+- 收录要求：`wonton-core plugin check --official` 通过，即有 `icon`、`tags`、`license`、`author`、`notices`，`description`、`tags`、`about`、`release_notes`、`setup` 都写了 `zh` 和 `en`，所有服务的 `image`
   按摘要固定，长期运行的服务都有健康检查；申请的权限和插件做的事相符；镜像来自上游官方或作者可复现的构建；
   清单里 `requires` 的每个能力，索引里至少要有一个插件提供，否则这个条目不收录。
 - 核心不内置索引，从 GitHub 取，取不到时用磁盘上次成功的那份，并说明列表是什么时候的、为什么没更新。开发镜像和测试用本地的索引目录代替（`WONTON_STORE_INDEX`）：`index.json`
@@ -2382,7 +2382,7 @@ x-wonton:
   - 不合格（退出码 1）：装不上的（核心还不支持的权限、渲染不了的 compose），图标或截图处理不了。
   - 提醒（退出码 0）：镜像没有按摘要固定，长期运行的服务没有健康检查，没有图标，图标的角是透明的，截图的长边不到
     1280，横屏和竖屏的截图混在一起，`kind: system`。`--official` 时前三项也算不合格，另外要有 `tags`、`license`、
-    `author`、`notices`，`description`、`tags`、`about`、`release_notes` 要写 `zh` 和 `en`。只看得到 compose 里写的健康检查，镜像自带的看不到。
+    `author`、`notices`，`description`、`tags`、`about`、`release_notes`、`setup` 要写 `zh` 和 `en`。只看得到 compose 里写的健康检查，镜像自带的看不到。
   - 用法不对时退出码 2。
 - 打包：`wonton-core plugin pack <目录>` 把插件包打成 tar 写到标准输出，只有 compose 文件和它引用的文件，README、截图
   这些不在里面；解析不了时和 `check` 一样报错，退出码 1。
