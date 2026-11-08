@@ -435,6 +435,48 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 声明 `oidc` 或 `proxy` 要同时满足：应用官方支持这种接法；接上后打开网页不会再看到应用的登录页，角色也对；不用脚本
 往应用里预建账号，不用改应用的数据，不用每次启动核对。做不到就用 `none`。
 
+### 网关的错误响应
+
+网关没认出用户或者自己拦下请求时，回自己的错误，请求不到达插件。这种响应分两种形状，按请求的 `Accept` 协商：
+
+- 含 `text/html`：HTML 错误页。
+- 其余，包括 `fetch` 默认的 `*/*` 和 `application/json`：JSON
+
+  ```json
+  {"error": {"category": "unauthenticated", "message": "…", "detail": "…"}}
+  ```
+
+  `message` 是一句按 App 语言写的人话，`detail` 可选、放技术细节。
+
+两种形状都带响应头 `x-wonton-error: <category>`，接口靠它判断原因，不看 `message` 的字。
+
+未登录的页面导航（`GET` 且要 HTML）不在这里回错误，改为跳到核心的登录页，登录后回到原地址。跨站的未登录请求
+（别的插件的页面发起的）换到会话也不认，回 401，不跳登录页。
+
+上游（插件自己）的响应网关原样转发，不改形状，也不加 `x-wonton-error`。看到响应里没有这个头，就说明请求已经
+到达插件，响应是应用自己的，包括应用自己回的 401。
+
+| 状态 | `category` | 什么时候 |
+| --- | --- | --- |
+| 400 | `invalid_input` | 路径拼不出上游地址，交接码或目标地址写错 |
+| 401 | `unauthenticated` | 没登录，或跨站请求 |
+| 403 | `not_shared` | 家人打开主人没开放给家人的插件 |
+| 403 | `cross_site` | 核心域名上的跨站修改请求 |
+| 403 | `permission_denied` | 这个人拿不到身份：代登录没有他的身份，或 OIDC 授权的人对不上 |
+| 404 | `not_installed` | 插件域名对应的插件没装 |
+| 404 | `no_webui` | 插件没有 `webui` |
+| 404 | `not_found` | 核心上没有这个路径 |
+| 404 | `unknown_host` | 主机名不属于任何已知用途 |
+| 409 | `conflict` | OIDC 登录的人和应用记下的对不上 |
+| 500 | `proxy_credentials` | 身份值写不进请求头 |
+| 502 | `oidc_error` | 身份提供方回了别的错 |
+| 502 | `upstream_unreachable` | 连不上上游 |
+| 503 | `not_ready` | 插件没在运行 |
+| 503 | `oidc_unavailable` | 核心没配身份提供方 |
+| 504 | `upstream_timeout` | 上游迟迟不回响应头 |
+
+核心自己的接口（`/_wonton/api/…`）不在这套规矩里，它们各自回 JSON。
+
 ### 好友分享
 
 `webui.friends` 是布尔值，默认 `false`。`true` 声明插件已验证好友使用、能区分好友身份；它不是授权开关，
@@ -607,7 +649,7 @@ webui:
 - Cookie 的值只能用 `{secret:…}` 和固定文字，文字里不能有空白、引号、逗号、分号和反斜杠：身份模板变量
   一律只用于请求头。请求头的值里不能有控制字符。不合规的清单在预览和安装时就被拒绝。
 - 只有网关认出用户的请求才加凭据，规则和其他插件网页一样：局域网浏览器要有这个插件子域名的会话，经隧道的
-  已配对设备看设备身份。没认出用户的请求不转发：打开页面跳到核心登录，其余请求 401。
+  已配对设备看设备身份。没认出用户的请求不转发：打开页面跳到核心登录，其余请求 401（形状见“网关的错误响应”）。
 - 插件子域名彼此同站，一个插件的页面能让浏览器带着会话向另一个插件发请求。所以网关按 Fetch Metadata
   的资源隔离策略，只认这些请求的登录状态：`Sec-Fetch-Site` 为 `same-origin` 或 `none`；顶层导航
   （`Sec-Fetch-Mode: navigate`，方法为 `GET` 或 `HEAD`）；没有 `Sec-Fetch-Site` 时，没有 `Origin`
