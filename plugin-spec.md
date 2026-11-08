@@ -431,7 +431,7 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 认人沿用声明的登录方式：
 
 - `sso: proxy` 的 `{user}` 是核心为这个人分配的本机用户名，固定、不复用，不和本机账号重名；
-  `{display_name}` 是当前人的显示名，`{role}` 区分 `owner`、`member`、`friend`，完整模板规则见下文。
+  显示名用已有的 `{name}`，新增的 `{role}` 区分 `owner`、`member`、`friend`，完整模板规则见下文。
 - `sso: oidc` 的 `sub`、`preferred_username` 使用同一个本机用户名，好友的 `groups` 为 `["friend"]`。
 - `sso: none` 仍用应用自己的登录，核心不替好友注册或登录。
 
@@ -572,13 +572,12 @@ webui:
 | 变量 | 值 |
 | --- | --- |
 | `{user}` | 当前经验证人的本机用户名，同 OIDC 的 `preferred_username`；固定、不复用。 |
-| `{display_name}` | 当前经验证人的显示名，可能改变，不能当账号主键。 |
-| `{name}` | 既有的显示名变量，含义同 `{display_name}`。 |
+| `{name}` | 当前经验证人的显示名，可能改变，不能当账号主键。 |
 | `{email}` | 当前人的邮箱；没填时不能代入空值，用到它的插件安装失败。 |
 | `{role}` | `owner`（主人）、`member`（家人）、`friend`（被分享的好友）。由网关认证身份后确定，不接受客户端自报。 |
 
-`{display_name}`、`{role}` 属于好友分享的接口约定，须由支持好友身份的核心校验和渲染；不支持时应报错，不能
-代入主人身份或假定所有人都是 `owner`。
+`{role}` 属于好友分享的接口约定，须由支持好友身份的核心校验和渲染；不支持时应报错，不能代入主人身份或
+假定所有人都是 `owner`。
 
 应用认人用 `{user}`：它装好后不变。只有应用确实只能按邮箱认人、没有用户名概念时，才用 `{email}` 认人；
 邮箱会变。
@@ -612,7 +611,7 @@ webui:
     ND_REVERSEPROXYWHITELIST: ${WONTON_CORE_ADDRESS}/32
   ```
 
-  这条管 `proxy.headers` 模板使用了 `{user}`、`{name}`、`{display_name}`、`{email}` 或 `{role}` 的插件。只信任核心，指 `webui.service` 的环境变量引用了 `${WONTON_CORE_ADDRESS}`，值里也没有 `0.0.0.0/0`、`::/0`。做不到时（应用没有这个选项，或者作者放宽了），按 `webui.service` 怎么开：
+  这条管 `proxy.headers` 模板使用了 `{user}`、`{name}`、`{email}` 或 `{role}` 的插件。只信任核心，指 `webui.service` 的环境变量引用了 `${WONTON_CORE_ADDRESS}`，值里也没有 `0.0.0.0/0`、`::/0`。做不到时（应用没有这个选项，或者作者放宽了），按 `webui.service` 怎么开：
 
   | 插件 | `plugin check` | 核心 |
   | --- | --- | --- |
@@ -1901,7 +1900,7 @@ x-wonton:
 | 字段 | 说明 |
 | --- | --- |
 | `lan.client.address` | 客户端填的地址，必须写 `{host}`，核心换成端口开着的局域网地址（IPv6 带方括号）。开在几个地址上就给几个。 |
-| `lan.client.username`、`password` | 值模板，只支持 `{user}`、`{email}`、`{secret:…}`，不使用网页请求的 `{name}`、`{display_name}` 或 `{role}`；`{secret:…}` 要引用核心生成、至少 16 字节的密钥。账号用 `{user}`，只有应用确实只能按邮箱认人时才写 `{email}`。 |
+| `lan.client.username`、`password` | 值模板，只支持 `{user}`、`{email}`、`{secret:…}`，不使用网页请求的 `{name}` 或 `{role}`；`{secret:…}` 要引用核心生成、至少 16 字节的密钥。账号用 `{user}`，只有应用确实只能按邮箱认人时才写 `{email}`。 |
 
 - 写了 `lan.client` 的插件，`lan.ports` 全部受开关 `lan_webui` 管：默认关，服务也不接 `--lan` 网络。
 - 开关打开后，插件详情里显示地址和账号，可以复制。详情接口只给用户本人，Bot 和其他插件拿不到。
