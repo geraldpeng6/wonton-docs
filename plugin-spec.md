@@ -302,6 +302,10 @@ services:
 - Compose 的服务：`mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”），`cap_drop`，
   `network_mode: "service:<服务名>"`（见“网络”）；`security_opt` 只写 `no-new-privileges`（任何一种写法）时不用申请 `security.opt`。
 
+**0.8**
+
+- `x-wonton.secrets.<名字>.input`（见“插件密钥”的“用户填写”）。
+
 ### 图标和截图
 
 - 图标是插件包里的 PNG 或 SVG，正方形：
@@ -1603,10 +1607,14 @@ x-wonton:
       show_owner: { label: { zh: 管理员密码, en: Admin password, zh-Hant: 管理員密碼, ja: 管理者パスワード } }
     matrix_recovery_key:              # 插件运行中生成，交给核心保管
       collect: { service: gateway, path: /opt/data/platforms/matrix/recovery-key.txt }
+    brave_key:                        # 用户填写，注入为 WONTON_SECRET_BRAVE_KEY
+      input:
+        title: { zh: Brave 搜索 API 密钥, en: Brave Search API key }
+        url: https://api-dashboard.search.brave.com/app/keys
 ```
 
-名字由小写字母、数字和 `_` 组成，以字母开头。每项必须有 `generate` 或 `collect` 之一，不能两个都有。
-两种密钥都存在核心的密钥库里（核心数据目录下，文件权限 0600，插件的容器访问不到）：卸载时保留数据就一起
+名字由小写字母、数字和 `_` 组成，以字母开头。每项必须有 `generate`、`collect`、`input` 三者之一，不能有两个。
+三种密钥都存在核心的密钥库里（核心数据目录下，文件权限 0600，插件的容器访问不到）：卸载时保留数据就一起
 保留，重装时沿用（数据库密码之类已经写进了数据，换了就对不上）；选择删除数据时一起删除。
 
 **核心生成（`generate`）**
@@ -1634,6 +1642,26 @@ x-wonton:
   变了就更新。
 - 核心不修改、不删除插件里的这个文件，也不注入回去。
 - 声明在 Bot 服务上时，每个 Bot 各存一份。
+
+**用户填写（`input`）**
+
+插件要用户自己在别的服务那里拿到的凭据，如模型服务商、搜索、地图的 API 密钥。
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `title` | 是 | 输入框的标题，写法同清单的 `title`（各语言的文字）。 |
+| `description` | 否 | 一句补充，比如免费额度、要开哪些权限。写法同上。 |
+| `url` | 否 | 去哪里拿这个密钥，只接受 `https://`。App 显示成一个链接。 |
+| `required` | 否 | 默认 `true`。 |
+
+- 填的值以 `WONTON_SECRET_<名字大写>` 注入。可选项没填时注入空串。
+- **必填项在安装时就要填**：App 的安装确认页用原生表单填；Bot 装插件时，主人在确认卡片里填，值不经过聊天，Bot 拿不到。
+  缺必填项时装不上，安装接口返回 `invalid_input`，写明缺哪几项。升级新增必填项时，在升级确认时填；填过的项沿用。
+- 上传插件包安装或升级时，值放在 `Wonton-Plugin-Secrets` 请求头里（base64url 无填充编码的 JSON 对象），
+  不进查询串，查询串会进各种日志和历史记录。
+- 装好以后，主人在插件详情页里修改；可选项可以清空。改了以后，核心重建用到这个变量的服务，新值随之生效。
+- 只有主人能填、能改。任何接口都不返回填过的值，主人自己也看不到，只显示“已填写”；日志和审计只记哪一项改了。
+- 核心不验证值对不对。填错时插件要把对方服务的鉴权错误如实显示出来，用户才知道要重新填。
 
 ## 对宿主的要求
 
