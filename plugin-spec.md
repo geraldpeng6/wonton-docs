@@ -79,7 +79,7 @@ x-wonton:
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
-| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`display`（见“全屏”）、`cross_origin_isolated`（见“跨源隔离”）。 |
+| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`friends`（默认 `false`，见“好友分享”）、`display`（见“全屏”）、`cross_origin_isolated`（见“跨源隔离”）。 |
 | `tabs` | 否 | 能放到 App 底栏的页面，要和 `webui` 一起声明，见“底栏页面”。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `headers`（见“提供工具”）、`tool_idle_seconds`、`tool_total_seconds`、`tools`（只提供列出的工具），见“工具与 MCP 总线”。 |
 | `bot` | 否 | Bot 的显示名（`display_name`，多语言）、静态头像（`avatar`）和状态头像（`avatars`：`idle`、`working`、`waiting`、`offline` 四个状态各一个文件），都是插件包里的文件。只能和 `matrix.bot` 权限一起声明，见“Matrix Bot”。 |
@@ -294,6 +294,7 @@ services:
   `spec` 保持旧版本。写 `spec: "0.9"` 的清单只有支持 0.9 的核心才装。
 - `bots.services` 里的服务每个 Bot 一组容器，各自注入 `WONTON_BOT_NAME`、这个 Bot 的 `WONTON_BOT_DATA`、模型凭据，以及
   带这个 Bot 总线令牌的 `WONTON_MCP_URL`（见“一个插件多个 Bot”）。
+- `webui.friends`（见“好友分享”）。
 
 **0.8**
 
@@ -416,6 +417,26 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 
 声明 `oidc` 或 `proxy` 要同时满足：应用官方支持这种接法；接上后打开网页不会再看到应用的登录页，角色也对；不用脚本
 往应用里预建账号，不用改应用的数据，不用每次启动核对。做不到就用 `none`。
+
+### 好友分享
+
+`webui.friends` 是布尔值，默认 `false`。`true` 声明插件已验证好友使用、能区分好友身份；它不是授权开关，
+不会自动开放网页。没声明或为 `false` 的插件也能由主人分享，但授权前须提示：好友会以自己的用户名登录，
+应用可能给他建账号、让他看到主人的数据。
+
+好友用自己已有的 Matrix 账号，不在分享人的服务器上建聊天账号。分享按插件、按好友或组授权，可设到期；
+收回、到期、删好友或卸载后，网关拒绝后续请求并断开已有的长连接（包括 WebSocket）。插件应用内的账号和
+数据由应用自己管理，收回访问不会替应用删除账号。
+
+认人沿用声明的登录方式：
+
+- `sso: proxy` 的 `{user}` 是核心为这个人分配的本机用户名，固定、不复用，不和本机账号重名；
+  显示名用已有的 `{name}`，新增的 `{role}` 区分 `owner`、`member`、`friend`，完整模板规则见下文。
+- `sso: oidc` 的 `sub`、`preferred_username` 使用同一个本机用户名，好友的 `groups` 为 `["friend"]`。
+- `sso: none` 仍用应用自己的登录，核心不替好友注册或登录。
+
+这些是分享接口约定；`webui.friends` 的解析不代表核心已提供分享行为。使用好友身份模板前必须确认目标核心
+支持对应的校验和渲染；不能把识别不了的变量作为普通文字透传。
 
 ### 应用自带的登录（`sso: none`）
 
@@ -545,9 +566,18 @@ webui:
 | `webui.proxy.cookies` | Cookie 名 → 值模板。名字不能以 `wonton_` 开头。和浏览器发来的其他 Cookie 合并成一个 `Cookie` 头。 |
 
 `sso: proxy` 至少写一项头或 Cookie。
-值模板里可以用 `{user}`（用户名，同 OIDC 的 `preferred_username`）、`{name}`、`{email}`，以及
-`{secret:<名字>}`，其余文字原样保留，如 `"Bearer {secret:api_token}"`；`{`、`}` 只能用来写占位符。用户没填邮箱时，
-用了 `{email}` 的插件装不上。
+值模板支持下列身份变量，以及插件自己的 `{secret:<名字>}`；其余文字原样保留，如
+`"Bearer {secret:api_token}"`。`{`、`}` 只能用来写占位符。
+
+| 变量 | 值 |
+| --- | --- |
+| `{user}` | 当前经验证人的本机用户名，同 OIDC 的 `preferred_username`；固定、不复用。 |
+| `{name}` | 当前经验证人的显示名，可能改变，不能当账号主键。 |
+| `{email}` | 当前人的邮箱；没填时不能代入空值，用到它的插件安装失败。 |
+| `{role}` | `owner`（主人）、`member`（家人）、`friend`（被分享的好友）。由网关认证身份后确定，不接受客户端自报。 |
+
+`{role}` 属于好友分享的接口约定，须由支持好友身份的核心校验和渲染；不支持时应报错，不能代入主人身份或
+假定所有人都是 `owner`。
 
 应用认人用 `{user}`：它装好后不变。只有应用确实只能按邮箱认人、没有用户名概念时，才用 `{email}` 认人；
 邮箱会变。
@@ -557,8 +587,8 @@ webui:
 
 - `{secret:…}` 只能引用插件自己的 `secrets` 里由核心生成（`generate`）、至少 16 字节的一项：引用不到别的插件的
   密钥，也引用不到插件交给核心保管（`collect`）的秘密。网关按值从响应里找出并去掉它（见下），值太短会误伤。
-- Cookie 的值只能用 `{secret:…}` 和固定文字，文字里不能有空白、引号、逗号、分号和反斜杠：用户名、显示名和邮箱
-  可能有 Cookie 里不能出现的字符。请求头的值里不能有控制字符。不合规的清单在预览和安装时就被拒绝。
+- Cookie 的值只能用 `{secret:…}` 和固定文字，文字里不能有空白、引号、逗号、分号和反斜杠：身份模板变量
+  一律只用于请求头。请求头的值里不能有控制字符。不合规的清单在预览和安装时就被拒绝。
 - 只有网关认出用户的请求才加凭据，规则和其他插件网页一样：局域网浏览器要有这个插件子域名的会话，经隧道的
   已配对设备看设备身份。没认出用户的请求不转发：打开页面跳到核心登录，其余请求 401。
 - 插件子域名彼此同站，一个插件的页面能让浏览器带着会话向另一个插件发请求。所以网关按 Fetch Metadata
@@ -581,7 +611,7 @@ webui:
     ND_REVERSEPROXYWHITELIST: ${WONTON_CORE_ADDRESS}/32
   ```
 
-  这条只管 `proxy.headers` 的模板用了 `{user}`、`{name}` 或 `{email}` 的插件。只信任核心，指 `webui.service` 的环境变量引用了 `${WONTON_CORE_ADDRESS}`，值里也没有 `0.0.0.0/0`、`::/0`。做不到时（应用没有这个选项，或者作者放宽了），按 `webui.service` 怎么开：
+  这条管 `proxy.headers` 模板使用了 `{user}`、`{name}`、`{email}` 或 `{role}` 的插件。只信任核心，指 `webui.service` 的环境变量引用了 `${WONTON_CORE_ADDRESS}`，值里也没有 `0.0.0.0/0`、`::/0`。做不到时（应用没有这个选项，或者作者放宽了），按 `webui.service` 怎么开：
 
   | 插件 | `plugin check` | 核心 |
   | --- | --- | --- |
@@ -1870,7 +1900,7 @@ x-wonton:
 | 字段 | 说明 |
 | --- | --- |
 | `lan.client.address` | 客户端填的地址，必须写 `{host}`，核心换成端口开着的局域网地址（IPv6 带方括号）。开在几个地址上就给几个。 |
-| `lan.client.username`、`password` | 值模板，写法和 `webui.proxy` 相同（`{user}`、`{email}`、`{secret:…}`，不能用 `{name}`）；`{secret:…}` 要引用核心生成、至少 16 字节的密钥。账号用 `{user}`，只有应用确实只能按邮箱认人时才写 `{email}`。 |
+| `lan.client.username`、`password` | 值模板，只支持 `{user}`、`{email}`、`{secret:…}`，不使用网页请求的 `{name}` 或 `{role}`；`{secret:…}` 要引用核心生成、至少 16 字节的密钥。账号用 `{user}`，只有应用确实只能按邮箱认人时才写 `{email}`。 |
 
 - 写了 `lan.client` 的插件，`lan.ports` 全部受开关 `lan_webui` 管：默认关，服务也不接 `--lan` 网络。
 - 开关打开后，插件详情里显示地址和账号，可以复制。详情接口只给用户本人，Bot 和其他插件拿不到。
