@@ -1,9 +1,9 @@
-# 插件规范 `x-wonton`（草案 v0.8）
+# 插件规范 `x-wonton`（草案 v0.10）
 
 > 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
-一个插件就是一个 `docker-compose.yml`，在顶层加一个 `x-wonton` 扩展字段描述它在 Wonton 里的身份、
-入口、能力和权限。compose 引用的配置文件、图标和设置表单与它放在同一个目录里，合称插件包。
+插件在清单顶层用 `x-wonton` 扩展字段描述它在 Wonton 里的身份、运行形态、入口、能力和权限。
+容器插件的清单是 `docker-compose.yml`；compose 引用的配置文件、图标和设置表单与它放在同一个目录里，合称插件包。
 没有 `x-wonton` 的 compose 文件可以由用户手动导入，但必须先补全权限声明。一个插件一个 Git 仓库，仓库根目录
 就是插件包，发布就是打 tag（见“发布与来源”）。可运行的示例见
 [插件模板](https://github.com/geraldpeng6/wonton-plugin-template)，官方插件的列表见
@@ -75,6 +75,7 @@ x-wonton:
 | `id` | 是 | 反向域名形式，全局唯一，安装后不可修改。至少两段，每段由小写字母、数字和单个连字符组成，总长不超过 63。 |
 | `version` | 是 | 插件包版本（语义化版本），和镜像版本无关。 |
 | `kind` | 是 | `app`（普通应用）、`agent`（Agent 运行时）、`channel`（第三方 IM 渠道）、`model`（模型服务）、`system`（系统插件，仅官方，只能由安装器预装）。 |
+| `runtime` | 否 | 运行形态：`compose`、`remote_mcp` 或 `skills`，省略时为 `compose`。`compose` 必须有非空的顶层 `services`；其他运行形态不允许出现 `services`，即使为空也不行。与 `kind` 独立。 |
 | `title`、`description` | 是 | 多语言文本，至少写一种语言。怎么写见“商店信息”。 |
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
@@ -85,6 +86,7 @@ x-wonton:
 | `bot` | 否 | Bot 的显示名（`display_name`，多语言）、静态头像（`avatar`）和状态头像（`avatars`：`idle`、`working`、`waiting`、`offline` 四个状态各一个文件），都是插件包里的文件。只能和 `matrix.bot` 权限一起声明，见“Matrix Bot”。 |
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
 | `agent` | `kind=agent` 时必填 | `protocol`：`matrix`（Agent 自己登录 Matrix，须声明 `matrix.bot`）或 `acp`（经 ACP 桥接入）。可选 `login`，见“Agent 插件”。 |
+| `agent.skills.mount` | 否 | 仅 `kind: agent` 允许。容器内的绝对路径，不能是 `/`，不能含 `..` 路径段，不能是 `/proc`、`/sys`、`/dev` 或它们的子路径。填写 Agent 原生会读取、但自己不会往里写的技能目录。 |
 | `provides` | 否 | 向其他插件提供的能力：`models`（见“模型网关”，只能 `kind: system` 的插件声明）、`egress_proxy`（见“网络”的“代理插件”），以及其他能力，键是能力名，见“能力依赖”。 |
 | `requires`、`wants` | 否 | 依赖的能力名列表：`requires` 的能力没有提供方装不上，`wants` 有提供方就用、没有照装。见“能力依赖”。 |
 | `gpu` | 否 | 拿到显卡的服务（`services`）。要和 `devices.gpu` 权限一起声明，见“显卡”。 |
@@ -96,9 +98,11 @@ x-wonton:
 
 `x-wonton` 里出现未知字段时安装失败；`spec` 比核心支持的版本新时，先报规范版本（见“商店信息”）。
 
+规范 0.10 只定义运行形态和技能目录的声明接口，不表示核心已支持 `remote_mcp`、`skills` 插件的安装或技能挂载。
+
 ## 插件包
 
-插件包是一个目录：`docker-compose.yml`，加上它引用的文件——`icon`、`settings`、`bot.avatar`、`bot.avatars`、`notices` 和
+本节描述 `compose` 运行形态的插件包：一个目录，包含 `docker-compose.yml`，加上它引用的文件——`icon`、`settings`、`bot.avatar`、`bot.avatars`、`notices` 和
 顶层 `configs` 的 `file`。`screenshots` 不算在内（见“商店信息”）。
 
 - 引用的路径相对 compose 文件所在的目录，不能是绝对路径、不能含 `..`、不能用变量，也不能经过软链接；
@@ -286,6 +290,11 @@ services:
 ### 各版本新增的字段
 
 清单用到下面某一版新增的字段时，`spec` 至少写那一版，`plugin check` 会逐项检查。
+
+**0.10**
+
+- `x-wonton.runtime`：声明 `compose`、`remote_mcp` 或 `skills`，省略时为 `compose`（见“字段”）。
+- `x-wonton.agent.skills.mount`：Agent 原生会读取、但自己不会往里写的容器内技能目录（见“字段”）。
 
 **0.9**
 
@@ -1908,7 +1917,7 @@ x-wonton:
 
 ## Compose 子集
 
-核心经 Docker API 渲染插件，只接受下面的字段，其余字段一律报错：
+对于 `compose` 运行形态，核心经 Docker API 渲染插件，顶层 `services` 必须非空，只接受下面的字段，其余字段一律报错：
 
 - 顶层：`name`、`services`、`volumes`（只支持不带参数的本地卷）、`configs`（见“插件包”）、`x-wonton`，
   以及任意 `x-` 扩展字段（如 `x-casaos`）；`version` 会被忽略。
@@ -1975,7 +1984,7 @@ x-wonton:
 
 ## 网络
 
-- 每个插件有独立的 Docker 网络 `wonton-<slug>`，容器叫 `wonton-<slug>--<服务名>`，服务之间用服务名互访。服务名是
+- 每个 `compose` 插件有独立的 Docker 网络 `wonton-<slug>`，容器叫 `wonton-<slug>--<服务名>`，服务之间用服务名互访。服务名是
   合法的 DNS 标签：只能有小写字母、数字和 `-`，不能含 `--`，不能以 `-` 开头或结尾。每个服务在插件网络里还有一个
   别名 `<服务名>.<slug>.wonton.internal`（如 `mcp.app-immich-photos.wonton.internal`），核心访问插件的网页、MCP
   和内网资源时都用它当 Host；宿主网络的服务照旧走中继。别名和实例名无关：网络本来就按实例分开。核心加入所有插件网络并负责
