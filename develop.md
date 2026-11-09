@@ -131,7 +131,7 @@ MCP 两条路径都复用 Hermes 官方镜像内的 [Python MCP SDK（MIT）](ht
 
 ### 选择核心镜像
 
-默认核心镜像是 `ghcr.io/geraldpeng6/wonton-core:beta`。第一次启动时可指定：
+默认核心镜像是 `ghcr.io/geraldpeng6/wonton-core:stable`。第一次启动时可指定：
 
 ```bash
 WONTON_CORE_IMAGE=<核心镜像> scripts/dev.sh up
