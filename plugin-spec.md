@@ -465,8 +465,10 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
   Bot 名与插件 id 都已校验为 ASCII，Bot 名最长 32 字节，不截 Bot 名。`digest8` 是
   `SHA256(UTF8(plugin_id) || 0x00 || UTF8(bot_name))` 的小写十六进制表示的前 8 位：完整插件 id、恰好一个
   NUL 字节、完整 Bot 名依次参与摘要。整个标签最长 63 字节；主机名为 `<标签>.<基础域名>`，scheme 和可选端口
-  沿用插件地址。合法插件标签不含 `--`，因此 `bot--` 专用于 Bot。核心登记时检查撞名：同一 Bot 可重复登记，
-  不同 Bot 撞名回 409 `conflict`，不静默改名或回退默认 Bot；查占用者与登记须原子完成。
+  沿用插件地址。合法插件标签不含 `--`，因此 `bot--` 专用于 Bot。同一 Bot 可重复登记；不同 Bot 撞名回
+  409 `conflict`，不静默改名或回退默认 Bot。查占用者与预留标签须在现有分配锁下原子完成，且先于创建
+  Matrix 身份、凭据、数据目录或容器；冲突不得留下这些部分副作用。崩溃后的恢复和重试由运行时实现定义，
+  这里不承诺跨系统回滚。
   标签内可能出现 `--`，只能查登记表认 Bot，不能拆 URL 猜身份。
 - 这个算法只确定 origin；打开页面时在其后原样追加现有 `webui.path`，不把 Bot 名拼进路径。
   容器用已有 `WONTON_BOT_NAME` 认出自己；Bot 服务的 `WONTON_APP_URL` 应为自己的 origin，不带路径和末尾 `/`。
@@ -477,14 +479,32 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
   这个插件各 Bot 的网页。私人 Bot 和共享 Bot 都不新增归属人例外或单独开关：创建者、聊天参与者、Matrix
   用户名和 URL 都不授予网页权限。好友仅在核心支持既有插件分享时，按同一插件分享授权访问；不由 Bot 另行授权。
   家人未获准回 403 `not_shared`。插件级入口只指向默认 Bot，并经过同一项检查，不是绕过入口。
+  开关旁须提醒主人：开放的是同一个 Bot 的应用及登录入口，家人可能看到或修改同一份应用状态；是否按人
+  隔离由上游应用自己的用户／账号模型决定。若共用会话或登录凭据，须明确说明家人会共用该登录状态，不能
+  笼统承诺每个人都有独立账号，也不能把支持多用户的应用一概描述为共用一个登录。
 - Agent、Bot 和其他插件的插件网络来源一律先拒绝，回 403 `permission_denied`，再考虑普通插件网页的
   自请求（`self_request`）例外；即使带了人的凭据也不能绕过。此规则只约束网关：同插件网络的容器仍可直接
   连接彼此监听的端口，网关不能阻止这条路，不能把独立 origin 当作容器间沙箱。
+  默认 origin 的 `<slug>.<基础域名>` 仍须在本插件网络解析到核心网关；所有非默认 Bot 的 origin 主机名也须
+  在该插件网络登记为核心网关的 DNS 别名。取消的只是 Bot 网页的 `self_request` 豁免，不是这些别名。
+  这改变了 Bot 服务自请求的行为：在容器内 `curl "$WONTON_APP_URL"` 应到达网关并得到 403
+  `permission_denied`，不是 DNS 解析失败，也不再转发到应用。
 - Bot 不存在回 404 `not_found`；未认证回 401 `unauthenticated`；目标 Bot 网页服务未就绪回 503 `not_ready`；
   未声明网页回 404 `no_webui`。页面导航的登录跳转仍按下节处理，不得因失败转开默认 Bot。
 - 家人在 Bot 网页登录账号前，App 必须提醒“服务器主人可以查看、管理这里的登录状态”；不承诺对主人保密。
   实现时提示须写入 iOS、Android 壳的简体中文、繁體中文、English、日本語四种本地化资源，不在核心拼文字。
 - 每 Bot 网页不新增局域网端口或宿主权限，Agent／Bot 插件既有的网络和高权限禁令不变。
+- App 用专门的 `TabRef::Bot { bot: BotRef, path: Option<String> }` 标识 Bot 页面，不存 URL，不降成
+  `TabRef::Plugin` 或 `TabRef::Url`。`path: None` 打开同一个 `BotRef` 的 `BotView.web` 在 `Ready` 时给出的
+  `page.url`；`Some(path)` 只允许该 origin 内的路径，可含查询和片段，不能换 origin。
+  打开／选择沿用 `Action::SelectTab`，固定沿用 `PinTab`、`PinCurrentPage` 和 `Panel`，`PlacedTab` 保留同一个
+  Bot 身份和路径。桥、媒体与 `--wonton-*` 也沿用既有 `TabRef`／`PlacedTab` 接口和页面容器，不另造壳层 WebView
+  或因是 Bot 页面而省略桥。
+  实现时把聊天已有的 `BotView` watch 通道接入 `TabsLink`，网页状态变化时重算 `TabsViewModel` 的 `TabPage`；
+  URL 只来自精确匹配该 `BotRef` 的 `BotView.web.Ready.page.url`，桥的来源校验以该 `TabPage.url` 为准。
+  `BotView.web: None` 表示没有验证可用的 URL；状态未知、缺失或出错时不给页面 URL，断连或身份变化时清空；
+  不读 `plugin.web_url`，不回退默认 Bot。
+  接口阶段不暴露运行时入口：尚不支持 Bot 页的客户端应明确拒绝，不能转开别的页面。
 
 ### 网关的错误响应
 
@@ -2175,7 +2195,8 @@ x-wonton:
   | 别名 | 出现条件 | 转发到 |
   | --- | --- | --- |
   | `auth.wonton.internal` | `webui.sso: oidc` | 身份提供方的公开端点。签发方和后台端点用它，浏览器走 `auth.<基础域名>`，见“OIDC”。 |
-  | `<slug>.<基础域名>` | 声明了 `webui` | 普通、全插件一份的网页：本插件网络来源的自请求（`self_request`）可不带会话转发，也不带身份；别的来源仍要会话。`webui.service` 在 `bots.services` 时不适用：默认和非默认 Bot 网页均先拒绝插件网络来源，见“每个 Bot 的网页”。 |
+  | `<slug>.<基础域名>` | 声明了 `webui` | 总是解析到核心网关；每 Bot 网页时仍指向默认 Bot。普通、全插件一份的网页允许本插件网络来源的自请求（`self_request`）不带会话转发，也不带身份；别的来源仍要会话。每 Bot 网页只取消该豁免，默认 Bot 也先拒绝插件网络来源，回 403 `permission_denied`。 |
+  | 非默认 Bot 的 origin 主机名 | `webui.service` 在 `bots.services`，对应 Bot 已登记 | 每个主机名都须在本插件网络作为核心网关的 DNS 别名；请求到达网关后，插件网络来源同样回 403 `permission_denied`，不是 DNS 失败。命名见“每个 Bot 的网页”。 |
   | `models.wonton.internal` | `models` | 模型网关声明的服务和端口。 |
   | `matrix.wonton.internal` | `matrix.bot` | Tuwunel 的 Matrix 客户端接口。 |
   | `mcp.wonton.internal` | `tools` | 核心的 MCP 总线。 |
