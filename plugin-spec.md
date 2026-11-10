@@ -1,6 +1,6 @@
 # 插件规范 `x-wonton`（草案 v0.13）
 
-> 草案，字段可能调整。正式发布之前规范直接改；除“模型网关”一节明示的旧权限读取约定外，不保留旧写法，插件跟着升。
+> 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
 插件在清单顶层用 `x-wonton` 扩展字段描述它在 Wonton 里的身份、运行形态、入口、能力和权限。
 容器插件的清单是 `docker-compose.yml`；compose 引用的配置文件、图标和设置表单与它放在同一个目录里，合称插件包。
@@ -348,7 +348,7 @@ services:
 - 安装时注入的变量：申请了 `notify` 的插件多拿到 `WONTON_SMTP_HOST`、`WONTON_SMTP_PORT`、`WONTON_MAIL_FROM`（见“发信”）。
 - `WONTON_OWNER_EMAIL`、OIDC 的 `email` 声明和 `{email}` 一律是用户的内部邮箱，总有值，见“安装时注入的变量”。
 - `webui.oidc.requires_email` 删掉：邮箱总有值，不用再声明，清单里写了会因未知字段报错。
-- 模型网关使用方改写 `wants: [models]`（旧清单的 `models` 权限按同一声明处理）；提供方保留 `provides.models`，使用方保留 `WONTON_MODEL_*` 专用变量（见“模型网关”）。
+- 模型网关使用方改写 `wants: [models]`；提供方保留 `provides.models`，使用方保留 `WONTON_MODEL_*` 专用变量（见“模型网关”）。
 
 **0.10**
 
@@ -1195,8 +1195,8 @@ x-wonton:
 
 核心不支持插件间依赖时，安装和升级含非空 `requires`、`wants`，或声明 `torrent_client`、`jellyfin`、第三方能力的
 `provides` 的插件均报 `unsupported`，提示升级核心；`plugin check` 仍校验这些声明，作者可以先写好清单。
-旧清单的 `models` 权限、`provides.models` 和 `provides.egress_proxy` 不受这道拦截影响；能读旧的模型权限不代表支持
-`wants: [models]`。下面的连接和生命周期规则仅适用于支持这些能力的核心；字段的最低规范版本以“各版本新增的字段”收录为准。
+`provides.models` 和 `provides.egress_proxy` 不受这道拦截影响。下面的连接和生命周期规则仅适用于支持这些能力的核心；
+字段的最低规范版本以“各版本新增的字段”收录为准。
 
 ```yaml
 x-wonton:
@@ -1339,7 +1339,7 @@ x-wonton:
 
 ### 使用方
 
-使用方声明可选能力，不再把 `models` 作为独立权限：
+使用方在 `wants` 里声明可选的模型能力：
 
 ```yaml
 x-wonton:
@@ -1348,7 +1348,6 @@ x-wonton:
   permissions: []
 ```
 
-旧清单的 `permissions: [models]` 仍可读取，按同一个可选能力声明处理，不保留另一套授权或注入路径。新清单改用上面的写法。
 `models` 不能写进 `requires`，也不能写进 `optional_permissions`；网关不是安装门槛。
 
 变量沿用 `WONTON_MODEL_BASE_URL`、`WONTON_MODEL_API_KEY`、`WONTON_MODEL_ANTHROPIC_BASE_URL`、
@@ -2592,7 +2591,7 @@ x-wonton:
   | `auth.wonton.internal` | `webui.sso: oidc` | 身份提供方的公开端点。签发方和后台端点用它，浏览器走 `auth.<基础域名>`，见“OIDC”。 |
   | `<slug>.<基础域名>` | 声明了 `webui` | 总是解析到核心网关；每 Bot 网页时仍指向默认 Bot。普通、全插件一份的网页允许本插件网络来源的自请求（`self_request`）不带会话转发，也不带身份；别的来源仍要会话。每 Bot 网页只取消该豁免，默认 Bot 也先拒绝插件网络来源，回 403 `permission_denied`。 |
   | 非默认 Bot 的 origin 主机名 | `webui.service` 在 `bots.services`，对应 Bot 已登记 | 每个主机名都须在本插件网络作为核心网关的 DNS 别名；请求到达网关后，插件网络来源同样回 403 `permission_denied`，不是 DNS 失败。命名见“每个 Bot 的网页”。 |
-  | `models.wonton.internal` | `wants: [models]`（旧清单的 `models` 权限按同一声明处理） | 模型网关声明的服务和端口。 |
+  | `models.wonton.internal` | `wants: [models]` | 使用方选用的模型网关声明的服务和端口。 |
   | `matrix.wonton.internal` | `matrix.bot` | Tuwunel 的 Matrix 客户端接口。 |
   | `mcp.wonton.internal` | `tools` | 核心的 MCP 总线。 |
   | `health.wonton.internal` | `plugins.health` | 只读的健康接口，见“插件健康探测”。 |
