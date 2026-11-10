@@ -85,7 +85,8 @@ scripts/dev.sh reinstall
 | `scripts/dev.sh rebuild` | 强制重建核心栈，再保数据重装工作区插件；其他插件的容器由核心管理，不重建 |
 | `scripts/dev.sh uninstall [--purge]` | 卸载插件；`--purge` 同时删除插件数据 |
 | `scripts/dev.sh status` | 查看开发环境服务和已装插件 |
-| `scripts/dev.sh logs [<服务>]` | 跟踪核心日志；给插件服务名则查看该服务日志 |
+| `scripts/dev.sh logs [<服务>]` | 跟踪日志：不给参数跟核心，给了核心栈的服务（`core`、`hydra` 等）或插件的服务名就跟那个；找不到时列出可选的服务名 |
+| `scripts/dev.sh diag` | 只读诊断：核心容器里解析 `auth.wonton.internal`、当前出口代理设置和可达性、插件容器里的代理变量；每项给命令和结果，失败逐项给原因，不改设置 |
 | `scripts/dev.sh token` | 输出用户令牌 |
 | `scripts/dev.sh session [--new]` | 建立或重建用户会话，cookie 保存在 `.wonton/session.cookies` |
 | `scripts/dev.sh web [--jar <文件>] [--fresh] [--sso] [<路径> [<curl 参数>…]]` | 以用户身份请求插件网页，默认复用会话；`--sso` 跟随重定向并提交 JS 自动表单的隐藏字段 |
