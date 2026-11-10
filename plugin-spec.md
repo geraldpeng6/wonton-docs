@@ -2103,7 +2103,9 @@ x-wonton:
   （用它自己的 `/health/detailed`），magpie 用自带的 `magpie healthcheck`。
 - 写在 compose 的 `healthcheck` 里。镜像自带的 `HEALTHCHECK` 也算数，但官方索引的插件要在 compose 里
   显式写出，便于审核，也随插件版本锁定。
-- 写上 `start_period` 和 `start_interval`：安装时能尽快判断就绪，启动慢时又不会误判失败。
+- 写上 `start_period` 和 `start_interval`：安装时能尽快判断就绪，启动慢时又不会误判失败。安装、启动、
+  升级时等健康的时限取自各服务 `healthcheck.start_period` 的最大值（加余量），上限 60 分钟；都没写时等
+  300 秒。装载要几分钟的插件（大模型类）写长一点的 `start_period`，不会被 300 秒误判失败。
 - 检查只能用镜像里已有的命令，distroless 之类的镜像里没有 `curl`、`wget`。
 - 官方索引的插件缺健康检查时不收录（`wonton-core plugin check --official` 检查）。导入的应用和社区插件
   没有健康检查时照常安装，状态如实显示为“运行中，健康未知”，不显示“健康”。
