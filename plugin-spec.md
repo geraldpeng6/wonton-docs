@@ -425,9 +425,10 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 
 ## 网页入口与单点登录
 
-插件网页的地址是 `<scheme>://<slug>.<基础域名>[:端口]`，`slug` 是把 `id` 里的 `.` 换成 `-`
-（`app.immich.photos` → `app-immich-photos`）。所有请求经核心网关，网关先校验用户的会话，未登录的请求
-不会到达插件；转发时去掉网关自己的 Cookie 和客户端伪造的 `X-Forwarded-*`，重新设置 `X-Forwarded-For`、
+插件网页默认地址是 `<scheme>://<slug>.<基础域名>[:端口]`，`slug` 是把 `id` 里的 `.` 换成 `-`
+（`app.immich.photos` → `app-immich-photos`）。`webui.service` 属于 `bots.services` 时，每个 Bot 有独立的
+网页来源（origin），见下节。所有网页请求经核心网关，网关先核对来源和访问权限；未获准的请求不会到达插件。
+转发时去掉网关自己的 Cookie 和客户端伪造的 `X-Forwarded-*`，重新设置 `X-Forwarded-For`、
 `X-Forwarded-Host`、`X-Forwarded-Proto`，保留原始 `Host`，支持 WebSocket。
 
 `webui.path`（默认 `/`）是入口路径：App 和状态页打开插件网页时，把它拼在网页地址后面，写
@@ -451,6 +452,39 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 
 声明 `oidc` 或 `proxy` 要同时满足：应用官方支持这种接法；接上后打开网页不会再看到应用的登录页，角色也对；不用脚本
 往应用里预建账号，不用改应用的数据，不用每次启动核对。做不到就用 `none`。
+
+### 每个 Bot 的网页
+
+以下是每 Bot 网页的接口约定，不表示目标核心已实现或通过端到端验证。清单不新增字段：当且仅当
+`webui.service` 列在 `bots.services` 里，同一份 `webui` 为每个 Bot 提供一份 UI，路由到该 Bot 的容器。
+未列在其中的网页服务仍是全插件一份，不按 Bot 复制。
+
+- 默认 Bot `default` 沿用 `<slug>.<基础域名>`；非默认 Bot 的标签为
+  `bot--<bot_name>-<slug_prefix>-<digest8>`。`slug` 是完整插件 `id` 中的 `.` 换成 `-`；
+  `slug_prefix` 取它前 `min(slug 的字节数, 48 - bot_name 的字节数)` 个字节，截断处的 `-` 原样保留。
+  Bot 名与插件 id 都已校验为 ASCII，Bot 名最长 32 字节，不截 Bot 名。`digest8` 是
+  `SHA256(UTF8(plugin_id) || 0x00 || UTF8(bot_name))` 的小写十六进制表示的前 8 位：完整插件 id、恰好一个
+  NUL 字节、完整 Bot 名依次参与摘要。整个标签最长 63 字节；主机名为 `<标签>.<基础域名>`，scheme 和可选端口
+  沿用插件地址。合法插件标签不含 `--`，因此 `bot--` 专用于 Bot。核心登记时检查撞名：同一 Bot 可重复登记，
+  不同 Bot 撞名回 409 `conflict`，不静默改名或回退默认 Bot；查占用者与登记须原子完成。
+  标签内可能出现 `--`，只能查登记表认 Bot，不能拆 URL 猜身份。
+- 这个算法只确定 origin；打开页面时在其后原样追加现有 `webui.path`，不把 Bot 名拼进路径。
+  容器用已有 `WONTON_BOT_NAME` 认出自己；Bot 服务的 `WONTON_APP_URL` 应为自己的 origin，不带路径和末尾 `/`。
+  全插件一份的服务仍拿插件／默认 Bot 的 origin。
+- OIDC 的登录回调和登出回跳登记应按对应 Bot 的 origin 拼接声明的路径；会话 Cookie 应精确绑定当前主机，
+  不设父域 `Domain`，不得借插件或其他 Bot 的 Cookie 获得访问权。这是登录接线要求，不是已实测结论。
+- 网页权限复用插件现有的同一个“家人能用”开关（`family`），默认关，即默认只给主人；打开后家人也能访问
+  这个插件各 Bot 的网页。私人 Bot 和共享 Bot 都不新增归属人例外或单独开关：创建者、聊天参与者、Matrix
+  用户名和 URL 都不授予网页权限。好友仅在核心支持既有插件分享时，按同一插件分享授权访问；不由 Bot 另行授权。
+  家人未获准回 403 `not_shared`。插件级入口只指向默认 Bot，并经过同一项检查，不是绕过入口。
+- Agent、Bot 和其他插件的插件网络来源一律先拒绝，回 403 `permission_denied`，再考虑普通插件网页的
+  自请求（`self_request`）例外；即使带了人的凭据也不能绕过。此规则只约束网关：同插件网络的容器仍可直接
+  连接彼此监听的端口，网关不能阻止这条路，不能把独立 origin 当作容器间沙箱。
+- Bot 不存在回 404 `not_found`；未认证回 401 `unauthenticated`；目标 Bot 网页服务未就绪回 503 `not_ready`；
+  未声明网页回 404 `no_webui`。页面导航的登录跳转仍按下节处理，不得因失败转开默认 Bot。
+- 家人在 Bot 网页登录账号前，App 必须提醒“服务器主人可以查看、管理这里的登录状态”；不承诺对主人保密。
+  实现时提示须写入 iOS、Android 壳的简体中文、繁體中文、English、日本語四种本地化资源，不在核心拼文字。
+- 每 Bot 网页不新增局域网端口或宿主权限，Agent／Bot 插件既有的网络和高权限禁令不变。
 
 ### 网关的错误响应
 
@@ -477,18 +511,18 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 | --- | --- | --- |
 | 400 | `invalid_input` | 路径拼不出上游地址，交接码或目标地址写错 |
 | 401 | `unauthenticated` | 没登录，或跨站请求 |
-| 403 | `not_shared` | 家人打开主人没开放给家人的插件 |
+| 403 | `not_shared` | 家人打开主人没开放给家人的插件网页，含每 Bot 网页，使用同一个开关 |
 | 403 | `cross_site` | 核心域名上的跨站修改请求 |
-| 403 | `permission_denied` | 这个人拿不到身份：代登录没有他的身份，或 OIDC 授权的人对不上 |
+| 403 | `permission_denied` | Bot 网页的插件网络来源检查不通过；或这个人拿不到代登录／OIDC 身份 |
 | 404 | `not_installed` | 插件域名对应的插件没装 |
 | 404 | `no_webui` | 插件没有 `webui` |
-| 404 | `not_found` | 核心上没有这个路径 |
+| 404 | `not_found` | Bot 不存在，或核心上没有这个路径 |
 | 404 | `unknown_host` | 主机名不属于任何已知用途 |
 | 409 | `conflict` | OIDC 登录的人和应用记下的对不上 |
 | 500 | `proxy_credentials` | 身份值写不进请求头 |
 | 502 | `oidc_error` | 身份提供方回了别的错 |
 | 502 | `upstream_unreachable` | 连不上上游 |
-| 503 | `not_ready` | 插件没在运行 |
+| 503 | `not_ready` | 插件或目标 Bot 的网页服务未就绪 |
 | 503 | `oidc_unavailable` | 核心没配身份提供方 |
 | 504 | `upstream_timeout` | 上游迟迟不回响应头 |
 
@@ -503,6 +537,8 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 好友用自己已有的 Matrix 账号，不在分享人的服务器上建聊天账号。分享按插件、按好友或组授权，可设到期；
 收回、到期、删好友或卸载后，网关拒绝后续请求并断开已有的长连接（包括 WebSocket）。插件应用内的账号和
 数据由应用自己管理，收回访问不会替应用删除账号。
+
+每 Bot 网页沿用同一插件分享授权，不新增 Bot 分享开关；仅支持上述分享接口的核心才能给好友开放。
 
 认人沿用声明的登录方式：
 
@@ -594,9 +630,9 @@ ID”；内置管理员角色的显示名是 `Admin`，`admin` 就对得上。Bo
   应用把浏览器送到那里授权。发现文档经网关给出时已经替你分好：`authorization_endpoint`、
   `end_session_endpoint` 是浏览器地址，`token_endpoint`、`userinfo_endpoint`、`jwks_uri`、`revocation_endpoint`
   是内部地址。签发方本身浏览器不访问，用哪个应用都一样写进配置。
-- 插件自己的网页地址在自己的网络里也解析得到，插件后端可以访问自己（比如给浏览器签发地址的应用回自己取东西）。
-  但把 `*.localhost` 直接当回环、不发 DNS 查询的库（curl、hickory-resolver）访问这个地址会绕过解析，得不到
-  核心的网关，这类应用要另外绕开：让浏览器那一侧去取，或改用 `WONTON_SERVICE_DOMAIN` 下的内部地址。
+- 全插件一份的普通网页在自己的网络里也解析得到，插件后端可以经网关访问自己（比如给浏览器签发地址的应用回自己取东西）；
+  每 Bot 网页不适用这个自请求例外，插件网络来源会先被拒绝，见“每个 Bot 的网页”。把 `*.localhost` 直接当回环、
+  不发 DNS 查询的库（curl、hickory-resolver）会绕过解析；普通网页可让浏览器取，或改用 `WONTON_SERVICE_DOMAIN` 下的内部地址。
 - 选型时先看应用接不接受 `http` 的 issuer：有的强制 `https`（如 BookStack），核心的 OIDC 是 `http`，
   这类应用登录走不通。
 - `webui.path` 可以指向应用的 OIDC 起点：App 打开网页时把它拼在地址后面，核心给出的网页地址
@@ -892,7 +928,7 @@ x-wonton:
 | `WONTON_HOST_NAME` | 总是 | 宿主主机名（核心从 Docker daemon 的 `/info` 取，如 `server-01`），可填服务的 `hostname:` 或应用里的主机设置。它是用户的主机名，可能是不想公开的信息，截图里要遮住。取不到时是空字符串。 |
 | `WONTON_SHARE_<名称>` | 授权了该共享文件夹 | 共享文件夹路径（大写，`-` 换成 `_`，如 `WONTON_SHARE_PHOTOS`）。 |
 | `TZ`、`PUID`、`PGID` | 总是 | 时区与运行用户。`TZ` 是 IANA 时区名，如 `Asia/Shanghai`、`UTC`。 |
-| `WONTON_APP_URL` | 声明了 `webui` | 插件网页的公开地址，不带末尾 `/`。应用生成回调地址、外部链接时使用。 |
+| `WONTON_APP_URL` | 声明了 `webui` | 网页的公开 origin，不带路径和末尾 `/`。每 Bot 网页的 Bot 服务应拿自己的 origin；全插件一份的服务拿插件／默认 Bot 的 origin，见“每个 Bot 的网页”。应用生成回调地址、外部链接时使用。 |
 | `WONTON_OIDC_ISSUER`、`WONTON_OIDC_CLIENT_ID`、`WONTON_OIDC_CLIENT_SECRET` | `webui.sso: oidc` | OIDC 客户端配置。签发方是核心在插件网络里的别名 `http://auth.wonton.internal:<端口>`。 |
 | `WONTON_OIDC_AUTH_URL`、`WONTON_OIDC_TOKEN_URL`、`WONTON_OIDC_USERINFO_URL` | `webui.sso: oidc` | 各端点地址，给不支持发现文档的应用（如 Grafana）。`AUTH_URL` 是浏览器地址（`auth.<基础域名>`），另外两个在插件网络里。 |
 | `WONTON_CORE_ADDRESS` | `webui.sso: proxy` | 核心在这个插件网络里的地址（网段的最后一个可用地址，如 `172.18.255.254`），核心容器重建后不变。写进应用的“信任的代理地址”，见“网关代登录”。 |
@@ -1391,7 +1427,8 @@ x-wonton:
 - 隔离：Bot 服务挂载应用数据目录时只能挂自己的 `${WONTON_BOT_DATA}`，也不能用命名卷，这样一个 Bot 读不到
   别的 Bot 的记忆和凭据。
 - 依赖：Bot 服务可以依赖同一个 Bot 的服务和全插件一份的服务；全插件一份的服务不能依赖 Bot 服务。
-  `mcp`、`provides` 不能指向 Bot 服务。`webui` 可以，连的是默认 Bot（`default`）那一组的容器；应用只监听回环地址时，
+  `mcp`、`provides` 不能指向 Bot 服务。`webui` 可以：每个 Bot 一份独立 origin，插件级入口指向默认 Bot
+  `default` 且经过同一项插件网页权限检查；地址算法、访问权限和登录要求见“每个 Bot 的网页”。应用只监听回环地址时，
   在同一个 Bot 里用 `network_mode: service:<服务名>` 配一个反向代理对外，`webui` 写被借用的服务。
 - Bot 服务在插件网络里的别名是 `<服务名>-<Bot 名>`，同一个 Bot 的服务之间也用它互访，如
   `http://sidecar-${WONTON_BOT_NAME}:8080`。
@@ -2138,7 +2175,7 @@ x-wonton:
   | 别名 | 出现条件 | 转发到 |
   | --- | --- | --- |
   | `auth.wonton.internal` | `webui.sso: oidc` | 身份提供方的公开端点。签发方和后台端点用它，浏览器走 `auth.<基础域名>`，见“OIDC”。 |
-  | `<slug>.<基础域名>` | 声明了 `webui` | 这个插件自己的网页地址：插件网络里的容器访问它时网关不要会话，直接转给它的网页服务，也不带身份。别的来源照旧要会话。 |
+  | `<slug>.<基础域名>` | 声明了 `webui` | 普通、全插件一份的网页：本插件网络来源的自请求（`self_request`）可不带会话转发，也不带身份；别的来源仍要会话。`webui.service` 在 `bots.services` 时不适用：默认和非默认 Bot 网页均先拒绝插件网络来源，见“每个 Bot 的网页”。 |
   | `models.wonton.internal` | `models` | 模型网关声明的服务和端口。 |
   | `matrix.wonton.internal` | `matrix.bot` | Tuwunel 的 Matrix 客户端接口。 |
   | `mcp.wonton.internal` | `tools` | 核心的 MCP 总线。 |
