@@ -972,7 +972,7 @@ x-wonton:
 
 ### 静态网页的数据（`web_storage`）
 
-静态网页要存数据时写 `requires: [web_storage]`（没有就用不了）或 `wants: [web_storage]`，页面用相对地址读写：
+静态网页要存数据时写 `requires: [web_storage]` 或 `wants: [web_storage]`，页面用相对地址读写：
 
 ```js
 const res = await fetch('/_wonton/data/todo.json');
@@ -986,8 +986,18 @@ await fetch('/_wonton/data/todo.json', {
   `Depth: 0` 和 `1`）。`PUT` 支持 `If-Match`、`If-None-Match: *`，对不上回 412；父目录不在回 409。
 - 不支持锁、移动、复制、`PROPPATCH`、部分写入和 `Depth: infinity`，回 405 或 501。
 - 每个插件 64 MiB、1024 个文件，单个文件 8 MiB，超了回 507，原文件不动。
-- 写请求的 `Origin` 必须是插件自己的源，否则回 403。
-- 一个插件一份数据，能打开页面的人都能读写。卸载时和容器插件的数据一样按“保留数据”处理。
+- **`requires` 和 `wants`：**
+  - `requires`：没有提供方时装不上；提供方没在运行时插件标为异常。
+  - `wants`：没有提供方也能装，这时数据路径回 503，页面要处理“存不了”。
+  - 没写 `web_storage` 的静态网页请求 `/_wonton/data/` 回 404。容器插件不能写 `web_storage`，用自己的数据目录。
+- **只有自己的页面能写：** 除 `GET`、`HEAD`、`OPTIONS`、`PROPFIND` 以外的请求都按写处理，要来自插件自己的页面
+  （`Origin` 是插件自己的源，或者浏览器标了 `Sec-Fetch-Site: same-origin`），否则回 403；别的网页发来的请求按没登录处理，回 401。
+  页面用 `fetch` 的默认设置就满足。
+- **响应头：** 数据的响应也带网页的 `Content-Security-Policy`，并且不缓存（`Cache-Control: no-store`）。
+- **数据什么时候在：**
+  - 一个插件一份数据，能打开页面的人都能读写。
+  - 升级不动数据，新版本去掉了 `web_storage` 也一样。
+  - 卸载时和容器插件的数据一样按“保留数据”处理：默认留下，再装同一个 ID 时接着用；选“彻底删除”才删。
 
 ### 外部网页（`runtime: link`）
 
