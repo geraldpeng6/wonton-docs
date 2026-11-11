@@ -1,4 +1,4 @@
-# 插件规范 `x-wonton`（草案 v0.11）
+# 插件规范 `x-wonton`（草案 v0.12）
 
 > 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
@@ -27,7 +27,7 @@ services:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
 
 x-wonton:
-  spec: "0.8"
+  spec: "0.12"
   id: app.immich.photos
   version: 2.0.0
   kind: app
@@ -973,7 +973,7 @@ x-wonton:
 | `WONTON_MATRIX_ALLOWED_USERS` | `matrix.bot` | 逗号分隔的 Matrix 用户 ID，Bot 只听这些人的话：私人 Bot 是归属人，共享 Bot 是主人。家人加入、联系人批了之后名单变长，核心重建这个 Bot 的服务，沿用设备和令牌。 |
 | `WONTON_MATRIX_HOME_ROOM` | `matrix.bot` | Bot 的主房间：核心替用户建好的、和 Bot 的加密私聊，定时任务的结果发到这里。 |
 | `WONTON_SECRET_<名字>` | `secrets` 里由核心生成的项 | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`。 |
-| `WONTON_SETTING_<名字>` | 引用了它的服务，且这一项有值 | 设置，名字转成大写，如 `WONTON_SETTING_BUDGET`。值的写法见“插件设置”。 |
+| `WONTON_SETTING_<名字>` | 清单声明了这一项，服务引用了它 | 设置，名字转成大写，如 `WONTON_SETTING_BUDGET`。值的写法见“插件设置”。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
 | `WONTON_PERMISSION_DOCKER_SOCKET`、`_DEVICES_GPU`、`_DEVICES_SERIAL`、`_DEVICES_USB` | 对应的可选权限开着 | 值是 `1`。关着时不定义（不是空串），用 `${VAR:+x}` 或 `[ -n "$VAR" ]` 判断。给这个插件的所有服务，不只拿到字段的那个。 |
 | `WONTON_LAN_ADDRESSES` | `network.lan` | 局域网端口开在哪些地址上，逗号分隔，如 `192.0.2.10`。地址变化时的重建规则见“局域网”。 |
@@ -1865,32 +1865,36 @@ services:
 ### 写法
 
 - 根是 `type: object`，`additionalProperties` 只能是 `false`；在 `properties` 里列每一项，需要的放 `required`。
-- 属性名是小写字母、数字和 `_`，以字母开头，最长 64；一份 Schema 最多 64 项。属性只有顶层，不嵌套对象。
+- `$schema` 必须是 `https://json-schema.org/draft/2020-12/schema`。
+- 属性名是小写字母、数字和 `_`，以字母开头，最长 64；一份 Schema 最多 64 项。表单只展开顶层属性，嵌套值用 JSON 文本编辑。
 - 每一项都要有 `x-wonton-title`（多语言，写法同清单的 `title`），`x-wonton-description` 可选。显示顺序按
   `x-wonton-order`，没列出来的按属性名排在后面。
 - App 认得这几种类型，画成对应的控件：`boolean`、`integer`、`number`、`string`、字符串的 `enum`，以及
   `array` + `items.enum` 的多选。长度（`minLength`、`maxLength`）、范围（`minimum`、`maximum`）、`pattern`
   和 `enum` 由核心照常校验，控件只是尽量照着长。
 - 其他写法（`object`、数组的其他元素、`const`、`oneOf`、`anyOf`、`allOf`）照常校验，App 把它们显示成 JSON 文本
-  编辑框。`$ref` 只认同一个文件里的 `$defs`，远程 `$ref` 报错。
+  编辑框。`$ref` 和 `$dynamicRef` 不收，同文件和远程都一样；任何子 Schema 中的敏感标记都拒绝。
+- App 不认识核心给出的控件类型时使用 JSON 文本控件；连值类型都不认识时只提示不支持，禁止编辑和提交，不把值当成空。
 - 默认值写在 `default`，自己必须过得了这一项的 Schema。必填项没有默认值时，安装时就得填。
+- 属性名不得和 `x-wonton.secrets` 里的名字重复。
+- 整份生效值序列化后不超过 64 KiB，单个字符串不超过 8 KiB，一个字符串数组不超过 64 项；大小按 UTF-8 字节计。
 - 敏感项不写在这里：见“敏感项”。
 - 使用 `settings` 的清单至少写 `spec: "0.12"`。
 
 ### 值和生效
 
 - 核心按 Schema 校验值。安装、升级在拉镜像之前校验；装好以后改一项只校验新值叠在现有值上的结果。不通过时不改、
-  不重建，接口返回 400 `settings_invalid`，逐项写明哪个字段、什么原因。Schema 本身不合格时安装和升级直接失败，
-  返回 400 `settings_schema_invalid`。
+  不重建，接口返回 400 `settings_invalid`，逐项写明哪个字段、什么原因，App 按字段标红。Schema 本身不合格时安装和
+  升级直接失败，返回 400 `settings_schema_invalid`。
 - 值存进插件记录，明文保存，读接口原样返回。值不是凭据，可以进日志和诊断。
 - 值以 `WONTON_SETTING_<属性名大写>` 注入。字符串原样；布尔是 `true`/`false`；整数和数字是十进制；字符串数组是
-  JSON 数组文本；JSON 文本类型的值是 JSON 文本。可选项没值、也没有默认值时注入空串（数组 `[]`，对象 `{}`，
-  布尔 `false`）。属性名 `foo_bar` 对应 `WONTON_SETTING_FOO_BAR`。
-- 变量只给渲染结果里引用它的服务：在 `environment`、`configs` 内容或 compose 的其他插值位置写
-  `${WONTON_SETTING_属性名大写}`。值变化时核心只重建这些服务，卷和数据不动，正在进行的任务会断；没有服务用到它时
-  只保存，下次启动生效。
+  JSON 数组文本；JSON 文本类型的值是 JSON 文本。可选项没值、也没有默认值时统一注入空串；显式的 `false`、`[]`、
+  `{}` 不算没值。属性名 `foo_bar` 对应 `WONTON_SETTING_FOO_BAR`。
+- 变量只用于 Compose 插值：在 `environment`、`configs` 内容或其他插值位置显式引用 `${WONTON_SETTING_属性名大写}`。
+  保存后核心按容器的 `wonton.render` 摘要比较最终渲染结果，只重建结果变化的服务；同值写入和无关服务不重建。
+  卷和数据不动，正在进行的任务会断；未被引用的设置只保存。
 - 清空一项时回到默认值；没有默认值的可选项注入空串，必填项清空前要另填。升级时新 Schema 删掉的属性连值一起丢掉；
-  新 Schema 下已经不合法、或新出现的必填项，在升级确认页里标出来，改好才能升级。
+  新 Schema 下已经不合法的项，以及新版本新增、没有默认值的必填项，在升级确认页里标出来，改好才能升级。
 - 一份设置全插件共用，Bot 服务也一样。
 
 ### 敏感项
@@ -1898,8 +1902,8 @@ services:
 凭据一样的东西（API 密钥、管理员密码）留在“插件密钥”的 `input` 里，不进设置：那里的值不回显、用系统密码框
 输入，设置里的值会原样返回给 App 和日志。
 
-属性上出现下面任一项就是错误（`settings_schema_invalid`），要把它挪到 `x-wonton.secrets`。标记要写在属性上，
-写在被 `$ref` 的 `$defs` 里不算：
+Schema 任意子项出现下面任一标记就是错误（`settings_schema_invalid`），要把凭据挪到 `x-wonton.secrets`。
+未标记的秘密无法自动识别，但同样禁止放进普通设置：
 
 - `writeOnly: true`
 - `format: "password"`
@@ -1910,7 +1914,7 @@ services:
 - 安装预览和 Bot 的确认卡片把设置表单列出来，主人在原生控件里填，和确认一起提交。值不经过聊天，Bot 拿不到。
 - 装好以后在插件详情页的设置里改：读接口给出字段、当前值、默认值和用到它的服务；写接口只带改动的项。
 - 每次读、写都带设置文件的摘要。插件在中间换了这个文件时摘要对不上，写请求返回 409 `changed`，App 重新读。
-- 只有主人能读、能写。插件没有 `settings` 时读接口返回 404 `not_found`。
+- 只有主人能读、能写。插件没装时读接口返回 404 `not_installed`；装着的版本没有 `settings` 时返回 400 `unsupported`。
 
 ## 插件密钥（`secrets`）
 
