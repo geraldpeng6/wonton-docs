@@ -1891,6 +1891,8 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
 - 插件目录就是官方索引（见“发布与来源”）。Bot 能装官方索引里的插件和自己写的插件（见“Agent 写插件”），不能装社区插件。
 - 敏感的调用会一直等到用户回答或者确认过期（10 分钟）。确认卡片不是聊天消息：核心推送给该回答它的用户，Wonton App 把它显示在
   发起这次调用的会话里和“等你确认”列表里，用户在 App 里回答。用户拒绝或者过期时工具返回错误（`isError: true`），说明原因。
+- 确认卡片发给谁：私人 Bot 的发给它的归属人，共享 Bot 和没有 Bot 的插件的发给主人；装卸、升级插件和开关插件权限的卡片，
+  归属人没有“能装插件”时发给主人。卡片上写着是哪个 Bot 发起的。
 - **报来源会话（可选）。** 卡片显示在哪个会话由调用方报，两种写法，两样都有时 `_meta` 为准：
   - `tools/call` 的 `params._meta` 里带 `app.wonton/origin`，值是 `{"room_id": "…", "thread_id": "…"}`：`room_id` 是
     `!` 开头的房间 ID；`thread_id` 可选，是话题根事件的 `$` 开头事件 ID。
@@ -1898,8 +1900,8 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
     请求头的客户端，一个会话配一份（比如 ACP 的 `session/new` 里 `mcpServers[].headers`）。
 
   来源只决定卡片显示在哪，不影响谁能回答。核心只认你的 Bot 和用户都在的房间；没报、报的房间对不上或核对不了时，
-  卡片显示在 Bot 和用户的主私聊里。没有 Bot 的插件报了也不用，卡片只在“等你确认”列表里。话题里报的，App 暂时显示在
-  这个房间的主对话里。
+  卡片显示在 Bot 和用户的主私聊里，主房间里没有收件人时只在“等你确认”列表里。没有 Bot 的插件报了也不用，卡片只在
+  “等你确认”列表里。话题里报的，App 暂时显示在这个房间的主对话里。
 
   ```json
   {"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {
@@ -1956,7 +1958,7 @@ Agent 自带的工具（shell、文件这类不经 MCP 总线的）要动手之�
 }
 ```
 
-- `tool_call_id`、`title`、`options` 必填且不能为空，请求体不超过 1 MiB。`description` 和 `arguments` 可选。`arguments` 会进卡片和审计，秘密要先去掉。
+- `tool_call_id`、`title`、`options` 必填且不能为空，请求体不超过 1 MiB。`description` 和 `arguments` 可选。`origin` 可选，是这次请求来自的会话（`{"room_id", "thread_id"}`），核对规则和卡片发给谁同上面的 MCP 调用。`arguments` 会进卡片和审计，秘密要先去掉。
 - `choice_id` 由插件自己定，核心不解释，同一次请求内不能重复。`kind` 只能是 `allow_once`、`allow_always`、`reject_once`、`reject_always`；卡片上的按钮按 `options` 的顺序显示 `name`。
 - `allow_always` 的作用域归 Agent 自己，不写进核心的工具策略，也不放行 MCP 工具。
 - 没有拒绝类的选项时，核心在卡片上加一个“取消”。
