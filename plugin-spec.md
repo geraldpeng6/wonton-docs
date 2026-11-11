@@ -4,8 +4,8 @@
 
 插件在清单顶层用 `x-wonton` 扩展字段描述它在 Wonton 里的身份、运行形态、入口、能力和权限。
 容器插件的清单是 `docker-compose.yml`；compose 引用的配置文件、图标和设置表单与它放在同一个目录里，合称插件包。
-没有 `x-wonton` 的 compose 文件可以由用户手动导入，但必须先补全权限声明。一个插件一个 Git 仓库，仓库根目录
-就是插件包，发布就是打 tag（见“发布与来源”）。可运行的示例见
+没有 `x-wonton` 的 compose 文件可以由用户手动导入，但必须先补全权限声明。插件包可以是一个 Git 仓库的根目录，
+也可以是仓库里的一个子目录（一个仓库放多个插件，见“发布与来源”），发布就是打 tag。可运行的示例见
 [插件模板](https://github.com/geraldpeng6/wonton-plugin-template)，官方插件的列表见
 [官方索引](https://github.com/geraldpeng6/wonton-store)。
 
@@ -104,7 +104,8 @@ x-wonton:
 ## 插件包
 
 本节描述 `compose` 运行形态的插件包：一个目录，包含 `docker-compose.yml`，加上它引用的文件——`icon`、`settings`、`bot.avatar`、`bot.avatars`、`notices` 和
-顶层 `configs` 的 `file`。`screenshots` 不算在内（见“商店信息”）。
+顶层 `configs` 的 `file`。`screenshots` 不算在内（见“商店信息”）。插件包可以是仓库的根目录，也可以是仓库里的一个子目录：
+引用的路径相对插件包所在的目录，放根目录还是子目录，插件包摘要一样。
 
 - 引用的路径相对 compose 文件所在的目录，不能是绝对路径、不能含 `..`、不能用变量，也不能经过软链接；
   单个文件不超过 2 MiB，整个插件包（文件大小相加）不超过 16 MiB。引用的文件不存在时安装失败。
@@ -2432,13 +2433,15 @@ x-wonton:
 
 ### 插件仓库
 
-- 一个插件一个 Git 仓库，仓库根目录就是插件包：`docker-compose.yml` 和它引用的文件。仓库里的其他文件（README、没有被
-  `notices` 引用的 LICENSE、Dockerfile、源码、截图、测试）核心不取，截图只在商店的详情页里显示。
+- 插件包在仓库根目录，或者仓库里的一个子目录：一个仓库可以放多个插件，每个插件一个子目录，`docker-compose.yml` 和它
+  引用的文件都在里面。仓库里的其他文件（README、没有被 `notices` 引用的 LICENSE、Dockerfile、源码、截图、测试）核心
+  不取，截图只在商店的详情页里显示。
 - 发布：把清单的 `version` 改成新版本，提交，再发布。发布流程（手动触发，见开发指南的“发布”）先构建、推送镜像，把
-  compose 里的镜像引用改成新摘要，这个提交直接进仓库默认分支；tag `v<version>` 打在这个提交上，随后推送。tag 和清单的
-  版本不一致时装不上。带预发布后缀的版本（如 `v1.2.0-beta.1`）只能按 tag 明确安装，不进商店，也不作为升级提示。tag 指向
-  的提交必须已含该版本的镜像摘要，所以发布不由推 tag 触发，tag 只打一次、发布过的 tag 不要移动：已经装上的不受影响，但
-  核心会提示用户这个 tag 被改过。
+  compose 里的镜像引用改成新摘要，这个提交直接进仓库默认分支；tag `v<version>` 打在这个提交上，随后推送；插件在子目录
+  时，tag 写成 `<子目录最后一段>/v<version>`（如 `kimi-code/v0.1.0`），同一仓库里子目录的最后一段不能重复，不然 tag 前缀
+  会撞上。tag 和清单的版本不一致时装不上。带预发布后缀的版本（如 `v1.2.0-beta.1`）只能按 tag 明确安装，不进商店，也不作为
+  升级提示。tag 指向的提交必须已含该版本的镜像摘要，所以发布不由推 tag 触发，tag 只打一次、发布过的 tag 不要移动：已经装
+  上的不受影响，但核心会提示用户这个 tag 被改过。
 - 插件自己的镜像由作者构建，推到公开的镜像仓库，compose 按摘要引用（`名字:标签@sha256:…`，多架构镜像写清单列表的
   摘要）。核心不构建镜像。
 - 公开仓库加上 topic `wonton-plugin`，几分钟后就出现在商店的社区插件里，标为“未审核”。想进官方商店，向官方索引提 PR
@@ -2450,12 +2453,16 @@ x-wonton:
 | --- | --- |
 | `github:<owner>/<repo>@v1.2.0` | 这个 tag |
 | `github:<owner>/<repo>` | 最新的正式版本：版本号最大的、不带预发布后缀的 `v<语义化版本>` tag |
+| `github:<owner>/<repo>/<子目录>@<子目录最后一段>/v1.2.0` | 这个 tag 指向的提交里的子目录 |
+| `github:<owner>/<repo>/<子目录>` | 子目录里最新的正式版本：只看 `<子目录最后一段>/v<语义化版本>` 的 tag，取版本号最大的、不带预发布后缀的 |
 | `github:<owner>/<repo>@<40 位提交号>` | 这个提交，开发时用；清单的版本照常校验，不检查升级 |
 | `index+<索引地址>#<插件 ID>` | 用户添加的第三方索引里的这个插件（见“第三方索引”） |
 | `upload:sha256:<插件包摘要>` | 刚上传、核心暂存着的插件包（见“上传插件包”） |
 
+- 子目录可以有多段（如 `agents/kimi-code`），每段只允许字母、数字、`.`、`-`、`_`，总长不超过 200，不能有空段、`.` 或
+  `..`。子目录里的来源照常写 tag（如 `kimi-code/v0.1.0`），核心核对清单版本时去掉前缀再比。
 - 核心经 git 协议 v2 的 `ls-refs`（`https://github.com/<owner>/<repo>.git`）把 tag 解析成提交，之后按提交取文件：先取
-  `docker-compose.yml`，再取它引用的文件。取到后和上传的插件包走同一套解析和校验。
+  插件包目录里的 `docker-compose.yml`，再取它引用的文件。取到后和上传的插件包走同一套解析和校验。
 - 私有仓库核心取不到（核心不存 GitHub 令牌），开发时从本地目录上传（见“开发与校验”）。
 - 安装记录写下来源、tag、提交和插件包。
 
@@ -2496,6 +2503,13 @@ x-wonton:
         "icon.svg": "<sha256 的十六进制>"
       },
       "compose": "<docker-compose.yml 的原文>"
+    },
+    {
+      "source": "github:geraldpeng6/wonton-agents/agents/codex",
+      "version": "0.1.0",
+      "commit": "<40 位提交号>",
+      "files": { "…": "…（路径相对插件包目录，不带子目录前缀）" },
+      "compose": "<该子目录的 docker-compose.yml 的原文>"
     }
   ],
   "onboarding": {
@@ -2528,9 +2542,9 @@ x-wonton:
   jsDelivr）。
 - `onboarding` 是 App 的新用户引导用的清单，四个键都要有。`agents` 是可选的 Agent，按顺序列出，不在这份索引里或者不是 `kind: agent` 的跳过；`needs` 是用户能选的需求和对应的插件，不在这份索引里的插件跳过；`providers` 是按语言推荐的模型服务商和拿 key 的地址，网关 `presets` 里没有的不显示；`prompts` 是第一次聊天时给用户点的问题。这个键读不懂只影响引导，不影响商店。
 - `docs` 是帮助文档的版本。`source` 不带版本，`files` 最多 500 个文件。核心按 `commit` 取 `files` 列出的文件，全部核对通过后才换用。`min_core` 比这台核心新时不换，继续用手头的。这个键读不懂只影响帮助文档。
-- 条目用 `wonton-core plugin index-entry <插件包目录> github:<owner>/<repo> <提交号>` 生成，不手写：目录是那个提交的
-  检出（核心不连 Git，不核对），条目的 JSON 写到标准输出；加 `--index <索引目录>` 时直接写进本地的索引目录，同一个
-  来源的旧条目换掉。
+- 条目用 `wonton-core plugin index-entry <插件包目录> github:<owner>/<repo>[/<子目录>] <提交号>` 生成，不手写：目录是那个
+  提交的检出（带子目录时是那个子目录的检出；核心不连 Git，不核对），条目的 JSON 写到标准输出；加 `--index <索引目录>`
+  时直接写进本地的索引目录，同一个来源的旧条目换掉。
 - 收录要求：`wonton-core plugin check --official` 通过，即有 `icon`、`tags`、`license`、`author`、`notices`，`description`、`tags`、`about`、`release_notes`、`setup` 都写了 `zh` 和 `en`，所有服务的 `image`
   按摘要固定，长期运行的服务都有健康检查；申请的权限和插件做的事相符；镜像来自上游官方或作者可复现的构建；
   清单里 `requires` 的每个能力，索引里至少要有一个插件提供，否则这个条目不收录。
@@ -2553,10 +2567,10 @@ x-wonton:
 
 | 用户填的 | 是什么 |
 | --- | --- |
-| `https://github.com/<owner>/<repo>`，可带 `.git`、`/tree/<tag>`、`/releases/tag/<tag>`、`/commit/<提交>` | 按下面判断 |
-| `github.com/<owner>/<repo>`、`<owner>/<repo>`、`github:<owner>/<repo>[@<版本>]` | 按下面判断 |
-| 仓库默认分支的根目录有 `docker-compose.yml` | 插件；没有正式版本 tag、地址里也没写版本时加不上 |
-| 仓库默认分支的根目录有 `index.json` | 第三方索引 |
+| `https://github.com/<owner>/<repo>`，可带 `.git`、`/tree/<tag>[/<子目录>]`、`/releases/tag/<tag>`、`/commit/<提交>` | 按下面判断 |
+| `github.com/<owner>/<repo>[/<子目录>]`、`<owner>/<repo>[/<子目录>]`、`github:<owner>/<repo>[/<子目录>][@<版本>]` | 按下面判断 |
+| 仓库默认分支的根目录（或写的子目录）有 `docker-compose.yml` | 插件；没有正式版本 tag、地址里也没写版本时加不上 |
+| 仓库默认分支的根目录（或写的子目录）有 `index.json` | 第三方索引 |
 | 其他 https 地址 | 第三方索引，解析不了就加不上 |
 
 添加的仓库和第三方索引都标为“未审核”。删掉来源不影响已经装上的插件。
@@ -2646,7 +2660,6 @@ x-wonton:
 
 - 插件间依赖与通信的声明方式。
 - 官方索引的签名（minisign），签名后索引也能经镜像和国内的静态托管分发。
-- 一个仓库放多个插件（`github:<owner>/<repo>/<路径>`）。
 - 快捷方式（`shortcuts`）的写法。
 - 插件升级时的数据迁移钩子。
 - 多 Bot 时的存储授权：共享文件夹是插件级的授权，家人的私人空间（`storage.home`）要按 Bot 的用户分别
