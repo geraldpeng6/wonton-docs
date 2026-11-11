@@ -1463,6 +1463,42 @@ x-wonton:
 > `profiles/<名字>/.env`，核心要按插件声明的模板把每个 Bot 的凭据写成文件；省内存，但只适合同一个人的
 > 多个 Bot。
 
+### 一轮失败时的消息
+
+一轮跑不完（模型服务连不上、key 被拒、额度用完、上游出错、被打断或超时）时，Bot 发一条失败消息：用户在
+App 里看到一句人话和下一步，原始报错收进默认收起的“详情”；别的 Matrix 客户端看到的是 `body`。
+
+消息是普通的 `m.text`，`body` 按用户的语言写人话（语言怎么拿见“OIDC”一节：`locale` 和
+`wonton__user_locale` 工具）；类别和原始报错放在消息内容的平级字段 `app.wonton.agent_failure`：
+
+```json
+{
+  "msgtype": "m.text",
+  "body": "模型服务连不上，稍等片刻再试。",
+  "app.wonton.agent_failure": {
+    "category": "unreachable",
+    "detail": "Post \"http://192.0.2.10:8080/v1/chat/completions\": 502 Bad Gateway"
+  }
+}
+```
+
+`category` 是失败类别，定用户能做的事，取这几个值，认不出的当作 `other`：
+
+| 类别 | 什么时候 |
+| --- | --- |
+| `unreachable` | 请求没送到模型服务：连接失败、域名解析不了、TLS 失败、网关 502/504 |
+| `key_rejected` | 模型服务在，但拒绝了凭据：401/403，key 无效或被吊销 |
+| `quota_exhausted` | 凭据有效但额度用完或被限流：402、429 |
+| `upstream_error` | 请求到了，上游返回错误：500/503/529、无效响应、内容策略拒绝 |
+| `turn_interrupted` | 这一轮被打断或超时，没走完就停了：部分动作可能已经执行过 |
+| `other` | 其余 |
+
+`detail` 是原始报错，App 原样收进“详情”，不排版、不识别链接；最多 2000 个字符，超出截掉。不写这个字段、
+`body` 为空或类别是 `other` 时，App 按普通消息显示。
+
+App 只把 Bot 账号发的这类消息当失败卡：别人发的同样结构的内容是普通消息。`body` 必须写——它是不认识
+这个字段的客户端唯一看得到的内容。
+
 ## 通知（`notify`）
 
 申请了 `notify` 的插件把要告诉用户的事交给核心，核心以核心账号发进和用户的“Wonton”私聊：安装时注入
