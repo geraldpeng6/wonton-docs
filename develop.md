@@ -260,7 +260,7 @@ compose 里有自己数据目录的数据库服务（postgres、mariadb/mysql、
    scripts/publish.sh --official
    ```
 
-   脚本要求工作区干净，先检查插件包；有 `images/` 时构建、推送镜像并把摘要写回提交，然后打 `v<版本>` tag，推送当前分支和 tag。仅使用上游镜像的插件直接进入打 tag 的流程。tag、预发布版本及来源的处理见[插件仓库](plugin-spec.md#插件仓库)和[来源](plugin-spec.md#来源)。
+   脚本要求工作区干净，先检查插件包；有 `images/` 时构建、推送镜像，把摘要写回 Compose 并直接提交到默认分支，tag `v<版本>` 打在这个提交上，然后推送当前分支和 tag；仅使用上游镜像的插件跳过摘要提交，tag 打在清单版本的提交上。tag 在打之前就指向了带镜像摘要的提交，因此发布不由推 tag 触发，tag 只打一次、发布过的 tag 不移动。tag、预发布版本及来源的处理见[插件仓库](plugin-spec.md#插件仓库)和[来源](plugin-spec.md#来源)。
 4. 想进入社区列表时，为公开仓库设置 topic `wonton-plugin`，按[社区插件](plugin-spec.md#社区插件)完成发布。申请官方收录时，按[官方索引](plugin-spec.md#官方索引)向索引仓库提 PR。私有仓库可用 `scripts/dev.sh install <tag>` 从本地 git 导出安装。
 
 ### 自建镜像
