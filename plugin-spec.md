@@ -75,19 +75,21 @@ x-wonton:
 | `id` | 是 | 反向域名形式，全局唯一，安装后不可修改。至少两段，每段由小写字母、数字和单个连字符组成，总长不超过 63。 |
 | `version` | 是 | 插件包版本（语义化版本），和镜像版本无关。 |
 | `kind` | 是 | `app`（普通应用）、`agent`（Agent 运行时）、`channel`（第三方 IM 渠道）、`model`（模型服务）、`system`（系统插件，仅官方，只能由安装器预装）。 |
-| `runtime` | 否 | 运行形态：`compose`、`remote_mcp` 或 `skills`，省略时为 `compose`。`compose` 必须有非空的顶层 `services`；其他运行形态不允许出现 `services`，即使为空也不行。与 `kind` 独立。 |
+| `runtime` | 否 | 运行形态：`compose`、`remote_mcp`、`skills`、`static_web` 或 `link`，省略时为 `compose`。`compose` 必须有非空的顶层 `services`；其他运行形态不允许出现 `services`，即使为空也不行。与 `kind` 独立。`static_web`、`link` 见“静态网页和外部网页”。 |
 | `title`、`description` | 是 | 多语言文本，至少写一种语言。怎么写见“标题和说明怎么写”。 |
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes`、`setup` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`friends`（默认 `false`，见“好友分享”）、`cross_origin_isolated`（见“跨源隔离”）。 |
 | `tabs` | 否 | 能放进侧边栏“我的应用”的应用页面，要和 `webui` 一起声明，见“应用页面”。 |
+| `static_web` | 否 | 仅 `runtime: static_web` 允许：`root`（包里的静态文件目录，默认 `web`）、`fallback`（找不到的路径回这个文件）、`connect`（页面能连的外部来源），见“静态网页和外部网页”。 |
+| `link` | `runtime: link` 时必填 | 仅 `runtime: link` 允许：`url`，一个 `https` 地址，见“静态网页和外部网页”。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `headers`（见“提供工具”）、`tool_idle_seconds`、`tool_total_seconds`、`tools`（只提供列出的工具），见“工具与 MCP 总线”。 |
 | `bot` | 否 | Bot 的显示名（`display_name`，多语言）、静态头像（`avatar`）和状态头像（`avatars`：`idle`、`working`、`waiting`、`offline` 四个状态各一个文件），都是插件包里的文件；聊天页的默认显示方式（`chat_layout`，见“聊天页的显示方式”）。只能和 `matrix.bot` 权限一起声明，见“Matrix Bot”。 |
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
 | `agent` | `kind=agent` 时必填 | `protocol`：`matrix`（Agent 自己登录 Matrix，须声明 `matrix.bot`）或 `acp`（经 ACP 桥接入）。可选 `login`，见“Agent 插件”。 |
 | `agent.skills.mount` | 否 | 仅 `kind: agent` 允许。容器内的绝对路径，不能是 `/`，不能含 `..` 路径段，不能是 `/proc`、`/sys`、`/dev` 或它们的子路径。填写 Agent 原生会读取、但自己不会往里写的技能目录。 |
-| `provides` | 否 | 向其他插件提供的能力：`models`（见“模型网关”，只能 `kind: system` 的插件声明）、`egress_proxy`（见“网络”的“代理插件”），以及其他能力，键是能力名，见“能力依赖”。 |
+| `provides` | 否 | 向其他插件提供的能力：`models`（见“模型网关”，只能 `kind: system` 的插件声明）、`egress_proxy`（见“网络”的“代理插件”），以及其他能力，键是能力名，见“能力依赖”。托管能力（`static_web`、`web_storage`）还要写 `mount`，见“提供方”。 |
 | `requires`、`wants` | 否 | 依赖的能力名列表：`requires` 的能力没有提供方装不上，`wants` 有提供方就用、没有照装。见“能力依赖”。 |
 | `gpu` | 否 | 拿到显卡的服务（`services`）。要和 `devices.gpu` 权限一起声明，见“显卡”。 |
 | `lan` | 否 | 在局域网上开放的端口（`ports`）。要和 `network.lan` 权限一起声明，见“局域网”。 |
@@ -327,6 +329,8 @@ services:
 **0.12**
 
 - `x-wonton.settings`：App 按它生成设置页，核心校验并注入值（见“插件设置”）。使用此字段的清单至少写 `spec: "0.12"`。
+- `x-wonton.runtime` 的新取值 `static_web`、`link`，以及 `x-wonton.static_web`、`x-wonton.link`（见“静态网页和外部网页”）。
+- `x-wonton.provides.<能力>.mount`：托管能力的提供方声明挂载点（见“能力依赖”的“提供方”）。
 
 **0.11**
 
@@ -909,6 +913,96 @@ x-wonton:
 - Android 的 App 在 WebView 156 及以上为声明了的插件打开隔离，没声明的插件不受影响。更旧的 WebView 给不了，App 打开前提示用户，用户可以选“仍然打开”，这时页面没有 `SharedArrayBuffer`。应用最好有不用它的降级。
 - 这一项放宽了 Android 上的安全保障：页面可能和别的网页共用渲染进程。插件详情页会写明；Agent 写的插件，安装和更新的确认卡片上也会写明，更新时新加这一项要主人确认。
 
+## 静态网页和外部网页
+
+不跑服务端代码的插件不用写容器。
+
+### 静态网页（`runtime: static_web`）
+
+插件包只有清单和一个静态文件目录，文件交给提供能力 `static_web` 的插件（静态托管插件）托管。核心存文件、把请求
+转给托管插件，插件自己不起容器。每个插件仍是一个独立的源（自己的子域名），谁能打开和容器插件的网页一样由网关判断。
+
+```yaml
+x-wonton:
+  spec: "0.12"
+  id: io.github.alice.snake
+  version: 1.0.0
+  kind: app
+  runtime: static_web
+  title: { zh: 贪吃蛇, en: Snake }
+  description: { zh: 小游戏, en: A small game }
+  permissions: [network.egress]     # 写了 connect 才写
+  static_web:
+    root: web                       # 默认 web
+    fallback: index.html            # 可选：单页应用
+    connect:                        # 可选：页面能连的外部来源
+      - https://api.example.com
+      - https://*.tiles.example.org
+```
+
+- **目录：** `root` 是包里的相对路径，不能以 `/` 开头，不能有 `..`、以 `.` 开头的段，也不能有 `_wonton` 这一段（网关占用
+  插件子域名上的 `/_wonton/`）。目录里要有 `index.html`。`fallback` 是 `root` 下的文件，找不到的路径回它；不写时回 404。
+- **能连哪里：** 页面只能连 `connect` 里写的来源，没写的被浏览器按 `Content-Security-Policy` 拦下。CSP 由核心按清单算、
+  网关加在响应上，托管插件给的同名头会被替换。
+  - 每项是 `https://<主机名>` 或 `wss://<主机名>`，主机名用小写、至少两段，可以以 `*.` 开头；不带路径和端口，
+    不能是 IP 地址或 `localhost`，最多 32 项。
+  - 声明的来源对取脚本、样式、图片、字体、媒体、`fetch`/WebSocket、`iframe` 都放行；内联脚本和 `eval` 照常能用。
+  - 写了 `connect` 就要在 `permissions` 里写 `network.egress`，反过来也一样，只写一边清单不合法。确认页写明“这个网页会从
+    你的设备连接：…”：页面在 App 里跑，外连从用户的设备直接出去，不经家里的服务器，也不走出网代理。
+  - CSP 管不到顶层跳转、WebRTC 和 DNS 预取；不要把它当成“页面不会外连”的保证。
+- **只能写这些字段：** 商店信息、`static_web`、`requires`/`wants`（只能是 `web_storage`）和 `permissions`（只能是
+  `network.egress`）。写了 `services`、`webui`、`tabs`、`secrets`、`settings`、`mcp`、`bot`、`bots`、`agent`、`provides`、
+  `lan`、`tunnel`、`setup`、`gpu`、`optional_permissions` 或别的权限，清单不合法：静态网页没有服务端，用得上这些就写成
+  容器插件。密钥尤其不能放：静态文件对能打开页面的人全部公开。
+- **没有托管插件时**按缺 `requires` 处理（见“能力依赖”）。托管插件没在运行时，静态插件标为异常，原因是“依赖的插件
+  没有在运行”。
+- 包的大小：最多 1024 项、合计 64 MiB，单个文件最多 16 MiB。
+
+### 静态网页的数据（`web_storage`）
+
+静态网页要存数据时写 `requires: [web_storage]`（没有就用不了）或 `wants: [web_storage]`，页面用相对地址读写：
+
+```js
+const res = await fetch('/_wonton/data/todo.json');
+const etag = res.headers.get('ETag');
+await fetch('/_wonton/data/todo.json', {
+  method: 'PUT', headers: { 'If-Match': etag }, body: JSON.stringify(todos),
+});
+```
+
+- 接口是 WebDAV 整文件读写的子集：`GET`、`HEAD`、`PUT`（整个文件覆盖或新建）、`DELETE`、`MKCOL`、`PROPFIND`（只收
+  `Depth: 0` 和 `1`）。`PUT` 支持 `If-Match`、`If-None-Match: *`，对不上回 412；父目录不在回 409。
+- 不支持锁、移动、复制、`PROPPATCH`、部分写入和 `Depth: infinity`，回 405 或 501。
+- 每个插件 64 MiB、1024 个文件，单个文件 8 MiB，超了回 507，原文件不动。
+- 写请求的 `Origin` 必须是插件自己的源，否则回 403。
+- 一个插件一份数据，能打开页面的人都能读写。卸载时和容器插件的数据一样按“保留数据”处理。
+
+### 外部网页（`runtime: link`）
+
+```yaml
+x-wonton:
+  spec: "0.12"
+  id: io.github.alice.dashboard
+  version: 1.0.0
+  kind: app
+  runtime: link
+  title: { zh: 看板, en: Dashboard }
+  description: { zh: 外部看板, en: External dashboard }
+  permissions: []
+  link:
+    url: https://dashboard.example.com/
+```
+
+- `url` 只收 `https`，不能带用户名和密码。核心只存地址，不代理、不做单点登录。
+- 清单只能有商店信息和 `link`：`permissions` 写空列表，不能写 `requires`、`wants` 和上一节列出的服务端字段。
+- App 用系统自带的 App 内浏览器打开，顶上显示网址；页面和 App 之间没有任何通道（不能发消息、调工具）。用户可以把它
+  钉进侧边栏或面板。
+
+### 安全档位
+
+商店、安装确认页和详情页显示核心按清单算出的安全档位，作者不能填：外部网页和不写 `connect` 的静态网页最低；
+其余按声明的权限（含可选权限）里风险最高的一项，以及是否依赖高权限能力来算。
+
 ## 权限
 
 | 权限 | 风险级别 | 含义 |
@@ -1072,6 +1166,8 @@ x-wonton:
   | `egress_proxy` | HTTP 代理，出口设置在提供方。没有使用方声明，不能写在 `requires`/`wants` 里 | 不用 | 否（风险由 `egress.proxy` 高权限管） |
   | `torrent_client` | qBittorrent Web API v2（`/api/v2/`） | 不用 | 否 |
   | `jellyfin` | Jellyfin 的 HTTP API | 要，在 `provides.jellyfin.credentials` 里 | 否 |
+  | `static_web` | 托管：HTTP 静态文件（RFC 9110 的 `GET`/`HEAD`、条件请求、`Range`），站点根是挂载点下的 `<X-Wonton-Plugin>/`。`runtime: static_web` 的插件隐含 `requires` 它，不用再写 | 不用 | 否 |
+  | `web_storage` | 托管：WebDAV（RFC 4918）整文件读写的子集，见“静态网页的数据” | 不用 | 否 |
 
   接口有不兼容的变化时换一个新名字（如 `search2`），能力名不带版本号。高权限能力见下面的“高权限能力”。
 - **第三方定义的**：`x-<作者>.<名字>`，作者和名字都用小写字母、数字、连字符，如 `x-acme.ledger`。核心只按名字
@@ -1111,6 +1207,18 @@ x-wonton:
 - `credentials` 的形状和执行方式同模型网关的凭据命令（见“模型网关”的“凭据的签发与吊销”）：核心给每个使用方
   签一个只属于它的凭据，注入 `WONTON_<能力名大写>_KEY`。能力表标了“不用凭据”的能力不声明它，提供方只认经
   核心转发来的请求。
+- **托管能力**（能力表里接口以“托管”开头的）的提供方还要写 `mount`：容器里的绝对路径，不能是 `/`，不能含 `..`，
+  不能在 `/proc`、`/sys`、`/dev` 下。核心把这项能力的总目录挂到那里（`static_web` 只读，`web_storage` 读写），
+  每个使用方插件一个子目录 `<mount>/<插件 ID>/`。之后装、升级、卸载使用方只改目录内容，不重建提供方的容器。提供方
+  只按核心写的 `X-Wonton-Plugin` 选子目录，不认请求的路径和 `Host`，不带这个头的请求回 400。不是托管能力的写了
+  `mount` 清单不合法。
+
+  ```yaml
+  x-wonton:
+    kind: system
+    provides:
+      static_web: { service: web, port: 8080, mount: /srv/wonton }
+  ```
 - 同一能力可以装几个提供方。设置里每种能力有一个全局默认的提供方（装上第一个时它就是默认；默认的被卸掉时，
   核心换成装得最早的），使用方可以在自己的详情页里单独指定另一个，不跟默认走。
 
