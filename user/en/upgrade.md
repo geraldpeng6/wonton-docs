@@ -5,7 +5,7 @@ summary: Review version changes and permissions before updating an installed app
 
 ## Update from the App Store
 
-1. Open the “应用” (Apps) tab.
+1. Open the “应用” (Apps) page.
 2. Tap “应用商店” (App Store). An installed app with an older version shows “更新” (Update).
 3. Tap “更新”.
 4. On the “升级” (Update) page, check the version change, source, release notes, permissions, and requirements.
@@ -13,7 +13,7 @@ summary: Review version changes and permissions before updating an installed app
 
 ## Update from app details
 
-Tap the app icon on the Apps tab, or open the app from the App Store. When “更新” appears beside the title, tap it, review the “升级” page, and tap “升级”.
+Tap the app icon on the Apps page, or open the app from the App Store. When “更新” appears beside the title, tap it, review the “升级” page, and tap “升级”.
 
 While the update runs, the task says “正在升级” (Updating). On success it says “已升级” (Updated), and the detail page reloads. Do not keep tapping the button while the task is running.
 

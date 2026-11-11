@@ -73,7 +73,7 @@ scripts/dev.sh reinstall
 
 布局、顺序和图标已经说明的内容，不再加副标题、说明文字或标签重复；让布局说话。错误、权限和来源提示不算多余，仍要清楚。
 
-开发页面时，按[底栏页面](plugin-spec.md#底栏页面tabs)、[全屏](plugin-spec.md#全屏)、[主题](plugin-spec.md#主题)、[和 App 通信](plugin-spec.md#和-app-通信)接入 App；需要跨源隔离时查[跨源隔离](plugin-spec.md#跨源隔离)。
+开发页面时，按[应用页面](plugin-spec.md#应用页面tabs)、[整页显示](plugin-spec.md#整页显示)、[主题](plugin-spec.md#主题)、[和 App 通信](plugin-spec.md#和-app-通信)接入 App；需要跨源隔离时查[跨源隔离](plugin-spec.md#跨源隔离)。
 
 ## 开发环境
 

@@ -5,7 +5,7 @@ summary: Check connection status and path, then pair again if needed
 
 ## Check the connection
 
-On the Apps tab, tap “连接” (Connection) in the upper-right corner. The page shows “状态” (Status). When a connection is established it also shows “路径” (Path), for example “直连 · … ms” (Direct · … ms) or “中继 · … ms” (Relay · … ms).
+On the Apps page, tap “连接” (Connection) in the upper-right corner. The page shows “状态” (Status). When a connection is established it also shows “路径” (Path), for example “直连 · … ms” (Direct · … ms) or “中继 · … ms” (Relay · … ms).
 
 Status meanings:
 

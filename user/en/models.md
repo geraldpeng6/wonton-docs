@@ -5,7 +5,7 @@ summary: Open the Models app and complete model setup
 
 ## Open Models
 
-1. Open the “应用” (Apps) tab.
+1. Open the “应用” (Apps) page.
 2. Tap “Models” in the app grid.
 3. Tap “打开” (Open) on its detail page.
 4. In the Models web app, follow its displayed steps to complete the model setup.

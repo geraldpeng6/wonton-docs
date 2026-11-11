@@ -12,7 +12,7 @@ Open Wonton. Before a device is paired, the app opens on the “配对” (Pair)
 3. Optionally change “这台设备的名字” (This device’s name).
 4. Tap “配对” (Pair) and wait while “正在配对…” (Pairing…) is shown.
 
-After pairing, the app opens the “应用” (Apps) tab. The connection information is saved, so later launches do not ask for the code again.
+After pairing, the app opens the “应用” (Apps) page. The connection information is saved, so later launches do not ask for the code again.
 
 ### When the camera cannot be used
 
@@ -35,7 +35,7 @@ Invalid text is rejected on the pairing page with the server’s reason. Do not 
 
 On a device that is already paired:
 
-1. Open the “应用” (Apps) tab.
+1. Open the “应用” (Apps) page.
 2. Tap “连接” (Connection) in the upper-right corner.
 3. Tap “添加设备” (Add device).
 4. Wait for the QR code, then scan it with Wonton on the new device.
