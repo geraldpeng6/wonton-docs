@@ -331,6 +331,9 @@ services:
 - `webui.oidc.owner_groups` 改名 `webui.oidc.admin_groups`：这个人是这个应用的管理员时才加这些组（见“OIDC”）。
 - `webui.oidc.role_claim`：只认“管理员”和“普通用户”、从专门的声明读角色的应用用它（见“OIDC”）。
 - `webui.friends` 删掉，换成 `webui.accounts`（见“好友分享”）。清单里还写着 `owner_groups` 或 `friends` 时，因未知字段报错。
+- 确认卡片显示在发起的会话里：`tools/call` 的 `params._meta` 可带 `app.wonton/origin`，或给总线请求配固定请求头
+  `wonton-origin-room`、`wonton-origin-thread`；Agent 权限确认的请求体可带 `origin`（见“工具与 MCP 总线”）。这些是调用时
+  的写法，不是清单字段，清单不必因此改 `spec`。
 
 **0.12**
 
@@ -1855,8 +1858,25 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
   | `wonton__help` | 否 | Wonton 和 App 的帮助文档，见下面的“帮助文档”。 |
 
 - 插件目录就是官方索引（见“发布与来源”）。Bot 能装官方索引里的插件和自己写的插件（见“Agent 写插件”），不能装社区插件。
-- 敏感的调用会一直等到用户回答或者确认过期（10 分钟）。确认卡片发在核心和用户的“Wonton”私聊里，用户在 Wonton App
-  里回答。用户拒绝或者过期时工具返回错误（`isError: true`），说明原因。
+- 敏感的调用会一直等到用户回答或者确认过期（10 分钟）。确认卡片不是聊天消息：核心推送给该回答它的用户，Wonton App 把它显示在
+  发起这次调用的会话里和“等你确认”列表里，用户在 App 里回答。用户拒绝或者过期时工具返回错误（`isError: true`），说明原因。
+- **报来源会话（可选）。** 卡片显示在哪个会话由调用方报，两种写法，两样都有时 `_meta` 为准：
+  - `tools/call` 的 `params._meta` 里带 `app.wonton/origin`，值是 `{"room_id": "…", "thread_id": "…"}`：`room_id` 是
+    `!` 开头的房间 ID；`thread_id` 可选，是话题根事件的 `$` 开头事件 ID。
+  - 连总线时带请求头 `wonton-origin-room`，可选 `wonton-origin-thread`。适合改不了每次调用、但能给 MCP 服务器配固定
+    请求头的客户端，一个会话配一份（比如 ACP 的 `session/new` 里 `mcpServers[].headers`）。
+
+  来源只决定卡片显示在哪，不影响谁能回答。核心只认你的 Bot 和用户都在的房间；没报、报的房间对不上或核对不了时，
+  卡片显示在 Bot 和用户的主私聊里。没有 Bot 的插件报了也不用，卡片只在“等你确认”列表里。话题里报的，App 暂时显示在
+  这个房间的主对话里。
+
+  ```json
+  {"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {
+    "name": "wonton__install_plugin",
+    "arguments": {"id": "app.grafana"},
+    "_meta": {"app.wonton/origin": {"room_id": "!r:home.example", "thread_id": "$root"}}
+  }}
+  ```
 - 用户在 App 里点了“我来操作”时，这个插件的敏感调用先停住，不发卡片也不执行，用户交还后才继续判定。这段最多 10 分钟，
   和卡片各算各的，所以 Agent 的工具超时要超过 20 分钟。只读工具照常执行。停得太久或者停住的调用太多时返回错误，
   `_meta` 的 `app.wonton/failure` 是 `owner_operating`：调用明确没有执行，过一会可以重试。
@@ -1896,6 +1916,7 @@ Agent 自带的工具（shell、文件这类不经 MCP 总线的）要动手之�
   "title": "运行 ls",
   "description": "列出工作区的文件",
   "arguments": {"command": "ls"},
+  "origin": {"room_id": "!r:home.example"},
   "options": [
     {"choice_id": "a", "kind": "allow_once", "name": "这次允许"},
     {"choice_id": "b", "kind": "allow_always", "name": "总是允许"},
@@ -1908,6 +1929,7 @@ Agent 自带的工具（shell、文件这类不经 MCP 总线的）要动手之�
 - `choice_id` 由插件自己定，核心不解释，同一次请求内不能重复。`kind` 只能是 `allow_once`、`allow_always`、`reject_once`、`reject_always`；卡片上的按钮按 `options` 的顺序显示 `name`。
 - `allow_always` 的作用域归 Agent 自己，不写进核心的工具策略，也不放行 MCP 工具。
 - 没有拒绝类的选项时，核心在卡片上加一个“取消”。
+- `origin` 可选：这次请求来自哪个会话，形状和核对规则同“使用工具”里的 `app.wonton/origin`。ACP 桥按每个会话所在的房间和话题填它。
 
 这是一个长请求，用户回答或者 10 分钟到期才返回，HTTP 客户端的超时要比这长：
 
@@ -1918,7 +1940,9 @@ Agent 自带的工具（shell、文件这类不经 MCP 总线的）要动手之�
 | `{"outcome": "expired"}` | 用户没在期限内回答。 |
 
 - 请求不合法（`kind` 不认识、`options` 为空、`choice_id` 重复等）时返回 400 `invalid_input`。
-- 这个插件已经有 3 个确认在等用户时（和 MCP 工具的确认共用这个上限）返回 429 `too_many_pending`，卡片发不出去时返回 503 `confirmation_unavailable`。这两种都没有问到用户，不能当成同意。
+- 这个插件已经有 3 个确认在等用户时（和 MCP 工具的确认共用这个上限）返回 429 `too_many_pending`；该回答这张卡片的人名下
+  没有任何已配对的设备、没人能回答时返回 503 `confirmation_unavailable`（推送没发出去不算：卡片照常进他的“等你确认”列表，
+  App 打开就看得到）。这两种都没有问到用户，不能当成同意。
 - 插件提前断开请求就是撤回，卡片随之作废。
 
 ## 插件健康探测（`plugins.health`）
@@ -1950,6 +1974,8 @@ Agent 自带的工具（shell、文件这类不经 MCP 总线的）要动手之�
 ## Agent 插件
 
 `kind: agent` 的插件是一个 Bot 的驱动。`protocol: matrix` 的 Agent 自己登录 Matrix；`protocol: acp` 的由 ACP 桥接到聊天。
+桥在 `session/new` 交给 Agent 的 `mcpServers[].headers` 里放这个会话的 `wonton-origin-room`（和 `wonton-origin-thread`），
+Agent 调总线时自然带上，确认卡片就显示在这个会话里，Agent 不用改。
 
 **账号登录。** 模型默认经模型网关。Agent 官方程序能用账号登录时，在 `agent.login` 里声明，核心经引导和插件详情的接口把选项交给 App：
 
