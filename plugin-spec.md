@@ -76,7 +76,7 @@ x-wonton:
 | `version` | 是 | 插件包版本（语义化版本），和镜像版本无关。 |
 | `kind` | 是 | `app`（普通应用）、`agent`（Agent 运行时）、`channel`（第三方 IM 渠道）、`model`（模型服务）、`system`（系统插件，仅官方，只能由安装器预装）。 |
 | `runtime` | 否 | 运行形态：`compose`、`remote_mcp` 或 `skills`，省略时为 `compose`。`compose` 必须有非空的顶层 `services`；其他运行形态不允许出现 `services`，即使为空也不行。与 `kind` 独立。 |
-| `title`、`description` | 是 | 多语言文本，至少写一种语言。怎么写见“商店信息”。 |
+| `title`、`description` | 是 | 多语言文本，至少写一种语言。怎么写见“标题和说明怎么写”。 |
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes`、`setup` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
@@ -289,9 +289,36 @@ services:
 | 下载 | Downloads | BT 下载 |
 | 工具 | Tools | 其他小工具 |
 
-`title` 写产品原名，如 Immich、Syncthing，不要翻译成用途，用途交给 `tags`。原名不译时只写 `en`，如 `title: { en: Immich }`。插件自己就是产品、没有上游时才用功能名，`zh` 和 `en` 都写。
+### 标题和说明怎么写
 
-`description` 和 `about` 写给普通用户：`description` 一句话说清它能帮你做什么，不写技术实现，读者称呼“你”。
+商店里的标题和说明是给不懂技术的家人看的，验收只有一条：只看标题和第一句，能说出这是干什么的。
+
+**标题**
+
+- `title` 写产品原名（Immich、Syncthing 这种），不要翻译成用途，用途交给 `tags`；原名不译时只写 `en`，如 `title: { en: Immich }`。
+- 原名看不出是干什么的（如 Copyparty），中文给通俗名、原名放括号：`家庭网盘（Copyparty）`；英文同理：`Home Cloud Drive (Copyparty)`。
+- 插件自己就是产品、没有上游时才用功能名，`zh` 和 `en` 都写。
+
+**说明（`description`）**
+
+- 第一句用日常说法讲它帮你做什么，能类比就类比（“像百度网盘”“像 Google 相册”“像微信收藏夹”），再给一两个用法。整段一两句，别长。
+- 写给普通用户：称呼“你”，不写技术实现。
+- 网盘、文件这一类插件多，第二句写清适合谁、和同类有什么不同。
+- 以真实能力为准：动笔前先读自己清单里的 `title`、`description`、`about`、`tags`、`webui` 和上游主页的简介，能做什么写什么，不夸大、不编功能。
+
+**不写术语**
+
+- SFTP、WebDAV、挂载、自托管、SSO、MCP、OIDC、ACP、API、容器、Docker、反向代理、索引器、种子站、LLM、推理、向量这类词都不要出现；实在绕不开就换成日常说法（“模型”可以说成“AI”）。
+
+**语言**
+
+- 标题和说明每种语言都写，至少 `zh` 和 `en`；清单里其他地方写了 `zh-Hant`、`ja` 的也补上，繁中用台湾用词。`about` 的第一段照这些要求写，其余段落不受这条限制。
+
+例子：
+
+- Copyparty：标题 `家庭网盘（Copyparty）`，说明 `像百度网盘，在手机和电脑上存取、分享家里的文件。设备之间自动同步用 Syncthing 更合适。`
+- Immich：标题 `Immich`，说明 `像 Google 相册，备份手机里的照片和视频，按人脸和内容搜索。`
+- qBittorrent：照抄上游简介家人看不懂——`BitTorrent 客户端，支持 RSS 订阅、顺序下载和 WebUI 远程管理`；改成标题 `下载工具（qBittorrent）`，说明 `像迅雷，把网上的资源下载到家里，网页上就能加链接、看进度。`
 
 ### 各版本新增的字段
 
