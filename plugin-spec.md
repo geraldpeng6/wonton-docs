@@ -80,8 +80,8 @@ x-wonton:
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes`、`setup` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
-| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`friends`（默认 `false`，见“好友分享”）、`display`（见“全屏”）、`cross_origin_isolated`（见“跨源隔离”）。 |
-| `tabs` | 否 | 能放到 App 底栏的页面，要和 `webui` 一起声明，见“底栏页面”。 |
+| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`friends`（默认 `false`，见“好友分享”）、`cross_origin_isolated`（见“跨源隔离”）。 |
+| `tabs` | 否 | 能放进侧边栏“我的应用”的应用页面，要和 `webui` 一起声明，见“应用页面”。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `headers`（见“提供工具”）、`tool_idle_seconds`、`tool_total_seconds`、`tools`（只提供列出的工具），见“工具与 MCP 总线”。 |
 | `bot` | 否 | Bot 的显示名（`display_name`，多语言）、静态头像（`avatar`）和状态头像（`avatars`：`idle`、`working`、`waiting`、`offline` 四个状态各一个文件），都是插件包里的文件；聊天页的默认显示方式（`chat_layout`，见“聊天页的显示方式”）。只能和 `matrix.bot` 权限一起声明，见“Matrix Bot”。 |
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
@@ -761,9 +761,9 @@ webui:
   局域网里的设备都能直连它，照样子伪造身份头冒充用户。这类应用用 `sso: oidc` 或 `sso: none`。
 - 用 `{secret:…}` 的插件分不出是谁在用：每个能打开这个小程序的人都以同一个应用身份登录。
 
-## 底栏页面（`tabs`）
+## 应用页面（`tabs`）
 
-有 `webui` 的插件可以声明能放到 App 底栏的页面。用户决定放哪些、什么顺序，插件和 Bot 都改不了。App 不支持这些字段时忽略它们，插件照常从“应用”打开。没声明 `tabs` 的插件也能放，入口是 `webui.path`，用插件自己的标题和图标。
+有 `webui` 的插件可以声明应用页面。页面出现在侧边栏的“我的应用”里，用户决定放哪些、什么顺序，插件和 Bot 都改不了。App 不支持这些字段时忽略它们，插件照常从“应用”打开。没声明 `tabs` 的插件也能放，入口是 `webui.path`，用插件自己的标题和图标。
 
 ```yaml
 x-wonton:
@@ -777,7 +777,6 @@ x-wonton:
       icon_selected: tabs/feed-fill.svg
       path: /feed
       layout: edge-to-edge
-      display: standard
 ```
 
 | 字段 | 必填 | 说明 |
@@ -787,23 +786,20 @@ x-wonton:
 | `icon` | 是 | 单色图标，插件包里的 PNG 或 SVG。只取透明通道，颜色由 App 上色，全透明或全不透明的图标不合格。SVG 的规则见“图标和截图”。 |
 | `icon_selected` | 否 | 选中时的图标，规则相同。没写时选中只靠颜色区分。 |
 | `path` | 是 | 入口路径，写法和 `webui.path` 相同（见“网页入口与单点登录”）。 |
-| `layout` | 否 | `inset`（默认）：页面夹在 App 的栏中间。`edge-to-edge`：页面铺满，从栏下面滚过去，作者按 `--wonton-inset-*` 留位置（见“主题”）。 |
-| `display` | 否 | `standard`（默认）或 `fullscreen`，见“全屏”。 |
+| `layout` | 否 | `inset`（默认）：从状态栏下沿开始，底边铺到屏幕底。`edge-to-edge`：页面铺满，内容从状态栏和 Home 条后面滚过去，作者按 `--wonton-inset-*` 留位置（见“主题”）。 |
 
 - 一个插件最多 4 项。不申请新权限，页面能做的事不变。
 - 插件停了、升级中、出错时，App 显示状态页，页面不用处理。升级后 App 重新加载已打开的页面。
 
-### 全屏
+### 整页显示
 
-带栏时页面在 App 的标题栏和底栏之间，不铺到底栏后面。全屏时 App 隐藏标题栏和底栏，右上角只留一个胶囊（“···”和退出全屏），状态栏竖屏照常显示。自带底栏的应用全屏后不会有两行底栏。
+页面打开就是整页，右上角有一个胶囊（“···”和“关闭”），状态栏竖屏照常显示。
 
 胶囊会自己藏起来：打开、加载完、转屏时出现，3 秒没碰就淡出；用户在页面上往下拉一下就出来，往上推就藏起。藏起来时不挡点按，点到的是页面。页面不用为它留位置，也隐藏不了它。
 
-清单写 `display: fullscreen` 时打开就全屏：`tabs` 的每一项写在该项上，只有 `webui` 的写在 `webui` 上。默认 `standard`。用户能在 App 里按页面改，用户的选择优先于清单。
+用户点胶囊的“关闭”就关闭这个页面，回到打开它的地方；再次打开会重新加载。
 
-用户点胶囊的退出全屏：如果是手动进的全屏，回到带栏的样子，页面不重新加载；打开就全屏的页面回到进来之前的标签。
-
-全屏时谁来躲开状态栏、Home 条（导航栏），按 `layout` 分：
+页面怎么躲开状态栏、Home 条（导航栏），按 `layout` 分：
 
 | `layout` | 页面内容 |
 | --- | --- |
@@ -811,9 +807,9 @@ x-wonton:
 | `edge-to-edge` | 铺满屏幕。写 `viewport-fit=cover`，按 `--wonton-inset-top`、`--wonton-inset-bottom`、`--wonton-inset-left`、`--wonton-inset-right` 留位置 |
 
 - 给 `html` 设背景色：页面之外露出来的地方（比如 Home 条后面）画的是它。
-- 要画到状态栏底下，用 `edge-to-edge`，按 `--wonton-inset-top` 排自己的标题。全屏时它是状态栏下沿（横屏为 0），不含胶囊；别把它当成固定值，按变量算。
+- 要画到状态栏底下，用 `edge-to-edge`，按 `--wonton-inset-top` 排自己的标题。它是状态栏下沿（横屏为 0），不含胶囊；别把它当成固定值，按变量算。
 - 用 `--wonton-inset-*`，不要用 `env()`：一些 Android WebView 版本的 `env()` 值不可靠。
-- 返回：iOS 从左边缘滑动，Android 按返回键，都是先退网页历史，到头才退出全屏。页面自己用横滑手势时，别从屏幕边缘开始。
+- 返回：iOS 从左边缘滑动，Android 按返回键，都是先退网页历史，到头就关闭这个应用页。页面自己用横滑手势时，别从屏幕边缘开始。
 
 ### 主题
 
@@ -828,7 +824,7 @@ App 在文档开始前把下面的 CSS 变量写到根元素，同时设置 `col
 | `--font-sans` | 系统字体 |
 | `--border-radius-xs`、`--border-radius-md`、`--border-radius-lg`、`--border-radius-full` | 圆角 |
 | `--wonton-accent-fill`、`--wonton-accent-ink`、`--wonton-accent-ink-on-fill` | 重点色的底色、文字和图标、放在重点色上的文字 |
-| `--wonton-inset-top`、`--wonton-inset-bottom` | 栏占的高度，含安全区；全屏时见“全屏”。`inset` 布局下是 0 |
+| `--wonton-inset-top`、`--wonton-inset-bottom` | 状态栏下沿 / Home 条。`inset` 布局下是 0 |
 | `--wonton-inset-left`、`--wonton-inset-right` | 左右安全区，横屏时躲刘海和圆角。`inset` 布局下是 0 |
 
 变量名只增不改。页面也可能在浏览器里打开，所以写上后备值：
@@ -851,21 +847,19 @@ body {
 
 | 方法 | 说明 |
 | --- | --- |
-| `ui/initialize`、`ui/notifications/initialized` | 握手。`hostCapabilities` 是 `openLinks` 和 `message.text`。`hostContext` 有 `theme`、`styles`、`locale`（App 在用的语言，如 `zh-Hant`；页面自己的 `navigator.language` 是用户要的语言）、`timeZone`、`platform: mobile`、`displayMode`（带栏 `inline`，全屏 `fullscreen`）、`availableDisplayModes`、`safeAreaInsets`。App 收到握手或页面加载完就撤掉骨架屏，先到先算 |
-| `ui/notifications/host-context-changed` | 明暗、重点色、字号、全屏状态变了 |
-| `ui/request-display-mode` | `mode` 是 `inline` 或 `fullscreen`，回实际生效的模式。用户把这个页面设成不全屏时不生效 |
+| `ui/initialize`、`ui/notifications/initialized` | 握手。`hostCapabilities` 是 `openLinks` 和 `message.text`。`hostContext` 有 `theme`、`styles`、`locale`（App 在用的语言，如 `zh-Hant`；页面自己的 `navigator.language` 是用户要的语言）、`timeZone`、`platform: mobile`、`safeAreaInsets`。App 收到握手或页面加载完就撤掉骨架屏，先到先算 |
+| `ui/notifications/host-context-changed` | 明暗、重点色、字号变了 |
 | `ui/open-link` | 系统浏览器打开，只收 `https` |
 | `ui/message` | `role: user`，`content` 只收文字块。切到聊天，把文字放进输入框，用户点发送才发 |
 
 其余方法回 JSON-RPC 错误 `-32601`，`tools/call` 和 `resources/read` 没有：页面用自己的后端。
 
-桥只给主题、语言、时区和栏高，不给用户身份和设备信息。要用户的身份用 `owner.identity`。
+桥只给主题、语言、时区和安全区，不给用户身份和设备信息。要用户的身份用 `owner.identity`。
 
-`window` 上另有两个事件，用 `addEventListener` 收，不走 SDK：
+`window` 上另有一个事件，用 `addEventListener` 收，不走 SDK：
 
 | 事件 | 什么时候 |
 | --- | --- |
-| `wonton:tab-reselected` | 用户再点一次当前标签。App 会把文档滚回顶部，页面有内层滚动时自己处理 |
 | `wonton:connection` | 手机和家里服务器的连接变了，`detail.connected` 是布尔值。`navigator.onLine` 看的是手机联网，不是服务器 |
 
 ### 跨源隔离

@@ -5,20 +5,20 @@ summary: Get, open, update, and uninstall plugin apps from the app store
 
 ## Get an app
 
-1. Open the “应用” (Apps) tab.
+1. Open the “应用” (Apps) page.
 2. Tap “应用商店” (App Store), the last tile in the grid. If no app is installed, “去应用商店” (Go to App Store) opens it too.
 3. Browse “已审核” (Reviewed) or “社区” (Community), or type a keyword in “搜索” (Search).
 4. Filter with “全部” (All) and the available tags.
 5. Tap an app’s name or description to inspect it; you can also tap “获取” (Get) on the row to open the install preview directly.
 6. On the “安装” (Install) page, check the version, source, permissions, requirements, and notices. Tap “安装” (Install) when you agree.
 
-While the install runs, the list shows its progress. On success it shows “已安装” (Installed), and the app appears on the Apps tab.
+While the install runs, the list shows its progress. On success it shows “已安装” (Installed), and the app appears on the Apps page.
 
 Pay attention to the “高权限” (High permissions) tag and the “权限” (Permissions) section. The confirmation page disables installation when the host blocks the app or the core does not support one of its permissions.
 
 ## Open and inspect an app
 
-Tap an app icon on the Apps tab. An agent with a chat entry opens its direct chat; an app with a web entry opens its web page. An app with no directly openable entry, or one that is installing, updating, or uninstalling, opens its detail page.
+Tap an app icon on the Apps page. An agent with a chat entry opens its direct chat; an app with a web entry opens its web page. An app with no directly openable entry, or one that is installing, updating, or uninstalling, opens its detail page.
 
 In the App Store, tap an app’s name or description to open its details. The page can include “新内容” (What’s new), “权限” (Permissions), “要求” (Requirements), and “信息” (Info), plus “主页” (Homepage) and “代码仓库” (Repository) links.
 
@@ -30,7 +30,7 @@ An installed app with an older version has an “更新” (Update) button in th
 
 ## Uninstall an app
 
-Long-press the app icon on the Apps tab, or tap “卸载” (Uninstall) on the installed app’s detail page. The confirmation dialog offers:
+Long-press the app icon on the Apps page, or tap “卸载” (Uninstall) on the installed app’s detail page. The confirmation dialog offers:
 
 - “卸载，保留数据” (Uninstall, keep data): remove the app but keep its data.
 - “卸载并删除数据” (Uninstall and delete data): also delete its keys and Bot account; this cannot be undone.
