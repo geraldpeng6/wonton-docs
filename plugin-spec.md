@@ -1835,10 +1835,13 @@ x-wonton:
     "budget": {
       "type": "string",
       "enum": ["household", "personal"],
-      "x-wonton-title": { "zh": "预算", "en": "Budget" },
+      "x-wonton-title": { "zh": "预算", "en": "Budget", "zh-Hant": "預算", "ja": "予算" },
+      "x-wonton-description": {
+        "zh": "选择要使用的预算", "en": "Choose the budget to use", "zh-Hant": "選擇要使用的預算", "ja": "使用する予算を選択"
+      },
       "x-wonton-enum-titles": {
-        "household": { "zh": "家庭", "en": "Household" },
-        "personal": { "zh": "个人", "en": "Personal" }
+        "household": { "zh": "家庭", "en": "Household", "zh-Hant": "家庭", "ja": "家計" },
+        "personal": { "zh": "个人", "en": "Personal", "zh-Hant": "個人", "ja": "個人" }
       }
     },
     "months": {
@@ -1846,7 +1849,7 @@ x-wonton:
       "minimum": 1,
       "maximum": 12,
       "default": 3,
-      "x-wonton-title": { "zh": "显示几个月", "en": "Months shown" }
+      "x-wonton-title": { "zh": "显示几个月", "en": "Months shown", "zh-Hant": "顯示幾個月", "ja": "表示する月数" }
     }
   }
 }
@@ -1866,15 +1869,28 @@ services:
 
 - 根是 `type: object`，`additionalProperties` 只能是 `false`；在 `properties` 里列每一项，需要的放 `required`。
 - `$schema` 必须是 `https://json-schema.org/draft/2020-12/schema`。
-- 属性名是小写字母、数字和 `_`，以字母开头，最长 64；一份 Schema 最多 64 项。表单只展开顶层属性，嵌套值用 JSON 文本编辑。
-- 每一项都要有 `x-wonton-title`（多语言，写法同清单的 `title`），`x-wonton-description` 可选。显示顺序按
-  `x-wonton-order`，没列出来的按属性名排在后面。
-- App 认得这几种类型，画成对应的控件：`boolean`、`integer`、`number`、`string`、字符串的 `enum`，以及
-  `array` + `items.enum` 的多选。长度（`minLength`、`maxLength`）、范围（`minimum`、`maximum`）、`pattern`
-  和 `enum` 由核心照常校验，控件只是尽量照着长。
-- 其他写法（`object`、数组的其他元素、`const`、`oneOf`、`anyOf`、`allOf`）照常校验，App 把它们显示成 JSON 文本
-  编辑框。`$ref` 和 `$dynamicRef` 不收，同文件和远程都一样；任何子 Schema 中的敏感标记都拒绝。
-- App 不认识核心给出的控件类型时使用 JSON 文本控件；连值类型都不认识时只提示不支持，禁止编辑和提交，不把值当成空。
+- 属性名是小写字母、数字和 `_`，以字母开头，最长 64；一份 Schema 最多 64 项，只允许顶层设置项。
+- `x-wonton-title` 必填，`x-wonton-description` 可选；`x-wonton-enum-titles` 的每个标题也使用同清单其他多语言字段的
+  BCP 47 语言键：`zh`（简体，`zh-Hans` 同样可协商）、`en`、`zh-Hant`、`ja`。至少写一种非空语言，示例列全 App 四种语言。
+  请求语言的匹配与回退沿用“商店信息”：按语言和文字系统协商，繁中优先 `zh-Hant`，缺时用 `zh`，然后 `en`，最后用已有语言。
+  不要求插件为缺失翻译改设置值。显示顺序按 `x-wonton-order`，没列的按属性名排在后面。
+- 只接受下表的原生控件子集，`type` 必须是单个字符串，不能写联合类型。
+
+| 属性 Schema | 原生控件 | 可选约束 |
+| --- | --- | --- |
+| `type: boolean` | 开关 | `default` |
+| `type: integer` | 整数输入 | `minimum`、`maximum`、`default` |
+| `type: number` | 小数输入 | `minimum`、`maximum`、`default` |
+| `type: string`，没有 `enum` | 文本框 | `minLength`、`maxLength`、`pattern`、`default` |
+| `type: string`，`enum` 全为字符串 | 单选 | `default`、`x-wonton-enum-titles` |
+| `type: array`，`items.type: string`，`items.enum` 全为字符串 | 多选 | `uniqueItems: true`（必需）、`default`、`x-wonton-enum-titles` |
+
+根只用 `$schema`、`type`、`properties`、`required`、`additionalProperties: false` 和 `x-wonton-order`。
+属性除表中的类型与约束，只能加 `x-wonton-title`、`x-wonton-description`；选项标题放在该属性的 `x-wonton-enum-titles`。
+嵌套对象、嵌套数组、无字符串枚举的数组、非字符串枚举、`null`、`const`、`oneOf`/`anyOf`/`allOf`、`$ref`、`$dynamicRef`
+以及其他超出该子集的写法，一律在预览阶段报 400 `settings_schema_invalid`，不装、不保存，不提供 JSON 文本编辑器。
+新核心增加的控件或值类型，旧 App 不认识时该项显示“要更新 App 才能改”，禁止提交整份表单，不把该项省略或清空后提交。
+
 - 默认值写在 `default`，自己必须过得了这一项的 Schema。必填项没有默认值时，安装时就得填。
 - 属性名不得和 `x-wonton.secrets` 里的名字重复。
 - 整份生效值序列化后不超过 64 KiB，单个字符串不超过 8 KiB，一个字符串数组不超过 64 项；大小按 UTF-8 字节计。
@@ -1887,9 +1903,9 @@ services:
   不重建，接口返回 400 `settings_invalid`，逐项写明哪个字段、什么原因，App 按字段标红。Schema 本身不合格时安装和
   升级直接失败，返回 400 `settings_schema_invalid`。
 - 值存进插件记录，明文保存，读接口原样返回。值不是凭据，可以进日志和诊断。
-- 值以 `WONTON_SETTING_<属性名大写>` 注入。字符串原样；布尔是 `true`/`false`；整数和数字是十进制；字符串数组是
-  JSON 数组文本；JSON 文本类型的值是 JSON 文本。可选项没值、也没有默认值时统一注入空串；显式的 `false`、`[]`、
-  `{}` 不算没值。属性名 `foo_bar` 对应 `WONTON_SETTING_FOO_BAR`。
+- 值以 `WONTON_SETTING_<属性名大写>` 提供给 Compose 插值。字符串原样；布尔是 `true`/`false`；整数和数字是十进制；
+  多选值是 JSON 字符串数组文本，仅供程序读取，不让用户编辑。可选项没值且无默认值时统一注入空串；显式的 `false`、`[]`
+  不算没值。属性名 `foo_bar` 对应 `WONTON_SETTING_FOO_BAR`。
 - 变量只用于 Compose 插值：在 `environment`、`configs` 内容或其他插值位置显式引用 `${WONTON_SETTING_属性名大写}`。
   保存后核心按容器的 `wonton.render` 摘要比较最终渲染结果，只重建结果变化的服务；同值写入和无关服务不重建。
   卷和数据不动，正在进行的任务会断；未被引用的设置只保存。
