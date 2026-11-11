@@ -1,4 +1,4 @@
-# 插件规范 `x-wonton`（草案 v0.10）
+# 插件规范 `x-wonton`（草案 v0.11）
 
 > 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
@@ -300,6 +300,9 @@ services:
 
 - `x-wonton.tunnel.ports`（见“隧道端口”）。使用此字段的清单至少写 `spec: "0.11"`；声明端口不等于核心和 App 已支持运行时映射。
 - `x-wonton.setup`（见“商店信息”的“装好后要做的一步”）。
+- 安装时注入的变量：申请了 `notify` 的插件多拿到 `WONTON_SMTP_HOST`、`WONTON_SMTP_PORT`、`WONTON_MAIL_FROM`（见“发信”）。
+- `WONTON_OWNER_EMAIL`、OIDC 的 `email` 声明和 `{email}` 一律是用户的内部邮箱，总有值，见“安装时注入的变量”。
+- `webui.oidc.requires_email` 删掉：邮箱总有值，不用再声明，清单里写了会因未知字段报错。
 
 **0.10**
 
@@ -324,8 +327,8 @@ services:
 
 **0.7**
 
-- `x-wonton`：`webui.cross_origin_isolated`（见“跨源隔离”）；`webui.oidc.post_logout_paths`、`webui.oidc.owner_groups`、
-  `webui.oidc.requires_email`（见“OIDC”）；`mcp.headers`、`mcp.tools`（见“工具与 MCP 总线”）；`bot.avatars`、`bot.chat_layout`（见“Matrix Bot”）；
+- `x-wonton`：`webui.cross_origin_isolated`（见“跨源隔离”）；`webui.oidc.post_logout_paths`、`webui.oidc.owner_groups`
+  （见“OIDC”）；`mcp.headers`、`mcp.tools`（见“工具与 MCP 总线”）；`bot.avatars`、`bot.chat_layout`（见“Matrix Bot”）；
   `provides.egress_proxy`（见“网络”的“代理插件”）；`provides.models.providers`，含 `custom`（见“模型网关”）。
 - 权限：`egress.proxy`、`plugins.health`。
 - Compose 的服务：`mem_limit`、`mem_reservation`、`cpus`、`cpu_shares`、`pids_limit`（见“资源限制”），`cap_drop`，
@@ -565,6 +568,7 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 - `sso: proxy` 的 `{user}` 是核心为这个人分配的本机用户名，固定、不复用，不和本机账号重名；
   显示名用已有的 `{name}`，新增的 `{role}` 区分 `owner`、`member`、`friend`，完整模板规则见下文。
 - `sso: oidc` 的 `sub`、`preferred_username` 使用同一个本机用户名，好友的 `groups` 为 `["friend"]`。
+- `{email}` 和 OIDC 的 `email` 是 `<好友的本机用户名>@wonton.internal`，只用来认人：发给它的信被拒收（见“发信”）。
 - `sso: none` 仍用应用自己的登录，核心不替好友注册或登录。
 
 这些是分享接口约定；`webui.friends` 的解析不代表核心已提供分享行为。使用好友身份模板前必须确认目标核心
@@ -595,7 +599,6 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 | `webui.oidc.post_logout_paths` | 否 | 额外的登出回跳路径，默认 `[]`；与 `redirect_paths` 一样每项以 `/` 开头。核心把路径拼在插件网页地址后，登记到 `post_logout_redirect_uris`。 |
 | `webui.oidc.token_endpoint_auth_method` | 否 | 应用在令牌端点出示密钥的方式：`client_secret_basic`（默认）或 `client_secret_post`。 |
 | `webui.oidc.owner_groups` | 否 | 用户是家庭的主人时，`groups` 在 `owner` 之外再加这些组名，按组名对角色的应用（如 BookStack）用它把主人对到管理员等角色。名字 1–64 个字符，只含 ASCII 字母、数字和 `_-.:`，不重复，最多 8 个。 |
-| `webui.oidc.requires_email` | 否 | 应用用 `email` 声明认人或必填邮箱时写 `true`：用户没填邮箱就装不上，安装页让用户先填，不用等到登录才失败。 |
 
 客户端可申请的 scope：`openid`、`profile`（`name`、`preferred_username`、`locale`）、`email`（`email`、
 `email_verified`）、`groups`（`owner`，声明了 `owner_groups` 再加那些组名）、`offline_access`。
@@ -603,8 +606,8 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 生成，卸载时删除客户端。
 
 认人用 `sub`（`preferred_username` 同值），邮箱只当资料：应用有用户名概念就用 `sub` 或
-`preferred_username` 找账号，不要拿 `email` 认人，邮箱会变。应用确实只有邮箱一种登录名时才用 `email`
-认人，这时写 `requires_email`。
+`preferred_username` 找账号。应用确实只有邮箱一种登录名时才用 `email` 认人：`email` 是用户的内部邮箱，装好后
+不变（见“安装时注入的变量”）。
 
 `locale` 属于 `profile`，是登录者本人最近一次设备请求的第一个语言标签，BCP 47 原样（如 `zh-Hant-TW`），
 不收窄到支持的几种语言。这个人还没有记录时不出现这个声明。ID 令牌和 userinfo 里的值相同。
@@ -632,7 +635,6 @@ x-wonton:
     oidc:
       redirect_paths: [/oidc/callback]
       owner_groups: [admin]
-      requires_email: true
 ```
 
 BookStack 把 `groups` 里的名字对到角色：先按角色显示名（大小写不敏感），再按角色设置里的“外部认证
@@ -643,7 +645,6 @@ ID”；内置管理员角色的显示名是 `Admin`，`admin` 就对得上。Bo
 应用不能自己注册管理员、要插件预建账号时，申请 `owner.identity`，按应用官方的引导机制用
 `WONTON_OWNER_NAME` 和 `WONTON_OWNER_EMAIL` 建（多数应用有建管理员的官方环境变量），不要装完再改
 应用的数据补邮箱：预建账号的值和 OIDC 登录给的 `sub`、`email` 声明一致，登录才对得上同一个账号。
-声明了 `requires_email` 的插件，用户装之前就填了邮箱。
 
 - 签发方和后台端点的地址只在插件网络里解析：`WONTON_OIDC_ISSUER` 是 `http://auth.wonton.internal:<端口>`，
   `WONTON_OIDC_TOKEN_URL`、`WONTON_OIDC_USERINFO_URL` 同样用这个内部名字；`WONTON_OIDC_AUTH_URL` 是浏览器地址，
@@ -705,14 +706,13 @@ webui:
 | --- | --- |
 | `{user}` | 当前经验证人的本机用户名，同 OIDC 的 `preferred_username`；固定、不复用。 |
 | `{name}` | 当前经验证人的显示名，可能改变，不能当账号主键。 |
-| `{email}` | 当前人的邮箱；没填时不能代入空值，用到它的插件安装失败。 |
+| `{email}` | 当前人的内部邮箱 `<用户名>@wonton.internal`，和 OIDC 的 `email` 声明同值。主人、家人、好友都有值；只有主人和家人的收得到信。 |
 | `{role}` | `owner`（主人）、`member`（家人）、`friend`（被分享的好友）。由网关认证身份后确定，不接受客户端自报。 |
 
 `{role}` 属于好友分享的接口约定，须由支持好友身份的核心校验和渲染；不支持时应报错，不能代入主人身份或
 假定所有人都是 `owner`。
 
-应用认人用 `{user}`：它装好后不变。只有应用确实只能按邮箱认人、没有用户名概念时，才用 `{email}` 认人；
-邮箱会变。
+应用认人用 `{user}`。只有应用确实只能按邮箱认人、没有用户名概念时，才用 `{email}` 认人。
 
 上游没有可信代理白名单（对所有来源都信任 `Remote-User` 这类头）时，申请了 `network.egress` 的插件
 过不了 `plugin check --official`，这种应用改用 OIDC。
@@ -891,7 +891,7 @@ x-wonton:
 | `tools` | — | 经核心的 MCP 总线调用核心和其他插件的工具，见“工具与 MCP 总线”。 |
 | `plugins.health` | — | 读所有插件的健康状态，见“插件健康探测”。 |
 | `matrix.bot` | — | 以 Bot 身份收发消息，见“Matrix Bot”。 |
-| `notify` | — | 给用户发通知，见“通知”。 |
+| `notify` | — | 给家里的人发通知和信，见“通知”和“发信”。 |
 | `owner.identity` | — | 知道用户的用户名和邮箱，还能查家人用什么语言，见“安装时注入的变量”。 |
 | `network.egress` | — | 能访问外网，也能访问用户的局域网，安装确认按这句写。见“网络”。 |
 | `network.lan` | 高 | 在局域网上开放 `lan.ports` 列出的端口，见“局域网”。 |
@@ -953,7 +953,7 @@ x-wonton:
 | `WONTON_OIDC_AUTH_URL`、`WONTON_OIDC_TOKEN_URL`、`WONTON_OIDC_USERINFO_URL` | `webui.sso: oidc` | 各端点地址，给不支持发现文档的应用（如 Grafana）。`AUTH_URL` 是浏览器地址（`auth.<基础域名>`），另外两个在插件网络里。 |
 | `WONTON_CORE_ADDRESS` | `webui.sso: proxy` | 核心在这个插件网络里的地址（网段的最后一个可用地址，如 `172.18.255.254`），核心容器重建后不变。写进应用的“信任的代理地址”，见“网关代登录”。 |
 | `WONTON_OWNER_NAME` | `owner.identity` | 用户的用户名，装好后不变，和 OIDC 的 `sub`、`preferred_username` 以及代登录模板的 `{user}` 同值，见下文。 |
-| `WONTON_OWNER_EMAIL` | 同上，且用户填了邮箱 | 用户的邮箱，和 OIDC 的 `email`、代登录模板的 `{email}` 同值。值是建容器时的快照，见下文。 |
+| `WONTON_OWNER_EMAIL` | `owner.identity` | 用户的内部邮箱 `<用户名>@wonton.internal`，装好后不变，和 OIDC 的 `email`、代登录模板的 `{email}` 同值。发到这个地址的信转进用户的“Wonton”私聊，见“发信”。 |
 | `WONTON_MODEL_BASE_URL` | `models` | 模型网关 OpenAI 兼容接口的地址，以 `/v1` 结尾，如 `http://models.wonton.internal:8080/v1`。没接上网关时是空字符串。 |
 | `WONTON_MODEL_ANTHROPIC_BASE_URL`、`WONTON_MODEL_GEMINI_BASE_URL` | `models`，且网关提供该接口 | Anthropic Messages、Gemini 接口的地址，按各自 SDK 的约定不带 `/v1`。没接上网关时是空字符串。 |
 | `WONTON_MODEL_API_KEY` | `models` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。没接上网关时是空字符串。 |
@@ -962,6 +962,8 @@ x-wonton:
 | `WONTON_<能力名大写>_KEY` | 同上，且提供方声明了 `credentials` | 只属于本插件的凭据。见“能力依赖”。 |
 | `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，路径里带着这个 Bot 的总线令牌，如 `http://mcp.wonton.internal:8080/mcp/<令牌>`；没有 Bot 的插件不带令牌段，如 `http://mcp.wonton.internal:8080/mcp`。 |
 | `WONTON_NOTIFY_URL` | `notify` | 发通知的地址：核心在插件网络里的别名，如 `http://notify.wonton.internal:8080/notices`，见“通知”。 |
+| `WONTON_SMTP_HOST`、`WONTON_SMTP_PORT` | `notify` | 应用发信用的 SMTP 服务器，如 `smtp.wonton.internal` 和 `25`。宣告 AUTH 但接受任何凭据，不加密，见“发信”。 |
+| `WONTON_MAIL_FROM` | `notify` | 应用发信的发件地址 `<插件 id>@plugins.wonton.internal`。 |
 | `WONTON_MATRIX_HOMESERVER` | `matrix.bot` | Matrix 客户端接口的地址：核心在插件网络里的别名，如 `http://matrix.wonton.internal:8080`。 |
 | `WONTON_MATRIX_USER_ID`、`WONTON_MATRIX_ACCESS_TOKEN` | `matrix.bot` | Bot 的 Matrix 用户 ID 和访问令牌。 |
 | `WONTON_MATRIX_ALLOWED_USERS` | `matrix.bot` | 逗号分隔的 Matrix 用户 ID，Bot 只听这些人的话：私人 Bot 是归属人，共享 Bot 是主人。家人加入、联系人批了之后名单变长，核心重建这个 Bot 的服务，沿用设备和令牌。 |
@@ -982,17 +984,15 @@ x-wonton:
   个人信息，引用了就装不上，错误写明“插件没申请 `owner.identity`”。应用登录时从 OIDC 或代登录模板拿到的身份不归这项权限管，
 - 用户名是固定 ID，装好后不变，插件不用处理它变化的情况。它只含小写字母、数字、`_` 和 `-`，以字母开头，最长 32 个
   字符，不是常见的系统用户名，可以直接用来建系统账号；镜像里自带的用户（`postgres`、`node`）可能重名，要插件自己
-  处理。应用认人一律用 OIDC 的 `sub`（和 `preferred_username` 同值）或代登录的 `{user}`，不要按邮箱认：
-  **邮箱只是资料，会变**。应用确实只有邮箱一种登录名、没有用户名概念时，才用 `email` 声明或 `{email}`。
-- 显示名和邮箱由用户在 App 里填，填过以后能改，不能改回没有。显示名没填时是用户名，所以 `name` 声明总有值；要显示
-  用户的名字用 `name`，不要用 `preferred_username`。
-- 用户没填邮箱时不注入 `WONTON_OWNER_EMAIL`，OIDC 也没有 `email` 声明。应用非要邮箱时写 `${WONTON_OWNER_EMAIL:?}`，
-  App 的安装页这时让用户先填邮箱，填好才能装：OIDC 登录要 `email` 声明的应用声明
-  `webui.oidc.requires_email`，不要等到登录时才失败。
-  能没有邮箱的写 `${WONTON_OWNER_EMAIL:-}`。
-- 用户改了邮箱或显示名之后，OIDC 声明和代登录的请求头马上换成新值，容器里的 `WONTON_OWNER_EMAIL`
-  还是旧值：核心重启只核对插件容器，不重建。容器重建时才拿到新值；升级或重装（可以不删数据）会重建，局域网地址变化
-  按“局域网”的规则只重建受影响的服务，未重建的服务保留旧值。应用里已有账号的资料由用户在应用里改，插件不写对账代码。
+  处理。应用认人一律用 OIDC 的 `sub`（和 `preferred_username` 同值）或代登录的 `{user}`。应用确实只有邮箱一种登录名、
+  没有用户名概念时，才用 `email` 声明或 `{email}`。
+- 插件拿到的邮箱是用户的内部邮箱 `<用户名>@wonton.internal`，总有值，跟用户名一样装好后不变，插件不写对账代码。
+  它只在这台服务器上有效，外面发不进来；应用发到这个地址的信转进用户的“Wonton”私聊（见“发信”）。用户在 App 里填的
+  真实邮箱不交给插件。
+- 被分享的好友也有内部邮箱，规则相同：用的是核心给好友分配的本机用户名，和主人、家人的地址不会重复；好友移除后
+  地址不回收、不分给别人。它只用来认人，好友不在这台服务器上收信。
+- 显示名由用户在 App 里填，填过以后能改。没填时是用户名，所以 `name` 声明总有值；要显示用户的名字用 `name`，不要用
+  `preferred_username`。改了以后，OIDC 声明和代登录的请求头马上换成新值；应用里已有账号的显示名由用户在应用里改。
 - 核心不注入 `WONTON_OWNER_ID`：OIDC 的 `sub` 就是用户的用户名，另起一个变量只是同一个值。
 
 **数据目录属主**：核心预先创建的绑定挂载目录（`WONTON_APP_DATA` 下）交给谁，看挂载它的服务的
@@ -1494,6 +1494,32 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST "$WONTON_NOTIFY_URL" \
 - 状态码：发成功是 201；字段不合法是 400 `invalid_input`；没申请 `notify` 是 403 `permission_denied`；
   插件网络以外是 403 `unauthenticated`；超了频率是 429 `rate_limited`；聊天服务不可用是 503
   `matrix_unavailable`。
+
+### 发信
+
+应用自己会发信（找回密码、提醒、邀请）时，把 SMTP 配成核心给的地址，信会转进收件人的“Wonton”私聊。家里每个人都有
+一个内部邮箱 `<用户名>@wonton.internal`，插件拿到的 `WONTON_OWNER_EMAIL`、OIDC 的 `email` 都是它。
+
+```yaml
+services:
+  paperless:
+    environment:
+      PAPERLESS_EMAIL_HOST: ${WONTON_SMTP_HOST}
+      PAPERLESS_EMAIL_PORT: ${WONTON_SMTP_PORT}
+      PAPERLESS_EMAIL_FROM: ${WONTON_MAIL_FROM}
+```
+
+- 不开 TLS 或 STARTTLS：服务器不提供加密，核心按来源认出是哪个插件，和通知一样。应用默认走 465 或要求加密的
+  （如 Audiobookshelf），改成 `WONTON_SMTP_PORT`、关掉加密。
+- 能不填用户名和密码就不填。服务器也宣告 AUTH、接受任何凭据，给非填不可的应用用（随便填，比如插件 id）；
+  Go 写的应用（如 Gitea）填了用户名就会在明文连接上拒绝认证，所以别填。
+- 收件人是外部地址的功能（发到电子书阅读器、邀请外面的朋友、分享给外部邮箱）会发送失败，应用自己报错。
+- 只能发给家里的人：收件人不是现有的家人或用户（外部地址、好友、已移除的人）时，服务器在 SMTP 阶段就拒收（550）。
+- 收件人收到的是一条会推送的消息：第一行是“插件名：主题”，下一行是纯文本正文。只有 HTML 的信转成文本，链接保留，
+  正文超过 4000 字截断。转换只看 HTML 的前 1 MiB；截断过或正文超长的，整封原始 HTML 作为 `message.html` 附件附在后面。
+  转不出来时正文换成一条按收件人语言的说明，原文仍在附件里。附件跟在后面，超过 20 MB 的只列名字和大小。
+- 和通知共用频率上限（每个插件每分钟 10 条、24 小时 200 条），超了的信丢弃，用户会在私聊里看到说明。
+- 发件地址用 `WONTON_MAIL_FROM`；核心不按 `From` 认插件，写别的地址也一样投，但用户看到的是你写的地址。
 
 ## 工具与 MCP 总线
 
