@@ -906,7 +906,7 @@ x-wonton:
 | `WONTON_<能力名大写>_KEY` | 同上，且提供方声明了 `credentials` | 只属于本插件的凭据。见“能力依赖”。 |
 | `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，路径里带着这个 Bot 的总线令牌，如 `http://mcp.wonton.internal:8080/mcp/<令牌>`；没有 Bot 的插件不带令牌段，如 `http://mcp.wonton.internal:8080/mcp`。 |
 | `WONTON_NOTIFY_URL` | `notify` | 发通知的地址：核心在插件网络里的别名，如 `http://notify.wonton.internal:8080/notices`，见“通知”。 |
-| `WONTON_SMTP_HOST`、`WONTON_SMTP_PORT` | `notify` | 应用发信用的 SMTP 服务器，如 `smtp.wonton.internal` 和 `25`。不认证、不加密，见“发信”。 |
+| `WONTON_SMTP_HOST`、`WONTON_SMTP_PORT` | `notify` | 应用发信用的 SMTP 服务器，如 `smtp.wonton.internal` 和 `25`。宣告 AUTH 但接受任何凭据，不加密，见“发信”。 |
 | `WONTON_MAIL_FROM` | `notify` | 应用发信的发件地址 `<插件 id>@plugins.wonton.internal`。 |
 | `WONTON_MATRIX_HOMESERVER` | `matrix.bot` | Matrix 客户端接口的地址：核心在插件网络里的别名，如 `http://matrix.wonton.internal:8080`。 |
 | `WONTON_MATRIX_USER_ID`、`WONTON_MATRIX_ACCESS_TOKEN` | `matrix.bot` | Bot 的 Matrix 用户 ID 和访问令牌。 |
