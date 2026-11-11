@@ -19,14 +19,19 @@ description: 写一个 Wonton 插件，装到主人的服务器上，让主人�
 4. 调 `wonton__install_plugin`，`dir` 同上。主人收到确认卡片，工具一直等到主人回答。
 5. 失败时错误里有容器日志，旧版本不受影响。改好再装。同一个错误改两次还不对，就把错误告诉主人，别一直试。
 6. 装好后调 `wonton__plugin_status` 看网页探测的状态码。你看不到渲染出来的样子，请主人看一眼。
-7. 主人要改时，改同一个目录，再调一次 `wonton__install_plugin`。数据保留，失败回滚，版本号不用改。权限没变宽时不用主人确认，装好后在聊天里说一声改了什么。
+7. 主人要改时，改同一个目录，再调一次 `wonton__install_plugin`。数据保留，失败回滚，版本号不用改。权限没变宽时不用主人确认，装好后在聊天里说一声改了什么。主人自己在 App 里装过或升级过的插件，你的更新会发卡片请主人确认，同意后这个插件归你管；被拒绝后 10 分钟内不会再发卡，别一直重试。
 
 要能退回时，在 outbox 的目录里用 git 提交。要退回就再装一次旧版。
 
-## Compose 与文件
+## 检查的两档
 
-Compose 支持范围和高权限字段以规范的 [Compose 子集](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#compose-子集)、[权限](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#权限)和[局域网](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#局域网networklan)为准，不使用旧版禁用字段列表。当前无 Docker、不能构建镜像的环境仍使用公开镜像加 `configs`。
+`wonton__check_plugin` 的问题必须清零，提醒可以留着：私用（自己装、Agent 写的，从目录安装）到这一步就够了。要上官方商店，还得通过 `--official` 那一档，比私用多要求：必须提供图标；镜像按摘要固定；长期运行的服务在 compose 里写健康检查；`tags`、`license`、`author`、`notices` 必填；`description`、`tags`、`about`、`release_notes`、`setup` 写了就要 `zh` 和 `en` 都有；代理地址交给核心注入，不写死；用请求头认用户的应用只信核心的代理地址（出网插件做不到就不收）。上架流程见[插件的开发指南](https://github.com/geraldpeng6/wonton-docs/blob/main/develop.md)。
 
+## 不能写的
+
+`ports`、`build`、`networks`、`privileged`、`devices`、`cap_add`、`container_name`、`env_file`、`extends`，以及相对路径的卷。写了都报错。
+
+- 网页经核心网关访问，声明 `webui` 就行，不要 `ports`。
 - 代码和页面用 `configs` 交给容器，不用卷。`configs` 的 `target` 不能在卷的挂载点里。
 - 数据放 `${WONTON_APP_DATA}`，挂成 `/data`。容器里别的地方在更新时都会丢。
 - 单个文件不超过 1 MiB，整个插件包不超过 2 MiB。依赖尽量用标准库。
@@ -58,7 +63,7 @@ Compose 支持范围和高权限字段以规范的 [Compose 子集](https://gith
 
 | 报错说的 | 怎么改 |
 | --- | --- |
-| 端口声明不支持 | 按规范的 [Compose 子集](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#compose-子集)和[局域网](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#局域网networklan)核对；网页入口查[网页入口与单点登录](https://github.com/geraldpeng6/wonton-docs/blob/main/plugin-spec.md#网页入口与单点登录) |
+| `ports` 不支持 | 删掉，用 `webui.port` |
 | `build` 不支持 | 用公开镜像加 `configs` |
 | 未知字段 | 按报错列出的可选字段改 |
 | 引用的文件不存在 | 路径相对 compose 所在目录，不能有 `..` |
