@@ -82,6 +82,7 @@ x-wonton:
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`accounts`（见“好友分享”）、`cross_origin_isolated`（见“跨源隔离”）、`health`（核心代探测的健康路径，见“健康检查”）。 |
 | `tabs` | 否 | 能放进侧边栏“我的应用”的应用页面，要和 `webui` 一起声明，见“应用页面”。 |
+| `matrix_widget` | 否 | 插件网页也是房间里的 Matrix widget：`url`、`entry`、`capabilities`，要和 `webui` 一起声明，见“房间里的 widget”。 |
 | `static_web` | 否 | 仅 `runtime: static_web` 允许：`root`（包里的静态文件目录，默认 `web`）、`fallback`（找不到的路径回这个文件）、`connect`（页面能连的外部来源），见“静态网页和外部网页”。 |
 | `link` | `runtime: link` 时必填 | 仅 `runtime: link` 允许：`url`，一个 `https` 地址，见“静态网页和外部网页”。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `headers`（见“提供工具”）、`tool_idle_seconds`、`tool_total_seconds`、`tools`（只提供列出的工具），见“工具与 MCP 总线”。 |
@@ -337,6 +338,7 @@ services:
 - `x-wonton.gpu.images`：按显卡厂商换服务的镜像，和 `requirements.gpu.vendors` 一起写（见“显卡”的“按厂商换镜像”）。
 - `requirements.gpu.vendors` 的顺序从此是优先级；`vendors` 里不认识的厂商算清单不合法。只用旧字段的清单不用因此抬版本，但顺序写反了会选到不想要的那家。
 - 安装时注入的变量：`WONTON_GPU_VENDOR`，给了显卡时才有（见“安装时注入的变量”）。
+- `x-wonton.matrix_widget`：插件网页作为房间里的 widget 打开（见“房间里的 widget”）。
 
 **0.13**
 
@@ -976,6 +978,48 @@ x-wonton:
 - 应用仍要自己发 `Cross-Origin-Opener-Policy: same-origin` 和 `Cross-Origin-Embedder-Policy: require-corp`（或 `credentialless`）：iOS 和 Safari 只看这两个头。
 - Android 的 App 在 WebView 156 及以上为声明了的插件打开隔离，没声明的插件不受影响。更旧的 WebView 给不了，App 打开前提示用户，用户可以选“仍然打开”，这时页面没有 `SharedArrayBuffer`。应用最好有不用它的降级。
 - 这一项放宽了 Android 上的安全保障：页面可能和别的网页共用渲染进程。插件详情页会写明；Agent 写的插件，安装和更新的确认卡片上也会写明，更新时新加这一项要主人确认。
+- 声明了的页面在 Android 上交给系统浏览器打开，那里没有桥，所以不能同时声明 `matrix_widget`（见“房间里的 widget”）。
+
+## 房间里的 widget（`matrix_widget`）
+
+聊天房间能嵌网页小工具（Matrix widget）。声明了 `matrix_widget`，插件网页就能在房间的上下文里打开：房间顶栏多一个入口，点开是全屏的页面，页面经桥收发这个房间的事件，像应用自己的一页。
+
+```yaml
+x-wonton:
+  webui:
+    service: web
+    port: 8080
+  matrix_widget:
+    url: /room?widgetId=$matrix_widget_id&roomId=$matrix_room_id&parentUrl=$org.wonton.page_origin&intent=join_existing
+    entry: video_call
+    capabilities:
+      - org.matrix.msc2762.receive.state_event:org.matrix.msc3401.call.member
+      - org.matrix.msc2762.send.state_event:org.matrix.msc3401.call.member
+      - org.matrix.msc4515.rtc_transports
+```
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `url` | 是 | 网页入口下的路径和查询，写法和 `webui.path` 相同。占位符由 App 替换：widget 规范的 `$matrix_room_id`、`$matrix_user_id`、`$matrix_widget_id`、`$org.matrix.msc2873.matrix_device_id`、`$org.matrix.msc4039.matrix_base_url`，另有 `$org.wonton.page_origin`（页面自己的源，给要 `parentUrl` 的页面用）。 |
+| `entry` | 否 | 房间顶栏的图标：`video_call`、`voice_call`、`other`（默认）。不认识的按 `other`。 |
+| `capabilities` | 否 | 页面要的能力串，见下面。 |
+
+- 要有 `webui`：widget 是这个插件的一页。不能和 `webui.cross_origin_isolated` 一起写——声明了跨源隔离的页面在 Android 上交给系统浏览器，那里没有桥，widget 跑不起来。
+- 页面只拿到打开它的那个房间，不放别的房间。事件按类型逐项声明，不收 `*`；`state_key` 也写实际的，不收 `*`。
+- 声明了就会拿到一小时的登录凭证（OpenID），只能拿它换回用户 ID。安装和更新的确认页会写明。
+- 能力按事件类型分两档，高级的在确认页上醒目显示：
+  - 高级：`m.room.message`、`m.room.encrypted`、`m.room.redaction`、`m.room.member`、`m.room.power_levels`，读到聊天内容或改历史、成员、权限。
+  - 普通：其余事件类型、给设备的消息、延迟发送、查通话服务器这类。
+- 新版本多要能力时，更新要主人重新确认；少了不用。
+- 声明 `matrix_widget` 的清单 `spec` 至少写 `"0.14"`。
+- `capabilities` 只认这些写法：
+  - `org.matrix.msc2762.receive.event:<事件类型>`、`org.matrix.msc2762.send.event:<事件类型>`
+  - `org.matrix.msc2762.receive.state_event:<事件类型>`、`org.matrix.msc2762.send.state_event:<事件类型>`，可以带 `#<state_key>`
+  - `org.matrix.msc3819.receive.to_device:<事件类型>`、`org.matrix.msc3819.send.to_device:<事件类型>`
+  - `org.matrix.msc4157.send.delayed_event`、`org.matrix.msc4157.update_delayed_event`
+  - `org.matrix.msc4039.download_file`、`org.matrix.msc4515.rtc_transports`、`io.element.requires_client`
+
+具体批准多少由 App 决定：页面请求的、清单写的和 App 允许的交集。声明了不等于一定拿到，页面要按实际批准的能力降级。
 
 ## 静态网页和外部网页
 
