@@ -92,6 +92,7 @@ scripts/dev.sh reinstall
 | `scripts/dev.sh web [--jar <文件>] [--fresh] [--sso] [<路径> [<curl 参数>…]]` | 以用户身份请求插件网页，默认复用会话；`--sso` 跟随重定向并提交 JS 自动表单的隐藏字段 |
 | `scripts/dev.sh api <方法> <路径> [<curl 参数>…]` | 携带用户令牌调用核心管理接口 |
 | `scripts/dev.sh egress <地址>` | 读取当前出口代理设置，保留返回的 `restarts` 和直连网段后设置新地址 |
+| `scripts/dev.sh model <上游地址> <模型> <key 文件>` | 把一个 OpenAI 兼容的服务商接成开发环境模型网关的上游，申请了 `models` 的插件才能验真实对话；key 只从文件读、经标准输入交给核心，不进参数、环境变量和输出 |
 | `scripts/dev.sh mcp list` | 在 Hermes gateway 容器中使用官方 SDK 列出 Bot 经 MCP 总线可调用的工具 |
 | `scripts/dev.sh mcp call <工具> [<JSON>]` | 经 MCP 总线调用工具，走 Bot 权限、确认和审计；参数默认 `{}`。敏感工具等待卡片答复，另开终端运行 `approve` |
 | `scripts/dev.sh mcp --direct list` | 在插件网络内的一次性客户端中，按工作区清单的 MCP 服务、端口和路径列出原生工具 |
@@ -169,7 +170,19 @@ scripts/dev.sh smoke [--upgrade-from <tag>]
 WONTON_DEV_EGRESS_PROXY=http://<代理地址> scripts/dev.sh smoke
 ```
 
-未设置时不配置出口代理。调试单项请求时，配合 `session`、`web --sso`、`mcp list` 和 `mcp call`；探测逻辑留在插件钩子中，不修改套件来绕过失败。
+未设置时不配置出口代理。
+
+开发环境的模型网关默认一个模型也没有。插件申请了 `models`、要在冒烟里验真实对话时，给一把一次性的、限定了模型的 key：
+
+```bash
+WONTON_DEV_MODEL_BASE_URL=http://host.docker.internal:<端口>/v1 WONTON_DEV_MODEL=<模型> \
+  WONTON_DEV_MODEL_KEY_FILE=<key 文件> scripts/dev.sh smoke
+```
+
+地址是从模型网关的容器里看的；Linux 上 `host.docker.internal` 会换成本机在模型网关插件网络里的地址，本机防火墙要放行。
+key 会存进开发实例的模型网关数据里，验完在服务商那边吊销。
+
+调试单项请求时，配合 `session`、`web --sso`、`mcp list` 和 `mcp call`；探测逻辑留在插件钩子中，不修改套件来绕过失败。
 
 ### 排错
 
