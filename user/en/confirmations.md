@@ -5,7 +5,12 @@ summary: Review what an agent will do, then allow or reject it
 
 ## Find the card
 
-A confirmation card appears in the private room “Wonton” for the core account. If it is not in the room you are viewing, the app shows a banner such as “标题，等你确认” (Title, waiting for your confirmation) or “几张卡片等你确认” (Several cards waiting for your confirmation); tap it to open the room. Android may also show a system notification. The Apps status area shows “等确认” (Waiting for confirmation).
+A confirmation card appears in the chat where it was requested, just above the message box; tap it to answer.
+You also get a notification that opens that chat. Every card is in the “等你确认” (Waiting for you) list, including
+ones answered in the last day; cards not started by a Bot (such as another server asking to connect) are only there.
+When you are not in the card's chat, the app shows a banner such as “标题，等你确认” (Title, waiting for your
+confirmation) or “几张卡片等你确认” (Several cards waiting for your confirmation); tap it to go there. The Apps
+status area shows “等确认” (Waiting for confirmation).
 
 ## Read it before choosing
 
