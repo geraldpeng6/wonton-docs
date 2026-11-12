@@ -472,9 +472,9 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 
 插件网页默认地址是 `<scheme>://<slug>.<基础域名>[:端口]`，`slug` 是把 `id` 里的 `.` 换成 `-`
 （`app.immich.photos` → `app-immich-photos`）。`webui.service` 属于 `bots.services` 时，每个 Bot 有独立的
-网页来源（origin），见下节。所有网页请求经核心网关，网关先核对来源和访问权限；未获准的请求不会到达插件。
-转发时去掉网关自己的 Cookie 和客户端伪造的 `X-Forwarded-*`，重新设置 `X-Forwarded-For`、
-`X-Forwarded-Host`、`X-Forwarded-Proto`，保留原始 `Host`，支持 WebSocket。
+网页来源（origin），见下节。所有网页请求经核心网关，网关先核对来源和访问权限；未获准的请求不会到达插件，
+登记的 OIDC 表单回调例外见下文“OIDC”。转发时去掉网关自己的 Cookie 和客户端伪造的 `X-Forwarded-*`，
+重新设置 `X-Forwarded-For`、`X-Forwarded-Host`、`X-Forwarded-Proto`，保留原始 `Host`，支持 WebSocket。
 
 `webui.path`（默认 `/`）是入口路径：App 和状态页打开插件网页时，把它拼在网页地址后面，写
 `/vnc.html?autoconnect=1&resize=remote` 就直接落到应用的远程桌面页。网关按域名转发，代理不因此改路由，
@@ -567,7 +567,7 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 两种形状都带响应头 `x-wonton-error: <category>`，接口靠它判断原因，不看 `message` 的字。
 
 未登录的页面导航（`GET` 且要 HTML）不在这里回错误，改为跳到核心的登录页，登录后回到原地址。跨站的未登录请求
-（别的插件的页面发起的）换到会话也不认，回 401，不跳登录页。
+（别的插件的页面发起的）换到会话也不认，回 401，不跳登录页；符合下文条件的 OIDC 表单回调除外。
 
 上游（插件自己）的响应网关原样转发，不改形状，也不加 `x-wonton-error`。看到响应里没有这个头，就说明请求已经
 到达插件，响应是应用自己的，包括应用自己回的 401。
@@ -643,6 +643,37 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 | `webui.oidc.token_endpoint_auth_method` | 否 | 应用在令牌端点出示密钥的方式：`client_secret_basic`（默认）或 `client_secret_post`。 |
 | `webui.oidc.admin_groups` | 否 | 这个人是这个应用的管理员时，`groups` 里再加这些组名，按组名对角色的应用（如 BookStack）用它把管理员对到应用里的管理员角色。名字 1–64 个字符，只含 ASCII 字母、数字和 `_-.:`，不重复，最多 8 个。 |
 | `webui.oidc.role_claim` | 否 | 从一个专门的声明读角色的应用用它：`name` 是声明名，`admin`、`user` 是管理员和普通用户各自的值，核心按这个人是不是这个应用的管理员填。名字和值的字符规则同组名；名字不能是核心已经在发的声明（`sub`、`groups`、`email` 等）。 |
+
+#### 表单回调的网关边界
+
+应用使用标准 [`response_mode=form_post`](https://openid.net/specs/oauth-v2-form-post-response-mode-1_0.html#FormPostResponseMode)
+时，不需要增加清单字段或强制改成 `query`。网关只给 `sso: oidc` 的下列请求开放不带网关登录状态的可达性：
+
+- 路径与本插件 `webui.oidc.redirect_paths` 的一项精确相同，不是前缀匹配；其他插件的路径不算。
+- 方法为 `POST`，`Content-Type` 取第一个 `;` 前的媒体类型、去两侧空白后，不分大小写精确等于
+  `application/x-www-form-urlencoded`。可以带 `charset` 等参数，JSON 和伪造的表单类型前缀不算。
+- `Origin` 缺失，或不分大小写等于核心生成的签发方浏览器 origin（`auth.<基础域名>`）或本插件 origin，
+  包括协议和端口；`Origin: null`、其他来源或错误端口不算。不依赖 `Sec-Fetch-*` 是否存在或其取值。
+
+**可达不等于认证成功。** 应用必须把回调绑定到自己发起的登录，校验受保护或不可预测的 `state` 及登录关联，
+并按所用流程校验关联 Cookie、PKCE、授权码、nonce 和令牌。不能只凭路径、表单类型或 `Origin` 接受登录；
+非浏览器客户端能省略或伪造 `Origin`，它只是浏览器来源隔离，不是身份认证。`state` 的有效期和防重放保证
+由应用的完整登录流程负责，网关不提供这些保证。
+
+这个例外增加的是登记回调端点的有限未认证可达面：不创建网关身份或会话，不注入网关凭据。
+请求仍带有有效插件会话或隧道身份、能认出人时，网关照常执行插件的家人开关；认不出人时无法按人检查，
+不能假设此前已经检查过。回调后的普通页面仍需网关鉴权。网关仍剥除请求中的 `wonton_*` Cookie，
+响应中的 `Set-Cookie` 仍去掉 `Domain` 并丢弃 `wonton_*` Cookie。
+这不是整个插件免登录，也不改变 `query`/GET 导航、其他方法或登出回跳的规则；`post_logout_paths` 不适用此例外。
+
+网关放行不保证每种部署都能完成登录，应用 Cookie 也必须能被浏览器保存并在回调时发送。例如
+[Kavita 固定源码](https://github.com/Kareadita/Kavita/blob/d77d956b9551227d8be2ee488b08f14aa3a341e5/Kavita.Server/Extensions/IdentityServiceExtensions.cs#L228-L258)
+使用的 ASP.NET Core 10.0.11 默认把[关联 Cookie](https://github.com/dotnet/aspnetcore/blob/v10.0.11/src/Security/Authentication/Core/src/RemoteAuthenticationOptions.cs)
+和 [nonce Cookie](https://github.com/dotnet/aspnetcore/blob/v10.0.11/src/Security/Authentication/OpenIdConnect/src/OpenIdConnectOptions.cs)
+设为 `SameSite=None; Secure`；即使浏览器允许 `http://*.localhost` 使用这些 Cookie，也不能推广到非 localhost 的
+普通 HTTP 地址。选型和部署时须确认应用的 HTTPS/localhost 要求，不要关闭应用的关联校验来绕过限制。
+
+#### 客户端配置
 
 客户端可申请的 scope：`openid`、`profile`（`name`、`preferred_username`、`locale`）、`email`（`email`、
 `email_verified`）、`groups`、`offline_access`。`groups` 总有 `user`；这个人是这个应用的管理员时再加 `plugin_admin`
