@@ -1136,7 +1136,7 @@ x-wonton:
 | `WONTON_<能力名大写>_KEY` | 同上，且提供方声明了 `credentials` | 只属于本插件的凭据。见“能力依赖”。 |
 | `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，路径里带着这个 Bot 的总线令牌，如 `http://mcp.wonton.internal:8080/mcp/<令牌>`；没有 Bot 的插件不带令牌段，如 `http://mcp.wonton.internal:8080/mcp`。 |
 | `WONTON_NOTIFY_URL` | `notify` | 发通知的地址：核心在插件网络里的别名，如 `http://notify.wonton.internal:8080/notices`，见“通知”。 |
-| `WONTON_SMTP_HOST`、`WONTON_SMTP_PORT` | `notify` | 应用发信用的 SMTP 服务器，如 `smtp.wonton.internal` 和 `25`。宣告 AUTH 但接受任何凭据，不加密，见“发信”。 |
+| `WONTON_SMTP_HOST`、`WONTON_SMTP_PORT` | `notify` | 应用发信用的 SMTP 服务器，如 `smtp.wonton.internal` 和 `25`。宣告 AUTH 但接受任何凭据；不强制加密，需要 STARTTLS 的应用直接用同一个端口，见“发信”。 |
 | `WONTON_MAIL_FROM` | `notify` | 应用发信的发件地址 `<插件 id>@plugins.wonton.internal`。 |
 | `WONTON_MATRIX_HOMESERVER` | `matrix.bot` | Matrix 客户端接口的地址：核心在插件网络里的别名，如 `http://matrix.wonton.internal:8080`。 |
 | `WONTON_MATRIX_USER_ID`、`WONTON_MATRIX_ACCESS_TOKEN` | `matrix.bot` | Bot 的 Matrix 用户 ID 和访问令牌。 |
@@ -1708,9 +1708,13 @@ x-wonton:
 `WONTON_NOTIFY_URL`，插件在插件网络里 `POST` 一条 JSON，不用令牌。监控、下载、备份这类插件的告警走这里，
 不用自己再接一套推送渠道。
 
+上游应用的 Webhook 或通知格式和这里不一样，也不用自己转换：把应用里“Webhook 地址”“推送服务器”那一栏直接填成
+`WONTON_NOTIFY_URL` 就行。路径不看（ntfy 的主题、Gotify 的 `/message` 接在后面都能用），`POST` 和 `PUT` 都收；
+除下面这套字段，还认 ntfy 和 Gotify 的写法，见“上游的写法”。上游应用没配标题也不会回错。
+
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
-| `title` | 是 | 一句话，最多 120 个字符 |
+| `title` | 否 | 一句话，最多 120 个字符；没有时核心从正文第一行或载荷里的 `name`、`subject` 之类取，都没有就用“通知” |
 | `body` | 否 | 纯文本，最多 2000 个字符 |
 | `level` | 否 | `info`（默认）、`warning`、`critical` |
 | `path` | 否 | 插件网页里的一页（以 `/` 开头，不能以 `//` 开头，不能有反斜杠和控制字符，可带 query），用户点通知时应用打开这一页；插件没有 `webui` 时不能写 |
@@ -1730,9 +1734,22 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST "$WONTON_NOTIFY_URL" \
 - 频率上限：每个插件每分钟 10 条、滚动 24 小时 200 条。超了的直接丢弃；第一次超限时核心在私聊里发一条说明，
   恢复前不再重复。计数在核心内存里，核心重启后重新计。
 - 通知只发给用户本人，家人不收。
-- 状态码：发成功是 201；字段不合法是 400 `invalid_input`；没申请 `notify` 是 403 `permission_denied`；
-  插件网络以外是 403 `unauthenticated`；超了频率是 429 `rate_limited`；聊天服务不可用是 503
-  `matrix_unavailable`。
+- 状态码：发成功是 200；字段不合法是 400 `invalid_input`；没申请 `notify` 是 403 `permission_denied`；
+  插件网络以外是 403 `unauthenticated`；不是 `POST`/`PUT` 是 405；超了频率是 429 `rate_limited`；
+  聊天服务不可用是 503 `matrix_unavailable`。
+
+### 上游的写法
+
+这些形状和字段都收，`title`、`body` 一类字段超长的截断：
+
+- ntfy：`Content-Type: text/plain`，正文就是内容，`Title` 头是标题，`Priority` 头 1–5（4 推送、5 强制推送），
+  `Tags` 头是逗号分隔的标签，并进正文末行。
+- Gotify：`POST …/message?token=<令牌>`，JSON `{title, message, priority}`，`message` 当正文，`priority`
+  8 及以上推送。
+- 其它 JSON：键值拍成“键: 值”行当正文，从 `title`、`subject`、`name`、`summary` 里找一个当标题，再没有就用
+  第一行。适合只有“通用 Webhook”的应用。
+- `level` 也认 `low`、`high`、`max`、`urgent` 这类上游级别名；`path` 只有自己那套 JSON 带。
+- 请求体上限 16 KiB，带附件（ntfy 的 multipart）不带；整段塞不下时应用侧报错。
 
 ### 发信
 
@@ -1748,8 +1765,9 @@ services:
       PAPERLESS_EMAIL_FROM: ${WONTON_MAIL_FROM}
 ```
 
-- 不开 TLS 或 STARTTLS：服务器不提供加密，核心按来源认出是哪个插件，和通知一样。应用默认走 465 或要求加密的
-  （如 Audiobookshelf），改成 `WONTON_SMTP_PORT`、关掉加密。
+- 不强制加密：不开 TLS 的应用照常发得出去。要求加密的应用用 STARTTLS、端口还是 `WONTON_SMTP_PORT`（465 直连 TLS
+  没有开）；证书是核心自签的、名字就是 `WONTON_SMTP_HOST`，应用校验证书时要么让它信这张证书，要么关掉校验
+  （如 `SMTP_TLS_SKIP_VERIFY`、`NODE_TLS_REJECT_UNAUTHORIZED=0`）。核心按来源认出是哪个插件，和通知一样。
 - 用宿主网络（`network_mode: host`）的插件不能发信，安装时拒绝：核心按来源网段认发信的插件，宿主网络发来的信
   认不出来源、会被丢弃。要发信就改用应用网络，或去掉 `notify`。
 - 能不填用户名和密码就不填。服务器也宣告 AUTH、接受任何凭据，给非填不可的应用用（随便填，比如插件 id）；
