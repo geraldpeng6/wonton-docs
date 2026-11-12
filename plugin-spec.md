@@ -1224,7 +1224,7 @@ x-wonton:
   | `jellyfin` | Jellyfin 的 HTTP API | 要，在 `provides.jellyfin.credentials` 里 | 否 |
   | `static_web` | 托管：HTTP 静态文件（RFC 9110 的 `GET`/`HEAD`、条件请求、`Range`），站点根是挂载点下的 `<X-Wonton-Plugin>/`。`runtime: static_web` 的插件隐含 `requires` 它，不用再写 | 不用 | 否 |
   | `web_storage` | 托管：WebDAV（RFC 4918）整文件读写的子集，见“静态网页的数据” | 不用 | 否 |
-  | `personal_data` | 位置和健康数据的存取：`POST /location`、`POST /health`、`GET /query`、`DELETE /data`、`GET /export`、`POST /cleanup`；每个请求带 `X-Wonton-User`（数据属于谁），类型名和 JSON 形状见 wontonapp/wonton 的 `wonton-protocol` 库里 `personal_data` 的文档和常量，等 wontonapp/wonton#437 | 要，在 `provides.personal_data.credentials` 里 | 否 |
+  | `personal_data` | 位置和健康数据的存取：`POST /location`、`POST /health`、`GET /query`、`DELETE /data`、`GET /export`、`POST /cleanup`；每个请求带 `X-Wonton-User`（数据属于谁），类型名和 JSON 形状见 wontonapp/wonton 的 `wonton-protocol` 库里 `personal_data` 的文档和常量 | 要，在 `provides.personal_data.credentials` 里 | 否 |
 
   接口有不兼容的变化时换一个新名字（如 `search2`），能力名不带版本号。高权限能力见下面的“高权限能力”。
 - **第三方定义的**：`x-<作者>.<名字>`，作者和名字都用小写字母、数字、连字符，如 `x-acme.ledger`。核心只按名字
