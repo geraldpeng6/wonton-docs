@@ -1138,7 +1138,7 @@ x-wonton:
 | `WONTON_MATRIX_USER_ID`、`WONTON_MATRIX_ACCESS_TOKEN` | `matrix.bot` | Bot 的 Matrix 用户 ID 和访问令牌。 |
 | `WONTON_MATRIX_ALLOWED_USERS` | `matrix.bot` | 逗号分隔的 Matrix 用户 ID，Bot 只听这些人的话：私人 Bot 是归属人，共享 Bot 是主人。家人加入、联系人批了之后名单变长，核心重建这个 Bot 的服务，沿用设备和令牌。 |
 | `WONTON_MATRIX_HOME_ROOM` | `matrix.bot` | Bot 的主房间：核心替用户建好的、和 Bot 的加密私聊，定时任务的结果发到这里。 |
-| `WONTON_SECRET_<名字>` | `secrets` 里由核心生成的项 | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`。 |
+| `WONTON_SECRET_<名字>` | `secrets` 里的项（核心生成的、收存的、用户填写的都有） | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`；用户填写的必填项没填时是空串。 |
 | `WONTON_SETTING_<名字>` | 清单声明了这一项，服务引用了它 | 设置，名字转成大写，如 `WONTON_SETTING_BUDGET`。值的写法见“插件设置”。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
 | `WONTON_BOT_AI_LEVEL` | `matrix.bot` 或 `bots.services` 里的服务 | 用这个 Bot 的人能让 AI 动手到哪一级：`read_only`（只给只读的工具）、`admin_approves_deletes`（改的自己确认，删的要管理员批）、`self_confirms`（都自己确认）。共享 Bot 取用它的人里最低的一级。Agent 插件凭它选自带工具的模式：不是 `self_confirms` 时用最严的那档；不认识的值按 `read_only`。 |
@@ -1744,12 +1744,13 @@ x-wonton:
   66 个字符的名字截成 `…__space_list_user_space__1ee6bee5`），模型看到的目录里是哈希名。工具名建议不超过
   `49 - slug 长度` 个字符，拿不准就压在 30 个字符以内；插件 id 本身也别太长。
 - 上游要凭据时声明 `headers`：头名 → 值模板，写法和 `webui.proxy` 相同，占位符只能用 `{secret:…}`，引用本插件
-  `secrets` 里声明的项（`generate` 或 `collect` 都行）。`{user}` 这类身份占位符不能用：MCP 调用不是主人的浏览器
-  请求，上游认的是应用签发给核心的凭据。不能加 `Host`、`Cookie`、`Forwarded`、`X-Forwarded-*`、逐跳头部和 MCP 的
+  `secrets` 里声明的项（`generate`、`collect`、`input` 都行；是没填的必填项时插件待配置，同“插件密钥”）。`{user}`
+  这类身份占位符不能用：MCP 调用不是主人的浏览器请求，上游认的是应用签发给核心的凭据。不能加 `Host`、`Cookie`、`Forwarded`、`X-Forwarded-*`、逐跳头部和 MCP 的
   协议头（`mcp-session-id`、`mcp-protocol-version`）。
 - 值在安装、升级和核心每次核对插件时按当时的密钥解析。核心发往 MCP 服务的每个请求都带上（包括握手），值不写进
-  日志、错误信息和审计。头引用的密钥在安装时就得有值：`collect` 的文件还没写下（比如生成它的一次性服务还没跑完）
-  就装不上，总线的头填不出来时宁可不上线。
+  日志、错误信息和审计。头引用的 `collect` 密钥在安装时就得有值：文件还没写下（比如生成它的一次性服务还没跑完）
+  就装不上，总线的头填不出来时宁可不上线。头里引用的 `input` 项没填时不拦安装：头先空着，必需的那一项没填时插件
+  待配置、MCP 调用报 `not_ready`（同“插件密钥”），填上以后请求头随之换成新值；可选项没填只是这个头暂时不带。
 - 密钥的值里不能有换行或控制字符，结尾的换行也算：`echo` 写的文件末尾多一个换行就填不出头，用 `printf '%s'`
   写。核心会报错到具体的头和密钥，值本身不出现在错误里。
 - `collect` 的密钥在核对时读到新值后，核心对这条上游的连接在条目更新后就断开重连，用新值（不需要重启插件）。
@@ -2194,8 +2195,10 @@ MCP 请求头（`{secret:…}`）引用不到按 Bot 收存的密钥——一个
 | `required` | 否 | 默认 `true`。 |
 
 - 填的值以 `WONTON_SECRET_<名字大写>` 注入。可选项没填时注入空串。
-- **必填项在安装时就要填**：App 的安装确认页用原生表单填；Bot 装插件时，主人在确认卡片里填，值不经过聊天，Bot 拿不到。
-  缺必填项时装不上，安装接口返回 `invalid_input`，写明缺哪几项。升级新增必填项时，在升级确认时填；填过的项沿用。
+- 安装时就把表单递到用户眼前：App 的安装确认页用原生表单填；Bot 装插件时，主人在确认卡片里填，值不经过聊天，Bot 拿不到。
+  必填项没填也装得上，插件状态是 `needs_configuration`（待配置）：详情页列出缺哪几项，插件的 MCP 工具在总线上列不出来、
+  调用报失败 `not_ready` 并点名缺哪项，网页入口照常。填齐后核心重建引用这个变量的服务，状态回到 `running`。
+  升级新增必填项时同样在升级确认时列出；填过的项沿用。可选项没填不影响状态。
 - 上传插件包安装或升级时，值放在 `Wonton-Plugin-Secrets` 请求头里（base64url 无填充编码的 JSON 对象），
   不进查询串，查询串会进各种日志和历史记录。
 - 装好以后，主人在插件详情页里修改；可选项可以清空。改了以后，核心重建用到这个变量的服务，新值随之生效。
