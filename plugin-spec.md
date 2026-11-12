@@ -1138,7 +1138,7 @@ x-wonton:
 | `WONTON_MATRIX_USER_ID`、`WONTON_MATRIX_ACCESS_TOKEN` | `matrix.bot` | Bot 的 Matrix 用户 ID 和访问令牌。 |
 | `WONTON_MATRIX_ALLOWED_USERS` | `matrix.bot` | 逗号分隔的 Matrix 用户 ID，Bot 只听这些人的话：私人 Bot 是归属人，共享 Bot 是主人。家人加入、联系人批了之后名单变长，核心重建这个 Bot 的服务，沿用设备和令牌。 |
 | `WONTON_MATRIX_HOME_ROOM` | `matrix.bot` | Bot 的主房间：核心替用户建好的、和 Bot 的加密私聊，定时任务的结果发到这里。 |
-| `WONTON_SECRET_<名字>` | `secrets` 里的项（核心生成的、收存的、用户填写的都有） | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`；用户填写的必填项没填时是空串。 |
+| `WONTON_SECRET_<名字>` | `secrets` 里的 `generate`、`input` 项 | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`；用户填写的项没填时是空串。`collect` 只收存，不注入。 |
 | `WONTON_SETTING_<名字>` | 清单声明了这一项，服务引用了它 | 设置，名字转成大写，如 `WONTON_SETTING_BUDGET`。值的写法见“插件设置”。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
 | `WONTON_BOT_AI_LEVEL` | `matrix.bot` 或 `bots.services` 里的服务 | 用这个 Bot 的人能让 AI 动手到哪一级：`read_only`（只给只读的工具）、`admin_approves_deletes`（改的自己确认，删的要管理员批）、`self_confirms`（都自己确认）。共享 Bot 取用它的人里最低的一级。Agent 插件凭它选自带工具的模式：不是 `self_confirms` 时用最严的那档；不认识的值按 `read_only`。 |
@@ -1749,8 +1749,8 @@ x-wonton:
   协议头（`mcp-session-id`、`mcp-protocol-version`）。
 - 值在安装、升级和核心每次核对插件时按当时的密钥解析。核心发往 MCP 服务的每个请求都带上（包括握手），值不写进
   日志、错误信息和审计。头引用的 `collect` 密钥在安装时就得有值：文件还没写下（比如生成它的一次性服务还没跑完）
-  就装不上，总线的头填不出来时宁可不上线。头里引用的 `input` 项没填时不拦安装：头先空着，必需的那一项没填时插件
-  待配置、MCP 调用报 `not_ready`（同“插件密钥”），填上以后请求头随之换成新值；可选项没填只是这个头暂时不带。
+  就装不上，总线的头填不出来时宁可不上线。头里引用的 `input` 项没填时不拦安装：MCP 调用报 `not_ready` 并点名缺项，
+  填上以后请求头随之换成新值。可选项没填不改变插件运行状态，但引用它的 MCP 入口仍未就绪。
 - 密钥的值里不能有换行或控制字符，结尾的换行也算：`echo` 写的文件末尾多一个换行就填不出头，用 `printf '%s'`
   写。核心会报错到具体的头和密钥，值本身不出现在错误里。
 - `collect` 的密钥在核对时读到新值后，核心对这条上游的连接在条目更新后就断开重连，用新值（不需要重启插件）。
