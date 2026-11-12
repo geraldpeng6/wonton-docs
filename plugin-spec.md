@@ -333,6 +333,7 @@ services:
 
 - `x-wonton.install_timeout_secs`：安装最多等多久（见“健康检查”）。
 - `secrets.<名字>.generate.encoding` 的新取值 `base64url`（无填充的 base64url，见“插件密钥”）。
+- 安装时注入的变量：`WONTON_GATEWAY_CIDR`（见“网关代登录”）和 `WONTON_APP_HOST`（见“安装时注入的变量”）。
 
 **0.13**
 
@@ -343,7 +344,6 @@ services:
 - 确认卡片显示在发起的会话里：`tools/call` 的 `params._meta` 可带 `app.wonton/origin`，或给总线请求配固定请求头
   `wonton-origin-room`、`wonton-origin-thread`；Agent 权限确认的请求体可带 `origin`（见“工具与 MCP 总线”）。这些是调用时
   的写法，不是清单字段，清单不必因此改 `spec`。
-- 安装时注入的变量：`WONTON_GATEWAY_CIDR`（见“网关代登录”）和 `WONTON_APP_HOST`（见“安装时注入的变量”）。
 
 **0.12**
 
