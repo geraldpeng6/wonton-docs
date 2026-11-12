@@ -80,7 +80,7 @@ x-wonton:
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes`、`setup` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
-| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`accounts`（见“好友分享”）、`cross_origin_isolated`（见“跨源隔离”）。 |
+| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`accounts`（见“好友分享”）、`cross_origin_isolated`（见“跨源隔离”）、`health`（核心代探测的健康路径，见“健康检查”）。 |
 | `tabs` | 否 | 能放进侧边栏“我的应用”的应用页面，要和 `webui` 一起声明，见“应用页面”。 |
 | `static_web` | 否 | 仅 `runtime: static_web` 允许：`root`（包里的静态文件目录，默认 `web`）、`fallback`（找不到的路径回这个文件）、`connect`（页面能连的外部来源），见“静态网页和外部网页”。 |
 | `link` | `runtime: link` 时必填 | 仅 `runtime: link` 允许：`url`，一个 `https` 地址，见“静态网页和外部网页”。 |
@@ -330,6 +330,7 @@ services:
 
 - `webui.oidc.owner_groups` 改名 `webui.oidc.admin_groups`：这个人是这个应用的管理员时才加这些组（见“OIDC”）。
 - `webui.oidc.role_claim`：只认“管理员”和“普通用户”、从专门的声明读角色的应用用它（见“OIDC”）。
+- `webui.health`：核心代探测的健康路径，给写不出 compose 健康检查的镜像用（见“健康检查”）。
 - `webui.friends` 删掉，换成 `webui.accounts`（见“好友分享”）。清单里还写着 `owner_groups` 或 `friends` 时，因未知字段报错。
 - 确认卡片显示在发起的会话里：`tools/call` 的 `params._meta` 可带 `app.wonton/origin`，或给总线请求配固定请求头
   `wonton-origin-room`、`wonton-origin-thread`；Agent 权限确认的请求体可带 `origin`（见“工具与 MCP 总线”）。这些是调用时
@@ -2534,7 +2535,7 @@ x-wonton:
 - 长期运行的服务都要有健康检查，而且检查的是真正可用，不只是进程还活着：Hermes 要 Matrix 已经连上
   （用它自己的 `/health/detailed`），magpie 用自带的 `magpie healthcheck`。
 - `webui` 指向宿主网络的服务时，健康检查是安装的硬要求：没写、写了 `disable: true` 或没写 `test` 都拒绝
-  安装。宿主网络上端口可能被别的程序占用，应用可能只记一行日志、容器照样运行，检查要确认网页真的能打开。
+  安装（`webui.health` 也算，核心经中继探）。宿主网络上端口可能被别的程序占用，应用可能只记一行日志、容器照样运行，检查要确认网页真的能打开。
   宿主网络的 webui 不能用 `sso: proxy`，见“网关代登录”。
 - 写在 compose 的 `healthcheck` 里。镜像自带的 `HEALTHCHECK` 也算数，但官方索引的插件要在 compose 里
   显式写出，便于审核，也随插件版本锁定。
@@ -2542,11 +2543,18 @@ x-wonton:
   升级时等健康的时限取自各服务 `healthcheck.start_period` 的最大值（加余量），上限 60 分钟；都没写时等
   300 秒。装载要几分钟的插件（大模型类）写长一点的 `start_period`，不会被 300 秒误判失败。
 - 检查只能用镜像里已有的命令，distroless 之类的镜像里没有 `curl`、`wget`。
+- `scratch`、`distroless` 这类镜像里连 shell 都没有，写不出能用的 `healthcheck`，改用核心代探测：
+  `webui.health` 写网页服务的一个路径（如 `/health`），核心按它探。只有 `webui.service` 指向的服务能这么写，
+  别的服务仍要在 compose 里写健康检查。`webui.health` 和 `healthcheck` 写一样就够，`--official` 两样都认。
+- 探测和别的健康检查走同一条路：安装、启动按同一个时限等它通过，运行期间每 30 秒探一次（每次 5 秒超时），
+  2xx 和 3xx 算健康，其余状态码和连不上、超时都算不健康，原因写进插件状态（如“GET /health：HTTP 503”）。
+  探测用核心访问插件网页的同一个地址（插件网络里，宿主网络经中继），和 `webui.path` 无关：入口是 `/` 的插件
+  照样写 `/health` 这类能确认应用好的路径，不是写 `/`。
 - 官方索引的插件缺健康检查时不收录（`wonton-core plugin check --official` 检查）。导入的应用和社区插件
   没有健康检查时照常安装，状态如实显示为“运行中，健康未知”，不显示“健康”。
 - 核心在安装、每次启动时检查，运行期间每 30 秒再看一次容器，插件列表里运行中的插件带上最近一次的结果：每个
-  长期运行的服务都有健康检查而且都通过了是 `healthy`；有服务没有健康检查，或者检查还没通过，是 `unknown`（只
-  知道在运行）。
+  长期运行的服务都有健康检查而且都通过了是 `healthy`（`webui.health` 的探测算健康检查）；有服务没有健康检查，
+  或者检查还没通过，是 `unknown`（只知道在运行）。
 - 检查失败的插件标为异常；容器好了，核心重新核对一遍，插件恢复运行。卸载中途失败、记录损坏这些和容器无关的异常
   不会自己恢复。
 - 一个容器失败不拿走别的服务的入口：只有 `webui` 指向的容器不健康时网页才打不开（503），`mcp` 服务和模型网关

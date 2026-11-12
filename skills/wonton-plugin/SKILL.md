@@ -39,7 +39,7 @@ description: 写一个 Wonton 插件，装到主人的服务器上，让主人�
 ## 一定要写的
 
 - `init: true`。否则程序作为 1 号进程不响应停止信号，每次更新都多等 10 秒，这段时间页面打不开。
-- `healthcheck`，带 `start_period` 和 `start_interval`。检查真正可用的地址，只用镜像里有的命令。
+- `healthcheck`，带 `start_period` 和 `start_interval`。检查真正可用的地址，只用镜像里有的命令。镜像里没有 shell 和 curl/wget 时（`scratch`、`distroless`），改在清单里写 `webui.health: /health`，由核心代探测。
 - `user: "${PUID}:${PGID}"`，写数据时用。这样数据目录里的文件归主人，不归 root。
 
 ## 容易猜错的
