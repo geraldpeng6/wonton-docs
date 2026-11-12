@@ -1687,6 +1687,10 @@ x-wonton:
   MCP 服务器要在镜像里自带一个转成 Streamable HTTP 的桥（如 supergateway）。
 - 工具在总线上叫 `<slug>__<工具名>`，如 `app-wonton-files__search_files`。核心连插件的 MCP 服务用 `initialize` 握手
   （MCP 2025-11-25）。
+- 工具名别太长：Agent 一端的客户端还要在总线名前加自己的前缀（如 `mcp__wonton__`，13 个字符），模型看到的全名是
+  `mcp__wonton__<slug>__<工具名>`。不少客户端把工具全名限在 64 个字符内，超了会截短、尾部换成哈希（实测 Hermes 把
+  66 个字符的名字截成 `…__space_list_user_space__1ee6bee5`），模型看到的目录里是哈希名。工具名建议不超过
+  `49 - slug 长度` 个字符，拿不准就压在 30 个字符以内；插件 id 本身也别太长。
 - 上游要凭据时声明 `headers`：头名 → 值模板，写法和 `webui.proxy` 相同，占位符只能用 `{secret:…}`，引用本插件
   `secrets` 里声明的项（`generate` 或 `collect` 都行）。`{user}` 这类身份占位符不能用：MCP 调用不是主人的浏览器
   请求，上游认的是应用签发给核心的凭据。不能加 `Host`、`Cookie`、`Forwarded`、`X-Forwarded-*`、逐跳头部和 MCP 的
