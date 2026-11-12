@@ -1139,6 +1139,7 @@ x-wonton:
 | `WONTON_MATRIX_ALLOWED_USERS` | `matrix.bot` | 逗号分隔的 Matrix 用户 ID，Bot 只听这些人的话：私人 Bot 是归属人，共享 Bot 是主人。家人加入、联系人批了之后名单变长，核心重建这个 Bot 的服务，沿用设备和令牌。 |
 | `WONTON_MATRIX_HOME_ROOM` | `matrix.bot` | Bot 的主房间：核心替用户建好的、和 Bot 的加密私聊，定时任务的结果发到这里。 |
 | `WONTON_MATRIX_SERVER_NAME` | `provides.matrix_rtc` | Matrix 服务器名，如 `example.org`，可能带端口。见“通话授权服务”。 |
+| `WONTON_MATRIX_CA_DIR` | `provides.matrix_rtc` | 放证书包 `ca-bundle.pem`（系统根证书 + 核心的 CA）的目录，宿主路径，在本插件的数据目录下。见“通话授权服务”。 |
 | `WONTON_SECRET_<名字>` | `secrets` 里由核心生成的项 | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`。 |
 | `WONTON_SETTING_<名字>` | 清单声明了这一项，服务引用了它 | 设置，名字转成大写，如 `WONTON_SETTING_BUDGET`。值的写法见“插件设置”。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
@@ -1325,9 +1326,26 @@ x-wonton:
 - 核心给提供方注入 `WONTON_MATRIX_SERVER_NAME`，提供方拿它填“可以建房间的服务器”名单（lk-jwt-service 的
   `LIVEKIT_FULL_ACCESS_HOMESERVERS`）。
 - 验 OpenID 令牌：在提供方的网络里，服务器名（去掉端口）解析到核心。核心在 443 上用 HTTPS 只答
-  `/.well-known/matrix/server`（指回自己）和 `/_matrix/federation/v1/openid/userinfo`（转给 Matrix 服务器），别的路径
-  404，别的插件来的请求 403。证书是核心给服务器名签的自签证书，提供方要跳过对它的校验（lk-jwt-service 设
-  `LIVEKIT_INSECURE_SKIP_VERIFY_TLS=YES_I_KNOW_WHAT_I_AM_DOING`）。
+  `/.well-known/matrix/server`（指回自己），以及转给 Matrix 服务器的 `/_matrix/federation/v1/openid/userinfo`、
+  `/.well-known/matrix/client` 和 MSC4140 不稳定路径上的 `POST /delayed_events/{delay_id}/{action}`；别的路径 404，别的插件来的
+  请求 403。
+- 证书由核心自己的 CA 签。核心把“系统根证书 + 核心的 CA”写成证书包 `ca-bundle.pem`，放在 `WONTON_MATRIX_CA_DIR` 指的目录里
+  （提供方数据目录下）。把这个目录挂进容器，让授权服务信任它，比如 `SSL_CERT_FILE` 指向这个文件。不要跳过证书校验，也不要只信
+  核心的 CA：那样验不了别的服务器来的用户。
+- 断线后的 delayed leave 由授权服务代管时，它要找服务器的客户端接口：把它指回同一个服务器名（lk-jwt-service 设
+  `LIVEKIT_CS_API_URL_OVERRIDES=${WONTON_MATRIX_SERVER_NAME}=https://${WONTON_MATRIX_SERVER_NAME}`）。
+
+  ```yaml
+  services:
+    jwt:
+      image: ghcr.io/element-hq/lk-jwt-service:0.9.0
+      environment:
+        LIVEKIT_FULL_ACCESS_HOMESERVERS: ${WONTON_MATRIX_SERVER_NAME}
+        LIVEKIT_CS_API_URL_OVERRIDES: ${WONTON_MATRIX_SERVER_NAME}=https://${WONTON_MATRIX_SERVER_NAME}
+        SSL_CERT_FILE: /etc/wonton-ca/ca-bundle.pem
+      volumes:
+        - ${WONTON_MATRIX_CA_DIR}:/etc/wonton-ca:ro
+  ```
 
 ## 预装插件
 
