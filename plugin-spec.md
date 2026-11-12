@@ -1018,6 +1018,7 @@ x-wonton:
   - `org.matrix.msc3819.receive.to_device:<事件类型>`、`org.matrix.msc3819.send.to_device:<事件类型>`
   - `org.matrix.msc4157.send.delayed_event`、`org.matrix.msc4157.update_delayed_event`
   - `org.matrix.msc4039.download_file`、`org.matrix.msc4515.rtc_transports`、`io.element.requires_client`
+  - `org.matrix.msc4407.receive.sticky_event`、`org.matrix.msc4407.send.sticky_event`、`m.always_on_screen`、`org.matrix.msc4533.rtc_livekit_get_token`、`org.matrix.msc4533.rtc_livekit_delegate_delayed_leave`
 
 具体批准多少由 App 决定：页面请求的、清单写的和 App 允许的交集。声明了不等于一定拿到，页面要按实际批准的能力降级。
 
