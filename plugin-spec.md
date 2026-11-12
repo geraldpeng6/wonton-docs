@@ -1,4 +1,4 @@
-# 插件规范 `x-wonton`（草案 v0.12）
+# 插件规范 `x-wonton`（草案 v0.13）
 
 > 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
@@ -27,7 +27,7 @@ services:
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
 
 x-wonton:
-  spec: "0.12"
+  spec: "0.13"
   id: app.immich.photos
   version: 2.0.0
   kind: app
@@ -80,7 +80,7 @@ x-wonton:
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes`、`setup` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
-| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`friends`（默认 `false`，见“好友分享”）、`cross_origin_isolated`（见“跨源隔离”）。 |
+| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`accounts`（见“好友分享”）、`cross_origin_isolated`（见“跨源隔离”）。 |
 | `tabs` | 否 | 能放进侧边栏“我的应用”的应用页面，要和 `webui` 一起声明，见“应用页面”。 |
 | `static_web` | 否 | 仅 `runtime: static_web` 允许：`root`（包里的静态文件目录，默认 `web`）、`fallback`（找不到的路径回这个文件）、`connect`（页面能连的外部来源），见“静态网页和外部网页”。 |
 | `link` | `runtime: link` 时必填 | 仅 `runtime: link` 允许：`url`，一个 `https` 地址，见“静态网页和外部网页”。 |
@@ -325,6 +325,12 @@ services:
 ### 各版本新增的字段
 
 清单用到下面某一版新增的字段时，`spec` 至少写那一版，`plugin check` 会逐项检查。
+
+**0.13**
+
+- `webui.oidc.owner_groups` 改名 `webui.oidc.admin_groups`：这个人是这个应用的管理员时才加这些组（见“OIDC”）。
+- `webui.oidc.role_claim`：只认“管理员”和“普通用户”、从专门的声明读角色的应用用它（见“OIDC”）。
+- `webui.friends` 删掉，换成 `webui.accounts`（见“好友分享”）。清单里还写着 `owner_groups` 或 `friends` 时，因未知字段报错。
 
 **0.12**
 
@@ -589,9 +595,10 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 
 ### 好友分享
 
-`webui.friends` 是布尔值，默认 `false`。`true` 声明插件已验证好友使用、能区分好友身份；它不是授权开关，
-不会自动开放网页。没声明或为 `false` 的插件也能由主人分享，但授权前须提示：好友会以自己的用户名登录，
-应用可能给他建账号、让他看到主人的数据。
+`webui.accounts: per_user` 声明应用按登录的人分开数据（各人有自己的账号、自己的东西）。它不是授权开关，
+不会自动开放网页。没声明的插件按“大家共用一份”对待：照样能开放给家里别的人或分享给好友，但开放和授权前
+须醒目提示：这些人会共用应用里的数据和登录状态，可能看到、改到别人的东西。没有账号体系、只靠链接区分的
+应用（如分账工具把群组链接发给同行的人）不写这一项，分享时按共用一份提示。
 
 好友用自己已有的 Matrix 账号，不在分享人的服务器上建聊天账号。分享按插件、按好友或组授权，可设到期；
 收回、到期、删好友或卸载后，网关拒绝后续请求并断开已有的长连接（包括 WebSocket）。插件应用内的账号和
@@ -602,12 +609,12 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 认人沿用声明的登录方式：
 
 - `sso: proxy` 的 `{user}` 是核心为这个人分配的本机用户名，固定、不复用，不和本机账号重名；
-  显示名用已有的 `{name}`，新增的 `{role}` 区分 `owner`、`member`、`friend`，完整模板规则见下文。
-- `sso: oidc` 的 `sub`、`preferred_username` 使用同一个本机用户名，好友的 `groups` 为 `["friend"]`。
+  显示名用已有的 `{name}`，`{role}` 是 `admin` 或 `user`，完整模板规则见下文。
+- `sso: oidc` 的 `sub`、`preferred_username` 使用同一个本机用户名，`groups` 的规则和家里的人相同（见“OIDC”）。
 - `{email}` 和 OIDC 的 `email` 是 `<好友的本机用户名>@wonton.internal`，只用来认人：发给它的信被拒收（见“发信”）。
 - `sso: none` 仍用应用自己的登录，核心不替好友注册或登录。
 
-这些是分享接口约定；`webui.friends` 的解析不代表核心已提供分享行为。使用好友身份模板前必须确认目标核心
+这些是分享接口约定；`webui.accounts` 的解析不代表核心已提供分享行为。使用好友身份模板前必须确认目标核心
 支持对应的校验和渲染；不能把识别不了的变量作为普通文字透传。
 
 ### 应用自带的登录（`sso: none`）
@@ -634,11 +641,14 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 | `webui.oidc.redirect_paths` | 是 | 应用登录回调的路径（以 `/` 开头，相对插件网页地址），核心据此登记客户端的回调地址。 |
 | `webui.oidc.post_logout_paths` | 否 | 额外的登出回跳路径，默认 `[]`；与 `redirect_paths` 一样每项以 `/` 开头。核心把路径拼在插件网页地址后，登记到 `post_logout_redirect_uris`。 |
 | `webui.oidc.token_endpoint_auth_method` | 否 | 应用在令牌端点出示密钥的方式：`client_secret_basic`（默认）或 `client_secret_post`。 |
-| `webui.oidc.owner_groups` | 否 | 用户是家庭的主人时，`groups` 在 `owner` 之外再加这些组名，按组名对角色的应用（如 BookStack）用它把主人对到管理员等角色。名字 1–64 个字符，只含 ASCII 字母、数字和 `_-.:`，不重复，最多 8 个。 |
+| `webui.oidc.admin_groups` | 否 | 这个人是这个应用的管理员时，`groups` 里再加这些组名，按组名对角色的应用（如 BookStack）用它把管理员对到应用里的管理员角色。名字 1–64 个字符，只含 ASCII 字母、数字和 `_-.:`，不重复，最多 8 个。 |
+| `webui.oidc.role_claim` | 否 | 从一个专门的声明读角色的应用用它：`name` 是声明名，`admin`、`user` 是管理员和普通用户各自的值，核心按这个人是不是这个应用的管理员填。名字和值的字符规则同组名；名字不能是核心已经在发的声明（`sub`、`groups`、`email` 等）。 |
 
 客户端可申请的 scope：`openid`、`profile`（`name`、`preferred_username`、`locale`）、`email`（`email`、
-`email_verified`）、`groups`（`owner`，声明了 `owner_groups` 再加那些组名）、`offline_access`。
-`owner_groups` 只发给声明它的这个客户端，别的插件看不到。客户端 ID 就是插件 `id`，密钥在安装时
+`email_verified`）、`groups`、`offline_access`。`groups` 总有 `user`；这个人是这个应用的管理员时再加 `plugin_admin`
+和声明的 `admin_groups`。插件看到的只有这两档：家里给每个人配的角色由主人起名、随时会改，不发给插件，
+按年龄、按库之类的细分在应用自己的用户设置里做（应用按 `sub` 认得出是谁）。
+`admin_groups` 和 `role_claim` 只发给声明它的这个客户端，别的插件看不到。客户端 ID 就是插件 `id`，密钥在安装时
 生成，卸载时删除客户端。
 
 认人用 `sub`（`preferred_username` 同值），邮箱只当资料：应用有用户名概念就用 `sub` 或
@@ -654,7 +664,7 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 
 保留数据卸载后重装，密钥是新的：应用把密钥存进自己数据库的（如 Forgejo 的认证源），要在每次创建容器时用 `WONTON_OIDC_CLIENT_SECRET` 更新已有的那条，不能“已存在就跳过”。
 
-按组名对角色的应用，声明 `owner_groups` 并让应用同步组：
+按组名对角色的应用，声明 `admin_groups` 并让应用同步组：
 
 ```yaml
 services:
@@ -670,13 +680,21 @@ x-wonton:
     sso: oidc
     oidc:
       redirect_paths: [/oidc/callback]
-      owner_groups: [admin]
+      admin_groups: [admin]
 ```
 
 BookStack 把 `groups` 里的名字对到角色：先按角色显示名（大小写不敏感），再按角色设置里的“外部认证
 ID”；内置管理员角色的显示名是 `Admin`，`admin` 就对得上。BookStack 还要求 `https` 的签发方地址
 （本节末的选型项），核心现在的 `http` 签发方它不接受：环境变量名作对照用，换成同类应用时以各自文档
-为准。应用没有组同步功能时不用 `owner_groups`，按它认角色的方式在文档里写清楚怎么给主人管理员。
+为准。应用没有组同步功能、只认一个角色声明时（如 Immich 读 `immich_role`，取值 `admin` 或 `user`），写 `role_claim`：
+
+```yaml
+    oidc:
+      redirect_paths: [/auth/login]
+      role_claim: { name: immich_role, admin: admin, user: user }
+```
+
+两样都没有的应用，按它认角色的方式在文档里写清楚怎么给管理员。
 
 应用不能自己注册管理员、要插件预建账号时，申请 `owner.identity`，按应用官方的引导机制用
 `WONTON_OWNER_NAME` 和 `WONTON_OWNER_EMAIL` 建（多数应用有建管理员的官方环境变量），不要装完再改
@@ -743,10 +761,9 @@ webui:
 | `{user}` | 当前经验证人的本机用户名，同 OIDC 的 `preferred_username`；固定、不复用。 |
 | `{name}` | 当前经验证人的显示名，可能改变，不能当账号主键。 |
 | `{email}` | 当前人的内部邮箱 `<用户名>@wonton.internal`，和 OIDC 的 `email` 声明同值。主人、家人、好友都有值；只有主人和家人的收得到信。 |
-| `{role}` | `owner`（主人）、`member`（家人）、`friend`（被分享的好友）。由网关认证身份后确定，不接受客户端自报。 |
+| `{role}` | `admin`（这个人是这个应用的管理员）或 `user`。由网关认证身份后确定，不接受客户端自报。 |
 
-`{role}` 属于好友分享的接口约定，须由支持好友身份的核心校验和渲染；不支持时应报错，不能代入主人身份或
-假定所有人都是 `owner`。
+`{role}` 须由支持它的核心校验和渲染；不支持时应报错，不能假定所有人都是 `admin`。
 
 应用认人用 `{user}`。只有应用确实只能按邮箱认人、没有用户名概念时，才用 `{email}` 认人。
 
@@ -1093,6 +1110,7 @@ x-wonton:
 | `WONTON_SECRET_<名字>` | `secrets` 里由核心生成的项 | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`。 |
 | `WONTON_SETTING_<名字>` | 清单声明了这一项，服务引用了它 | 设置，名字转成大写，如 `WONTON_SETTING_BUDGET`。值的写法见“插件设置”。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
+| `WONTON_BOT_AI_LEVEL` | `matrix.bot` 或 `bots.services` 里的服务 | 用这个 Bot 的人能让 AI 动手到哪一级：`read_only`（只给只读的工具）、`admin_approves_deletes`（改的自己确认，删的要管理员批）、`self_confirms`（都自己确认）。共享 Bot 取用它的人里最低的一级。Agent 插件凭它选自带工具的模式：不是 `self_confirms` 时用最严的那档；不认识的值按 `read_only`。 |
 | `WONTON_PERMISSION_DOCKER_SOCKET`、`_DEVICES_GPU`、`_DEVICES_SERIAL`、`_DEVICES_USB` | 对应的可选权限开着 | 值是 `1`。关着时不定义（不是空串），用 `${VAR:+x}` 或 `[ -n "$VAR" ]` 判断。给这个插件的所有服务，不只拿到字段的那个。 |
 | `WONTON_LAN_ADDRESSES` | `network.lan` | 局域网端口开在哪些地址上，逗号分隔，如 `192.0.2.10`。地址变化时的重建规则见“局域网”。 |
 | `WONTON_PROXY_URL` | `network.egress` | 出口容器的地址 `http://egress.wonton.internal:3128`，用户没配代理时是空串。给有自己代理设置、不读 `HTTP_PROXY` 的程序用，见“网络”。 |
@@ -1733,8 +1751,10 @@ x-wonton:
   不能重复，每个名字按 MCP 2025-11-25 的工具名规定校验（1–128 个字符，只有 ASCII 字母、数字、`_`、`-` 和 `.`）。
   列表里写了但上游没有的名字：其余工具照常提供，缺哪些写在 `wonton__list_plugins` 的 `tools_error` 里；调用不在
   列表里的工具和调用不存在的工具一样报错。
-- 总线转来的 `tools/call` 在 `_meta` 里带 `app.wonton/user`：私人 Bot 调用时是归属人的用户名，共享 Bot 不带。
-  多用户的应用按它切到这个人的数据；不认它的插件对所有人给同样的数据。
+- 总线转来的 `tools/call` 在 `_meta` 里带 `app.wonton/user`：私人 Bot 调用时是归属人的用户名；共享 Bot 认得出这一轮
+  只替一个人办事时带这个人，否则不带。同时带 `app.wonton/capabilities`，是这个人在这个插件里的能力列表，
+  已定义的只有 `plugin_admin`（是这个应用的管理员），不认识的值忽略。多用户的应用按它们切到这个人的数据、给对应的权限；不认它们的插件
+  对所有人给同样的数据。没带 `app.wonton/user` 时，不能把这次调用当成管理员的，按大家共用的数据给，或者拒绝。
 - 没有标 `readOnlyHint: true`（MCP 的工具注解）的工具算敏感：总线先请用户确认，确认了才转给插件。会改数据的工具
   不要标成只读。不会改数据的工具要标上，否则 Bot 每次调用都要用户确认。
 - 用户可以放宽确认：卡片上放行一段时间、对某个 Bot 始终允许、对某个 Bot 一律允许，或者把某个工具标成只读。这些都在总线
