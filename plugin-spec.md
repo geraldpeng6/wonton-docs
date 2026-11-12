@@ -81,7 +81,7 @@ x-wonton:
 | `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes`、`setup` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`friends`（默认 `false`，见“好友分享”）、`cross_origin_isolated`（见“跨源隔离”）。 |
-| `tabs` | 否 | 能放进侧边栏“我的应用”的应用页面，要和 `webui` 一起声明，见“应用页面”。 |
+| `tabs` | 否 | 能放进侧边栏“我的应用”的应用页面，要和 `webui` 一起声明（静态网页不用），见“应用页面”。 |
 | `static_web` | 否 | 仅 `runtime: static_web` 允许：`root`（包里的静态文件目录，默认 `web`）、`fallback`（找不到的路径回这个文件）、`connect`（页面能连的外部来源），见“静态网页和外部网页”。 |
 | `link` | `runtime: link` 时必填 | 仅 `runtime: link` 允许：`url`，一个 `https` 地址，见“静态网页和外部网页”。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `headers`（见“提供工具”）、`tool_idle_seconds`、`tool_total_seconds`、`tools`（只提供列出的工具），见“工具与 MCP 总线”。 |
@@ -797,7 +797,7 @@ webui:
 
 ## 应用页面（`tabs`）
 
-有 `webui` 的插件可以声明应用页面。页面出现在侧边栏的“我的应用”里，用户决定放哪些、什么顺序，插件和 Bot 都改不了。App 不支持这些字段时忽略它们，插件照常从“应用”打开。没声明 `tabs` 的插件也能放，入口是 `webui.path`，用插件自己的标题和图标。
+有 `webui` 的插件和静态网页（见“静态网页和外部网页”）可以声明应用页面。页面出现在侧边栏的“我的应用”里，用户决定放哪些、什么顺序，插件和 Bot 都改不了。App 不支持这些字段时忽略它们，插件照常从“应用”打开。没声明 `tabs` 的插件也能放，入口是 `webui.path`，用插件自己的标题和图标。
 
 ```yaml
 x-wonton:
@@ -938,10 +938,18 @@ x-wonton:
     connect:                        # 可选：页面能连的外部来源
       - https://api.example.com
       - https://*.tiles.example.org
+  webui:                            # 可选：只收展示字段
+    path: /
+    display: standard
+  tabs: [...]                       # 可选：见“应用页面”
 ```
 
 - **目录：** `root` 是包里的相对路径，不能以 `/` 开头，不能有 `..`、以 `.` 开头的段，也不能有 `_wonton` 这一段（网关占用
-  插件子域名上的 `/_wonton/`）。目录里要有 `index.html`。`fallback` 是 `root` 下的文件，找不到的路径回它；不写时回 404。
+  插件子域名上的 `/_wonton/`）。目录里：
+  - 要有 `index.html`；
+  - 不能有软链接、以 `.` 开头的文件或目录（如 `.env`、`.git/`），也不能有 `_wonton/` 目录；
+  - 最多 1024 项（文件和目录一起数）、合计 64 MiB，单个文件最多 16 MiB。
+- **`fallback`：** `root` 下的文件。`GET`、`HEAD` 找不到时网关改取它，单页应用的前端路由因此能直接打开；不写时照实回 404。
 - **能连哪里：** 页面只能连 `connect` 里写的来源，没写的被浏览器按 `Content-Security-Policy` 拦下。CSP 由核心按清单算、
   网关加在响应上，托管插件给的同名头会被替换。
   - 每项是 `https://<主机名>` 或 `wss://<主机名>`，主机名用小写、至少两段，可以以 `*.` 开头；不带路径和端口，
@@ -950,13 +958,17 @@ x-wonton:
   - 写了 `connect` 就要在 `permissions` 里写 `network.egress`，反过来也一样，只写一边清单不合法。确认页写明“这个网页会从
     你的设备连接：…”：页面在 App 里跑，外连从用户的设备直接出去，不经家里的服务器，也不走出网代理。
   - CSP 管不到顶层跳转、WebRTC 和 DNS 预取；不要把它当成“页面不会外连”的保证。
-- **只能写这些字段：** 商店信息、`static_web`、`requires`/`wants`（只能是 `web_storage`）和 `permissions`（只能是
-  `network.egress`）。写了 `services`、`webui`、`tabs`、`secrets`、`settings`、`mcp`、`bot`、`bots`、`agent`、`provides`、
-  `lan`、`tunnel`、`setup`、`gpu`、`optional_permissions` 或别的权限，清单不合法：静态网页没有服务端，用得上这些就写成
-  容器插件。密钥尤其不能放：静态文件对能打开页面的人全部公开。
+- **只能写这些字段：** 商店信息、`static_web`、`webui` 的展示字段（`path`、`display`、`cross_origin_isolated`）、`tabs`、
+  `requires`/`wants`（只能是 `web_storage`）和 `permissions`（只能是 `network.egress`）。写了 `services`、`webui.service`、
+  `webui.port`、`webui.sso`、`webui.oidc`、`webui.proxy`、`webui.friends`、`secrets`、`settings`、`mcp`、`bot`、`bots`、
+  `agent`、`provides`、`lan`、`tunnel`、`setup`、`gpu`、`optional_permissions` 或别的权限，清单不合法：静态网页没有服务端，
+  用得上这些就写成容器插件。密钥尤其不能放：静态文件对能打开页面的人全部公开。
+  - 不写 `webui` 时按 `webui: {path: /}` 算。`tabs` 的写法和容器插件一样（见“应用页面”），路径都落在静态目录里。
+  - 静态网页不能分享给好友。
 - **没有托管插件时**按缺 `requires` 处理（见“能力依赖”）。托管插件没在运行时，静态插件标为异常，原因是“依赖的插件
   没有在运行”。
-- 包的大小：最多 1024 项、合计 64 MiB，单个文件最多 16 MiB。
+- **响应头：** 网关在托管插件的响应上写 `Content-Security-Policy`、`X-Content-Type-Options: nosniff`，声明了
+  `cross_origin_isolated` 时加跨源隔离要的头（见“跨源隔离”）；托管插件给的同名头不算数。
 
 ### 静态网页的数据（`web_storage`）
 
@@ -1212,6 +1224,11 @@ x-wonton:
   每个使用方插件一个子目录 `<mount>/<插件 ID>/`。之后装、升级、卸载使用方只改目录内容，不重建提供方的容器。提供方
   只按核心写的 `X-Wonton-Plugin` 选子目录，不认请求的路径和 `Host`，不带这个头的请求回 400。不是托管能力的写了
   `mount` 清单不合法。
+  - 核心在建提供方的容器之前建好总目录。`static_web` 的目录是 0755、文件是 0644，提供方不用 root 运行也读得到。
+  - 换内容是整个子目录原子替换，文件都是新写的：靠修改时间和大小算 `ETag` 的服务端照样对。
+  - 网关转发前删掉请求里所有 `X-Wonton-*` 头再写 `X-Wonton-Plugin`，访问控制在网关做完；提供方不鉴权，也不用读清单
+    （`fallback`、CSP 都由网关处理）。
+  - 一项托管能力同时只能有一个提供方，装第二个时报冲突。有使用方在用时，提供方卸不掉，先卸使用方。
 
   ```yaml
   x-wonton:
