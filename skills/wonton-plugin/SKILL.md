@@ -48,7 +48,7 @@ description: 写一个 Wonton 插件，装到主人的服务器上，让主人�
 - **健康检查和代理：** 只有 `wget` 和 shell 的写法由核心改写成不走代理。`python3 -c` 不改写，用 `urllib.request.build_opener(urllib.request.ProxyHandler({}))` 自己绕开，见 `assets/backend`。
 - **没有登录的页面：** `sso: none` 又不做登录是可以的，所有请求先经网关校验主人的会话，别人打不开。不要自己加默认密码。
 - **出网：** 要访问外部地址就申请 `network.egress`，这个权限同时能访问主人的局域网，主人确认时看得到。用户填的地址不用替他拦，但不要把抓回来的内容不转义就放进页面。
-- **跨源隔离：** 页面需要 `SharedArrayBuffer` 时，声明 `webui.cross_origin_isolated: true`。网关会加 `Document-Isolation-Policy: isolate-and-credentialless` 让页面跨源隔离（桌面 Chrome 137+ 认这个头）。App 内的安卓 WebView 不支持跨源隔离，这个头和上游发的 `Cross-Origin-Opener-Policy`/`Cross-Origin-Embedder-Policy` 都不生效，声明了的页面在 App 里也拿不到 `SharedArrayBuffer`，要用系统浏览器打开。首次安装会提示主人，从未声明改为声明的更新必须重新确认。
+- **跨源隔离：** 页面需要 `SharedArrayBuffer` 时，声明 `webui.cross_origin_isolated: true`。网关会加 `Document-Isolation-Policy: isolate-and-credentialless`，COOP/COEP 仍由应用自己发（桌面 Chrome 137+ 认这个头）。Android 的 WebView 给不了跨源隔离，声明了的页面自动在系统浏览器里打开，没有 App 的桥和主题；iOS 照旧在 App 内打开。首次安装会提示主人，从未声明改为声明的更新必须重新确认。
 
 ## 让页面像 App 的一部分
 
