@@ -131,6 +131,7 @@ x-wonton:
 | `provides` | 否 | 向其他插件提供的能力：`models`（见“模型网关”，只能 `kind: system` 的插件声明）、`egress_proxy`（见“网络”的“代理插件”），`agent_acp`（见“Agent 插件”）以及其他能力，键是能力名，见“能力依赖”。托管能力（`static_web`、`web_storage`）还要写 `mount`，见“提供方”。 |
 | `requires`、`wants` | 否 | 依赖的能力名列表：`requires` 的能力没有提供方装不上，`wants` 有提供方就用、没有照装。提供方可以声明自己提供的同一能力；核心选提供方时排除自身。见“能力依赖”。 |
 | `gpu` | 否 | 拿到显卡的服务（`services`），以及按显卡厂商换的镜像（`images`）。要和 `devices.gpu` 权限一起声明，见“显卡”。 |
+| `devices` | 否 | 按类声明要交给哪些服务，具体设备由用户在安装时选：`serial`（每项 `service`、`target`、可选 `optional`）、`usb`、`disk`（各 `service`），见“设备”。 |
 | `lan` | 否 | 在局域网上开放的端口（`ports`）。要和 `network.lan` 权限一起声明，见“局域网”。 |
 | `clients` | 否 | 第三方 App 的入口：`http` 和 `tcp`。要和 `network.clients` 权限一起声明，见“第三方 App 入口”。 |
 | `tunnel` | 否 | 经隧道映射到已配对设备本机的端口（`ports`），见“隧道端口”。不需要新增权限，与 `lan` 独立。 |
@@ -386,6 +387,8 @@ services:
 - `x-wonton.matrix_widget`：插件网页作为房间里的 widget 打开（见“房间里的 widget”）。
 - `x-wonton.license_url`：非 SPDX 许可证的全文地址（见“商店信息”）。
 - `x-wonton.clients`、权限 `network.clients`、`webui.guests` 和变量 `WONTON_EXTERNAL_URL`（见“第三方 App 入口”）。使用它们的清单至少写 `spec: "0.14"`。
+- `x-wonton.devices`：按类声明要交给哪些服务，宿主上的具体设备由用户在安装时选（见“设备”）。
+- 权限 `devices.disk`：交给服务用户勾选的整块硬盘，并带上 `SYS_RAWIO`（见“设备”）。
 
 **0.13**
 
@@ -1330,6 +1333,9 @@ x-wonton:
 | `network.clients` | — | 让第三方 App 连进来：`clients.http`、`clients.tcp` 的入口，以及访客链接（`webui.guests`）。装好不生效，用户打开开关才生效，见“第三方 App 入口”。 |
 | `egress.proxy` | 高 | 做出网代理：选它以后，所有出网插件的请求都经过它，它能看到这些插件访问了哪些网站，也能改写不加密的内容。和 `provides.egress_proxy` 成对，见“网络”的“代理插件”。 |
 | `devices.gpu` | 高 | 使用显卡，见“显卡”。 |
+| `devices.serial` | 高 | 使用用户安装时选的一个串口设备，见“设备”。可以声明成可选、默认关。 |
+| `devices.usb` | 高 | 访问这台主机上所有 USB 设备，见“设备”。可以声明成可选、默认关。 |
+| `devices.disk` | 很高 | 读写用户勾选的整块硬盘，见“设备”。 |
 | `devices.<路径>` | 高 | 访问宿主设备，路径只能是 `/dev/net/tun` 或 `/dev/fuse`，如 `devices./dev/net/tun`。 |
 | `network.host` | 很高 | 使用宿主网络：能访问本机所有端口，开的端口直接开在本机的网卡上，开在哪些网卡上由应用决定。 |
 | `cap.<能力>` | 很高或最高 | 给服务增加 Linux capability，如 `cap.NET_ADMIN`。`NET_ADMIN`、`NET_RAW`、`NET_BIND_SERVICE`、`SYS_TIME`、`SYS_NICE`、`IPC_LOCK` 是很高，其余都是最高。 |
@@ -2910,6 +2916,58 @@ x-wonton:
   下一家，都不行就按上面两条处理。`requirements.arch` 仍管整个插件，只对通用镜像。
 - 厂商版镜像和通用镜像一样要按摘要固定，官方索引收录每一个厂商版镜像之前都要先在那种显卡的真实主机上实测通过。
 - 换镜像不算权限变宽：用户确认的仍是 `devices.gpu`。设备和组不因为换了镜像而改变。
+
+## 设备（`devices.serial`、`devices.usb`、`devices.disk`）
+
+有的应用要接在主机上的硬件：Zigbee 棒、ESP 板、扫描仪、硬盘。它们在每台主机上的路径都不一样、拔插后还会变，所以清单只说
+“要什么设备、交给哪个服务”，具体是哪个设备由用户在安装页里选，核心记在安装记录里。写了 `devices` 一节就至少写
+`spec: "0.14"`。
+
+```yaml
+x-wonton:
+  spec: "0.14"
+  permissions: [devices.serial, devices.usb, devices.disk]
+  devices:
+    serial:
+      - { service: zigbee2mqtt, target: /dev/zigbee, optional: true }
+    usb:
+      - { service: scanservjs }
+    disk:
+      - { service: collector }
+```
+
+| 类 | 权限 | 用户给的是 | 容器里 |
+| --- | --- | --- | --- |
+| 串口 | `devices.serial` | 每个 `serial` 项一个设备（从 `/dev/serial/by-id` 里挑） | 清单写的 `target` |
+| USB | `devices.usb` | 整类：这台主机上所有 USB 设备，不用选 | 只读的 `/dev/bus/usb` |
+| 硬盘 | `devices.disk` | 用户勾的整块盘 | 依次 `/dev/sda`、`/dev/sdb`…，NVMe 为 `/dev/nvme0n1`… |
+
+| 字段 | 说明 |
+| --- | --- |
+| `devices.serial[].service` | 拿到这个设备的服务。同一个类里一个服务只能出现一次。 |
+| `devices.serial[].target` | 必填。设备在容器里的路径，必须绝对。 |
+| `devices.serial[].optional` | 用户安装时可以不选。可选的位置不选时服务照常起，不拿设备。 |
+| `devices.usb[].service`、`devices.disk[].service` | 拿到这类设备的服务，不用写 `target`。 |
+
+- 每一类都要有对应的权限，权限也要有对应的项：只写一边，清单不合法。`devices.serial`、`devices.usb` 可以声明成可选、
+  默认关（见“可选权限”）；`devices.disk` 不能。
+- 宿主路径不写在清单里：`/dev/sda`、`/dev/ttyUSB0` 这类路径写进 compose 的 `devices:` 会被拒（只有固定设备例外，见“权限”）。
+- 串口用 `/dev/serial/by-id` 的路径交给 Docker，编号变了也能找回同一个设备；容器加入设备节点所属的组，非 root 进程才开得了
+  它。用户给每个位置选一个设备，一个服务拿不到旁边的别的串口。
+- 硬盘整盘只读交给服务（`--device` 加 `:r`）：读 SMART 只需要打开节点。核心随 `devices.disk` 给 `SYS_RAWIO`，插件不用也不
+  能为此另写 `cap.SYS_RAWIO`。勾了 NVMe 盘时还交给控制器 `/dev/nvmeN`。
+- 硬盘按勾选顺序起名，插件不要依赖宿主上的盘名。
+- 用户装着系统的盘（宿主根目录或 Wonton 数据目录所在的）也列出来、标“系统盘”，默认不勾。认不出时一块都不标。
+- 申请了任一 `devices.*` 权限的服务由核心只读挂上宿主的 `/run/udev`，Zigbee2MQTT 列适配器、smartctl 认盘都靠它。宿主没有
+  `/run/udev` 时不挂，预览写明。
+- 必需的设备不在（没插、被拔）时预览的 `blocked` 写明缺什么，类别 `device_unavailable`，装不了。可选的位置照样能装。
+- 串口是选中的设备的一部分：装好以后拔掉，拿到它的服务标为异常（类别 `device_unavailable`），插回来并稳定两秒后核心自动重启
+  那个服务，别的服务不动。硬盘是固定装着的，不做拔插恢复。
+- 卸载时设备随记录释放（对应的容器删掉，节点本来也不是插件的）。
+- `devices` 只对 `runtime: compose` 有意义。
+
+**注意：** 用户选的设备和宿主所有 USB 设备都是宿主的东西，插件的容器逃逸出去以后能碰到的也就是这些。提示文字由核心按权限
+的级别写，插件不用自己写。
 
 ## 隧道端口（`tunnel.ports`）
 
