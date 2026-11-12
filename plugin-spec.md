@@ -78,7 +78,7 @@ x-wonton:
 | `runtime` | 否 | 运行形态：`compose`、`remote_mcp`、`skills`、`static_web` 或 `link`，省略时为 `compose`。`compose` 必须有非空的顶层 `services`；其他运行形态不允许出现 `services`，即使为空也不行。与 `kind` 独立。`static_web`、`link` 见“静态网页和外部网页”。 |
 | `title`、`description` | 是 | 多语言文本，至少写一种语言。怎么写见“标题和说明怎么写”。 |
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
-| `screenshots`、`author`、`homepage`、`license`、`tags`、`about`、`release_notes`、`setup` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
+| `screenshots`、`author`、`homepage`、`license`、`license_url`、`tags`、`about`、`release_notes`、`setup` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
 | `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`accounts`（见“好友分享”）、`cross_origin_isolated`（见“跨源隔离”）、`health`（核心代探测的健康路径，见“健康检查”）。 |
 | `tabs` | 否 | 能放进侧边栏“我的应用”的应用页面，要和 `webui` 一起声明，见“应用页面”。 |
@@ -265,7 +265,8 @@ services:
 | `screenshots` | 截图：仓库里的 PNG 或 JPEG（路径规则同插件包里的文件），1 到 6 张，按顺序显示。截图不算插件包的一部分：不参与插件包摘要，安装时不取，上传插件包时忽略；商店的详情页要显示时，核心按同一个提交去取。 |
 | `author` | 插件包的作者：`name`（必填）、`url`（HTTPS，可选）。不一定是应用的作者。 |
 | `homepage` | 应用的主页，HTTPS。 |
-| `license` | 应用的许可证，SPDX 表达式，如 `AGPL-3.0-only`、`MIT OR Apache-2.0`。插件包自己的许可证写在仓库的 LICENSE 里。 |
+| `license` | 应用的许可证，SPDX 表达式，如 `AGPL-3.0-only`、`MIT OR Apache-2.0`。不在 SPDX 列表里的许可证（如 n8n 的 SUL、Joplin 的个人使用许可）写成 `LicenseRef-<名字>`，如 `LicenseRef-SUL-1.0`，再用 `license_url` 给出许可全文；写别的名字或普通写法（如 `Apache 2`）都报错。插件包自己的许可证写在仓库的 LICENSE 里。 |
+| `license_url` | 许可证全文的地址，HTTPS，要配 `license` 一起写。`LicenseRef-` 的许可证用它给出许可全文，App 显示许可证时打开这个地址；核心和 `--official` 不强制要求。 |
 | `tags` | 标签，插件自己写，按语言分开，如 `{ zh: [相册, AI], en: [Photos, AI] }`。每种语言最多 8 个，每个 1 到 24 个字符，不能重复。商店按出现过的标签筛选，所以写用途，不写技术词；也用来搜索。 |
 | `about` | 详细介绍：多语言，纯文本，空行分段，每种语言不超过 4000 个字符。没写时详情页只显示 `description`。 |
 | `release_notes` | 这个版本的更新说明：多语言，纯文本，每种语言不超过 2000 个字符，升级提示里显示。数据迁移不可逆时要写明。 |
@@ -339,6 +340,7 @@ services:
 - `requirements.gpu.vendors` 的顺序从此是优先级；`vendors` 里不认识的厂商算清单不合法。只用旧字段的清单不用因此抬版本，但顺序写反了会选到不想要的那家。
 - 安装时注入的变量：`WONTON_GPU_VENDOR`，给了显卡时才有（见“安装时注入的变量”）。
 - `x-wonton.matrix_widget`：插件网页作为房间里的 widget 打开（见“房间里的 widget”）。
+- `x-wonton.license_url`：非 SPDX 许可证的全文地址（见“商店信息”）。
 
 **0.13**
 
