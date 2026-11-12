@@ -1,4 +1,4 @@
-# 插件规范 `x-wonton`（草案 v0.13）
+# 插件规范 `x-wonton`（草案 v0.14）
 
 > 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
@@ -149,11 +149,14 @@ configs:
   的归档接口把文件写进容器，每次创建容器都重新写入。两种做法里 `uid`、`gid`、`mode` 对 `file` 也生效
   （docker compose 对 `file` 用绑定挂载，这三项只对 `content` 生效）。应用要自己改写的配置，用下面的
   一次性服务复制进数据目录。
+- 目标的上级目录在镜像里不存在时核心建出来（root 属主，`0755`），已有的目录不动；上级路径上是个普通文件时
+  安装失败并写明路径。`read_only` 的服务由 Docker 在创建容器时建。
 - `target` 是容器里的绝对路径，不能和这个服务的挂载点（卷、绑定挂载、`tmpfs`）重叠：写进挂载点的文件
   会留在卷或数据目录里，`tmpfs` 则在启动时把它盖住。
 - 没写 `uid`、`gid` 时，属主取服务的 `user`：数字形式的 `uid:gid` 就是它，只有 uid 时组是 0，没写
-  `user` 或写的是用户名时是 root。`mode` 按八进制理解（`0440`、`"0440"`、`0o440` 都是 0440），默认
-  `0444`，写权限位被忽略，不能超过 `0777`。默认所有用户可读，收紧了 `mode` 才需要关心属主。
+  `user` 或写的是用户名时是 root。`mode` 按八进制理解（`0640`、`"0640"`、`0o640` 都是 0640），默认
+  `0644`，不能超过 `0777`。默认所有用户可读、属主可写，收紧了 `mode` 才需要关心属主。一次性的复制服务
+  复制出去的文件同样带属主写位，复制后应用和主人都能改。
 
 ### 一次性服务与首次写配置
 
@@ -325,6 +328,11 @@ services:
 ### 各版本新增的字段
 
 清单用到下面某一版新增的字段时，`spec` 至少写那一版，`plugin check` 会逐项检查。
+
+**0.14**
+
+- `x-wonton.install_timeout_secs`：安装最多等多久（见“健康检查”）。
+- `secrets.<名字>.generate.encoding` 的新取值 `base64url`（无填充的 base64url，见“插件密钥”）。
 
 **0.13**
 
@@ -2250,8 +2258,9 @@ MCP 请求头（`{secret:…}`）引用不到按 Bot 收存的密钥——一个
 
 **核心生成（`generate`）**
 
-- `bytes` 是随机字节数，1 到 1024，默认 32；`encoding` 是 `hex`（默认，小写）或 `base64`（带填充、不换行），
-  结果和 `openssl rand -hex <bytes>`、`openssl rand -base64 <bytes>` 的格式相同。
+- `bytes` 是随机字节数，1 到 1024，默认 32；`encoding` 是 `hex`（默认，小写）、`base64`（带填充、不换行）或
+  `base64url`（无填充、URL 安全，给只收这种字符的启动参数用），前两种和 `openssl rand -hex <bytes>`、
+  `openssl rand -base64 <bytes>` 的格式相同。
 - 首次安装时生成，以 `WONTON_SECRET_<名字大写>` 注入；升级时保留，升级新增的项在升级时生成。已有的值
   不随 `bytes`、`encoding` 的修改重新生成。
 - 做法同 Runtipi 的 `random` 字段：随机生成后保存，不像 Umbrel 的 `APP_SEED` 那样从主种子派生——只恢复了
@@ -2577,6 +2586,11 @@ x-wonton:
   - 借用的服务自动依赖被借用的服务，先启动后者；被借用的服务重建时（如开关局域网访问），借用的服务跟着重建。
   - 两个服务要么都是 Bot 服务，要么都不是。
 
+- `environment` 里写 `on`、`off`、`yes`、`no` 时加引号：YAML 1.1 的工具（docker compose 等）会把裸写的这几个
+  当成布尔，交给容器的是 `true`/`false`。列表写法（`- KEY=值`）整条是字符串，不受影响。`plugin check` 对裸写的
+  提醒。
+- `depends_on` 里的每个名字都得是同一个 compose 文件里的服务，否则安装会去等一个永远不存在的容器；`plugin check`
+  提醒。
 - 所有插件容器默认带 `no-new-privileges:true`，核心写进 HostConfig，不需要声明。依赖 setuid 的镜像
   （容器里用 sudo 的）写 `security_opt: [no-new-privileges:false]` 退回 Docker 默认，这一项不算权限。
 - 高权限字段按服务生效，必须和 `x-wonton.permissions` 里的权限一一对应：
@@ -2607,6 +2621,8 @@ x-wonton:
 - 写上 `start_period` 和 `start_interval`：安装时能尽快判断就绪，启动慢时又不会误判失败。安装、启动、
   升级时等健康的时限取自各服务 `healthcheck.start_period` 的最大值（加余量），上限 60 分钟；都没写时等
   300 秒。装载要几分钟的插件（大模型类）写长一点的 `start_period`，不会被 300 秒误判失败。
+- 安装时要下载大文件（模型、词表）的插件还可以写 `x-wonton.install_timeout_secs`：安装、启动、升级、重建等
+  主人等着的操作至少等这么久，60 到 1800 秒。它只放宽下限，`start_period` 的规则不变。
 - 检查只能用镜像里已有的命令，distroless 之类的镜像里没有 `curl`、`wget`。
 - `scratch`、`distroless` 这类镜像里连 shell 都没有，写不出能用的 `healthcheck`，改用核心代探测：
   `webui.health` 写网页服务的一个路径（如 `/health`），核心按它探。只有 `webui.service` 指向的服务能这么写，
