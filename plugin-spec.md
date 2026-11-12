@@ -1138,6 +1138,7 @@ x-wonton:
 | `WONTON_MATRIX_USER_ID`、`WONTON_MATRIX_ACCESS_TOKEN` | `matrix.bot` | Bot 的 Matrix 用户 ID 和访问令牌。 |
 | `WONTON_MATRIX_ALLOWED_USERS` | `matrix.bot` | 逗号分隔的 Matrix 用户 ID，Bot 只听这些人的话：私人 Bot 是归属人，共享 Bot 是主人。家人加入、联系人批了之后名单变长，核心重建这个 Bot 的服务，沿用设备和令牌。 |
 | `WONTON_MATRIX_HOME_ROOM` | `matrix.bot` | Bot 的主房间：核心替用户建好的、和 Bot 的加密私聊，定时任务的结果发到这里。 |
+| `WONTON_MATRIX_SERVER_NAME` | `provides.matrix_rtc` | Matrix 服务器名，如 `example.org`，可能带端口。见“通话授权服务”。 |
 | `WONTON_SECRET_<名字>` | `secrets` 里由核心生成的项 | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`。 |
 | `WONTON_SETTING_<名字>` | 清单声明了这一项，服务引用了它 | 设置，名字转成大写，如 `WONTON_SETTING_BUDGET`。值的写法见“插件设置”。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
@@ -1213,6 +1214,7 @@ x-wonton:
   | --- | --- | --- | --- |
   | `models` | OpenAI 兼容 API（`provides.models.apis`），凭据按使用方隔离。使用方照旧申请 `models` 权限，不经 `wants` 声明 | 要，在 `provides.models.credentials` 里 | 否 |
   | `egress_proxy` | HTTP 代理，出口设置在提供方。没有使用方声明，不能写在 `requires`/`wants` 里 | 不用 | 否（风险由 `egress.proxy` 高权限管） |
+  | `matrix_rtc` | MatrixRTC 的 LiveKit 授权服务（MSC4195：`/sfu/get`、`/get_token`），见“通话授权服务”。没有使用方声明，不能写在 `requires`/`wants` 里 | 不用 | 否 |
   | `torrent_client` | qBittorrent Web API v2（`/api/v2/`） | 不用 | 否 |
   | `jellyfin` | Jellyfin 的 HTTP API | 要，在 `provides.jellyfin.credentials` 里 | 否 |
   | `static_web` | 托管：HTTP 静态文件（RFC 9110 的 `GET`/`HEAD`、条件请求、`Range`），站点根是挂载点下的 `<X-Wonton-Plugin>/`。`runtime: static_web` 的插件隐含 `requires` 它，不用再写 | 不用 | 否 |
@@ -1302,6 +1304,30 @@ x-wonton:
 - 升级提供方时，新版本不再提供某个有人 `requires` 的能力、又没有别的提供方能接上，拦下这次升级并写明是谁
   在用。
 - 启动 `requires` 了某能力的插件时，它选用的提供方停着就先启动提供方。
+
+### 通话授权服务（`matrix_rtc`）
+
+MatrixRTC 通话（Element Call 这类客户端）要一个 LiveKit 授权服务：拿 Matrix 的 OpenID 令牌换 LiveKit 令牌
+（MSC4195，如 lk-jwt-service）。通话插件这样声明：
+
+```yaml
+x-wonton:
+  provides:
+    matrix_rtc: { service: jwt, port: 8080 }
+```
+
+- Matrix 服务器公布的授权服务地址（MSC4143 的 `livekit_url`）固定是 Matrix 对外地址下的 `/_wonton/matrix-rtc`，
+  核心去掉这个前缀转给提供方的 `port`。只放行已配对的设备，不要 Matrix 访问令牌：授权靠请求体里的 OpenID 令牌，
+  由提供方去验。CORS 预检也转过去，由提供方自己答。
+- 没装提供方、它没在运行或连不上时，这个地址回 503，错误类别 `matrix_rtc_unavailable`，带
+  `Access-Control-Allow-Origin: *`，网页读得到原因。
+- 一台服务器只能装一个，装第二个时安装失败（`conflict`）；服务器没接 Matrix 时装不上（`matrix_unavailable`）。
+- 核心给提供方注入 `WONTON_MATRIX_SERVER_NAME`，提供方拿它填“可以建房间的服务器”名单（lk-jwt-service 的
+  `LIVEKIT_FULL_ACCESS_HOMESERVERS`）。
+- 验 OpenID 令牌：在提供方的网络里，服务器名（去掉端口）解析到核心。核心在 443 上用 HTTPS 只答
+  `/.well-known/matrix/server`（指回自己）和 `/_matrix/federation/v1/openid/userinfo`（转给 Matrix 服务器），别的路径
+  404，别的插件来的请求 403。证书是核心给服务器名签的自签证书，提供方要跳过对它的校验（lk-jwt-service 设
+  `LIVEKIT_INSECURE_SKIP_VERIFY_TLS=YES_I_KNOW_WHAT_I_AM_DOING`）。
 
 ## 预装插件
 
