@@ -342,10 +342,10 @@ services:
 - 安装时注入的变量：`WONTON_GPU_VENDOR`，给了显卡时才有（见“安装时注入的变量”）。
 - `x-wonton.matrix_widget`：插件网页作为房间里的 widget 打开（见“房间里的 widget”）。
 - `x-wonton.license_url`：非 SPDX 许可证的全文地址（见“商店信息”）。
+- `x-wonton.clients`、权限 `network.clients`、`webui.guests` 和变量 `WONTON_EXTERNAL_URL`（见“第三方 App 入口”）。使用它们的清单至少写 `spec: "0.14"`。
 
 **0.13**
 
-- `x-wonton.clients`、权限 `network.clients`、`webui.guests` 和变量 `WONTON_EXTERNAL_URL`（见“第三方 App 入口”）。使用它们的清单至少写 `spec: "0.13"`。
 - `webui.oidc.owner_groups` 改名 `webui.oidc.admin_groups`：这个人是这个应用的管理员时才加这些组（见“OIDC”）。
 - `webui.oidc.role_claim`：只认“管理员”和“普通用户”、从专门的声明读角色的应用用它（见“OIDC”）。
 - `webui.health`：核心代探测的健康路径，给写不出 compose 健康检查的镜像用（见“健康检查”）。
