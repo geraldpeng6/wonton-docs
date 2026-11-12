@@ -335,6 +335,7 @@ services:
 - 确认卡片显示在发起的会话里：`tools/call` 的 `params._meta` 可带 `app.wonton/origin`，或给总线请求配固定请求头
   `wonton-origin-room`、`wonton-origin-thread`；Agent 权限确认的请求体可带 `origin`（见“工具与 MCP 总线”）。这些是调用时
   的写法，不是清单字段，清单不必因此改 `spec`。
+- 安装时注入的变量：`WONTON_GATEWAY_CIDR`（见“网关代登录”）和 `WONTON_APP_HOST`（见“安装时注入的变量”）。
 
 **0.12**
 
@@ -828,10 +829,10 @@ webui:
   ```yaml
   environment:
     ND_REVERSEPROXYUSERHEADER: Remote-User
-    ND_REVERSEPROXYWHITELIST: ${WONTON_CORE_ADDRESS}/32
+    ND_REVERSEPROXYWHITELIST: ${WONTON_GATEWAY_CIDR}
   ```
 
-  这条管 `proxy.headers` 模板使用了 `{user}`、`{name}`、`{email}` 或 `{role}` 的插件。只信任核心，指 `webui.service` 的环境变量引用了 `${WONTON_CORE_ADDRESS}`，值里也没有 `0.0.0.0/0`、`::/0`。做不到时（应用没有这个选项，或者作者放宽了），按 `webui.service` 怎么开：
+  这条管 `proxy.headers` 模板使用了 `{user}`、`{name}`、`{email}` 或 `{role}` 的插件。只信任核心，指 `webui.service` 的环境变量引用了 `${WONTON_GATEWAY_CIDR}` 或 `${WONTON_CORE_ADDRESS}`，值里也没有 `0.0.0.0/0`、`::/0`。做不到时（应用没有这个选项，或者作者放宽了），按 `webui.service` 怎么开：
 
   | 插件 | `plugin check` | 核心 |
   | --- | --- | --- |
@@ -1126,6 +1127,8 @@ x-wonton:
 | `WONTON_OIDC_ISSUER`、`WONTON_OIDC_CLIENT_ID`、`WONTON_OIDC_CLIENT_SECRET` | `webui.sso: oidc` | OIDC 客户端配置。签发方是核心在插件网络里的别名 `http://auth.wonton.internal:<端口>`。 |
 | `WONTON_OIDC_AUTH_URL`、`WONTON_OIDC_TOKEN_URL`、`WONTON_OIDC_USERINFO_URL` | `webui.sso: oidc` | 各端点地址，给不支持发现文档的应用（如 Grafana）。`AUTH_URL` 是浏览器地址（`auth.<基础域名>`），另外两个在插件网络里。 |
 | `WONTON_CORE_ADDRESS` | `webui.sso: proxy` | 核心在这个插件网络里的地址（网段的最后一个可用地址，如 `172.18.255.254`），核心容器重建后不变。写进应用的“信任的代理地址”，见“网关代登录”。 |
+| `WONTON_GATEWAY_CIDR` | `webui.sso: proxy` | 同一个地址的 CIDR 写法（如 `172.18.255.254/32`）：只收 CIDR 的应用直接用它，不用拼 `${WONTON_CORE_ADDRESS}/32`。 |
+| `WONTON_APP_HOST` | 声明了 `webui` | `WONTON_APP_URL` 里的主机名，带端口、默认端口不带（如 `app-photos.wonton.example`）。compose 插值取不出网址里的这一段，按 Host 认请求的应用（`ALLOWED_HOSTS`、`config.hosts` 这类白名单）用它收紧。 |
 | `WONTON_OWNER_NAME` | `owner.identity` | 用户的用户名，装好后不变，和 OIDC 的 `sub`、`preferred_username` 以及代登录模板的 `{user}` 同值，见下文。 |
 | `WONTON_OWNER_EMAIL` | `owner.identity` | 用户的内部邮箱 `<用户名>@wonton.internal`，装好后不变，和 OIDC 的 `email`、代登录模板的 `{email}` 同值。发到这个地址的信转进用户的“Wonton”私聊，见“发信”。 |
 | `WONTON_MODEL_BASE_URL` | `models` | 模型网关 OpenAI 兼容接口的地址，以 `/v1` 结尾，如 `http://models.wonton.internal:8080/v1`。没接上网关时是空字符串。 |
@@ -2629,7 +2632,7 @@ x-wonton:
 - 每个 `compose` 插件有独立的 Docker 网络 `wonton-<slug>`，容器叫 `wonton-<slug>--<服务名>`，服务之间用服务名互访。服务名是
   合法的 DNS 标签：只能有小写字母、数字和 `-`，不能含 `--`，不能以 `-` 开头或结尾。每个服务在插件网络里还有一个
   别名 `<服务名>.<slug>.wonton.internal`（如 `mcp.app-immich-photos.wonton.internal`），核心访问插件的网页、MCP
-  和内网资源时都用它当 Host；宿主网络的服务照旧走中继。别名和实例名无关：网络本来就按实例分开。核心加入所有插件网络并负责
+  和内网资源时都用它当 Host；宿主网络的服务照旧走中继（中继的 unix 套接字在核心的中继目录里，默认 `/run/wonton/relay`，按实例和插件取哈希短名，安装目录再长也放得下）。别名和实例名无关：网络本来就按实例分开。核心加入所有插件网络并负责
   路由。插件之间、插件和 Tuwunel、插件和模型网关都不共用网络。开发环境的核心设了实例名（`WONTON_INSTANCE`）时，网络、
   容器和命名卷的名字在 `wonton-` 后多一段 `<实例名>--`。
 - 核心以低于默认的网关优先级（`gw_priority: -1`）接入插件网络，默认路由和发布的端口始终在核心自己的网络上。
@@ -2671,10 +2674,11 @@ x-wonton:
   > 数据发出去，只能靠审核。
 - 核心的地址：每个插件网络的最后一个可用地址留给核心，容器自动分配只用网段的前一半，核心容器重建后地址不变（`WONTON_CORE_ADDRESS`）。
 - 走代理：要走代理才能出网的主机，用户配一次代理地址，插件不用管。出口容器 `wonton-egress` 接在每个出网插件的网络上，别名 `egress.wonton.internal`，是这些网络里除核心和插件服务之外唯一的容器。连宿主时用网关地址或局域网地址都行，和不配代理时一样。
-  - 核心给声明了 `network.egress` 的插件的每个服务（写了 `network_mode: none` 或 `host` 的除外：`none` 不出网，`host` 走宿主自己的路由，不经出口容器；`service:<服务名>` 照常写）写好 `HTTP_PROXY`、`HTTPS_PROXY`、`http_proxy`、`https_proxy`、`NO_PROXY`、
+  - 核心给声明了 `network.egress` 的插件的每个服务（写了 `network_mode: none` 的除外：`none` 不出网；`service:<服务名>` 照常写）写好 `HTTP_PROXY`、`HTTPS_PROXY`、`http_proxy`、`https_proxy`、`NO_PROXY`、
     `no_proxy` 和 `NODE_USE_ENV_PROXY=1`。地址是出口容器 `http://egress.wonton.internal:3128`，插件看不到用户的代理。`NO_PROXY` 已经包含回环、
     `.localhost`、`.wonton.internal`、本插件的服务名和 IPv4 私有网段（10/8、100.64/10、169.254/16、172.16/12、192.168/16；插件网络和
     `--lan` 网络的网段都在这些私有网段里。IPv6 网段条目会把 httpx 这类读了 `NO_PROXY` 的客户端建连接时弄崩，所以不写）。没配代理时这些变量都不写。这是核心唯一直接写进容器环境的一组变量。
+  - 宿主网络的服务解析不了 `egress.wonton.internal`（宿主网络里没有 Docker 的 DNS）：这些服务拿到的是出口容器在插件网络里的固定地址 `http://<地址>:3128`，同样只由核心写，换代理地址不变。没有宿主网络服务的插件不受影响。
   - compose 里写了同名代理变量时以 compose 为准，写成空就是这个服务不走代理。写了 `NO_PROXY` 或 `no_proxy` 时核心不覆盖，把自己名单里缺的条目并到后面：作者写的名单常常只有自己的服务，少了核心的条目，插件内部的请求会被送去用户的代理，上游解析不了插件的服务名，得到 502 一类的错。不要写具体的代理地址：官方索引不收，换一台主机也用不了。
   - 镜像自己带了代理变量（`docker inspect --format '{{.Config.Env}}' <镜像>` 能看到）时，在 compose 里把它们写成空（`HTTP_PROXY: ""` 这样，核心不注入的名字也一样），或者从镜像里去掉。不然这些变量原样进容器：没配代理、或插件没声明 `network.egress` 时核心什么都不注入，应用照着镜像里的地址走，同插件的内部请求也发给那个代理。声明了 `network.egress` 且配了代理时，核心注入的变量盖掉镜像里同名的，核心不管的名字（如 `ALL_PROXY`）原样保留。
   - 程序不读这些变量但有自己的代理设置（SearXNG 的 `outgoing.proxies`、Java 的 `-Dhttp.proxyHost`）时，在配置里引用 `${WONTON_PROXY_URL}`。
