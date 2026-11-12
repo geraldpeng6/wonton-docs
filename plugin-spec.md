@@ -91,7 +91,7 @@ x-wonton:
 | `agent.skills.mount` | 否 | 仅 `kind: agent` 允许。容器内的绝对路径，不能是 `/`，不能含 `..` 路径段，不能是 `/proc`、`/sys`、`/dev` 或它们的子路径。填写 Agent 原生会读取、但自己不会往里写的技能目录。 |
 | `provides` | 否 | 向其他插件提供的能力：`models`（见“模型网关”，只能 `kind: system` 的插件声明）、`egress_proxy`（见“网络”的“代理插件”），以及其他能力，键是能力名，见“能力依赖”。托管能力（`static_web`、`web_storage`）还要写 `mount`，见“提供方”。 |
 | `requires`、`wants` | 否 | 依赖的能力名列表：`requires` 的能力没有提供方装不上，`wants` 有提供方就用、没有照装。见“能力依赖”。 |
-| `gpu` | 否 | 拿到显卡的服务（`services`）。要和 `devices.gpu` 权限一起声明，见“显卡”。 |
+| `gpu` | 否 | 拿到显卡的服务（`services`），以及按显卡厂商换的镜像（`images`）。要和 `devices.gpu` 权限一起声明，见“显卡”。 |
 | `lan` | 否 | 在局域网上开放的端口（`ports`）。要和 `network.lan` 权限一起声明，见“局域网”。 |
 | `tunnel` | 否 | 经隧道映射到已配对设备本机的端口（`ports`），见“隧道端口”。不需要新增权限，与 `lan` 独立。 |
 | `secrets` | 否 | 插件自己的密钥：核心生成后注入，或插件运行中生成、交给核心保管（见“插件密钥”）。 |
@@ -334,6 +334,9 @@ services:
 - `x-wonton.install_timeout_secs`：安装最多等多久（见“健康检查”）。
 - `secrets.<名字>.generate.encoding` 的新取值 `base64url`（无填充的 base64url，见“插件密钥”）。
 - 安装时注入的变量：`WONTON_GATEWAY_CIDR`（见“网关代登录”）和 `WONTON_APP_HOST`（见“安装时注入的变量”）。
+- `x-wonton.gpu.images`：按显卡厂商换服务的镜像，和 `requirements.gpu.vendors` 一起写（见“显卡”的“按厂商换镜像”）。
+- `requirements.gpu.vendors` 的顺序从此是优先级；`vendors` 里不认识的厂商算清单不合法。只用旧字段的清单不用因此抬版本，但顺序写反了会选到不想要的那家。
+- 安装时注入的变量：`WONTON_GPU_VENDOR`，给了显卡时才有（见“安装时注入的变量”）。
 
 **0.13**
 
@@ -1159,6 +1162,7 @@ x-wonton:
 | `WONTON_SETTING_<名字>` | 清单声明了这一项，服务引用了它 | 设置，名字转成大写，如 `WONTON_SETTING_BUDGET`。值的写法见“插件设置”。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
 | `WONTON_BOT_AI_LEVEL` | `matrix.bot` 或 `bots.services` 里的服务 | 用这个 Bot 的人能让 AI 动手到哪一级：`read_only`（只给只读的工具）、`admin_approves_deletes`（改的自己确认，删的要管理员批）、`self_confirms`（都自己确认）。共享 Bot 取用它的人里最低的一级。Agent 插件凭它选自带工具的模式：不是 `self_confirms` 时用最严的那档；不认识的值按 `read_only`。 |
+| `WONTON_GPU_VENDOR` | 给了显卡 | 选中那家的显卡的厂商：`amd`、`nvidia`、`intel`。各家参数不同时用它插值；不给显卡时不存在（不是空串）。 |
 | `WONTON_PERMISSION_DOCKER_SOCKET`、`_DEVICES_GPU`、`_DEVICES_SERIAL`、`_DEVICES_USB` | 对应的可选权限开着 | 值是 `1`。关着时不定义（不是空串），用 `${VAR:+x}` 或 `[ -n "$VAR" ]` 判断。给这个插件的所有服务，不只拿到字段的那个。 |
 | `WONTON_LAN_ADDRESSES` | `network.lan` | 局域网端口开在哪些地址上，逗号分隔，如 `192.0.2.10`。地址变化时的重建规则见“局域网”。 |
 | `WONTON_PROXY_URL` | `network.egress` | 出口容器的地址 `http://egress.wonton.internal:3128`，用户没配代理时是空串。给有自己代理设置、不读 `HTTP_PROXY` 的程序用，见“网络”。 |
@@ -2387,7 +2391,7 @@ requirements:
 | `arch` | `amd64`、`arm64`。不写表示都行。插件的每个服务都要能在列出的每种架构上跑，见下。 | Docker 报告的架构。 |
 | `memory` | 应用能跑起来的内存下限（官方写的最低要求，不是推荐值）。写法是数字加 `M` 或 `G`，如 `512M`、`1.5G`，1G 等于 1024M。 | 主机的总内存。标称 8G 的机器实际报出来不到 8G，所以到要求的 90% 就算够。 |
 | `gpu.need` | `required`（默认）：没有符合的显卡就装不上。`optional`：照常装，不给设备，插件自己退回 CPU。 | 见“显卡”。 |
-| `gpu.vendors` | 能用的厂商：`amd`、`nvidia`、`intel`。不写表示哪家都行。 | 驱动可用的显卡的厂商。 |
+| `gpu.vendors` | 能用的厂商：`amd`、`nvidia`、`intel`。不写表示哪家都行。**顺序是优先级**：主机有几家时用写在前面的那家，见“显卡”。 | 驱动可用的显卡的厂商。 |
 | `gpu.memory` | 显存下限，写法同 `memory`。 | 显卡报告的显存，到要求的 90% 就算够（标称 8G 的卡实际报 8188 MiB）。集成显卡报告的够要求就算满足，不够算查不出来：划给核显的量不是它的上限。驱动不报告的算查不出来。 |
 
 - `arch` 管整个插件，没有“某个服务只在某种架构上装”的写法：插件在一台主机上装上，就是每个服务都在跑，工具和网页都能用。
@@ -2455,6 +2459,7 @@ x-wonton:
 | 字段 | 说明 |
 | --- | --- |
 | `gpu.services` | 拿到显卡的服务，至少一项，不能重复，都要在 `services` 里。其余服务什么都不拿。 |
+| `gpu.images` | 按显卡厂商换的镜像，见下面的“按厂商换镜像”。 |
 | `requirements.gpu` | 要什么样的显卡，见“对宿主的要求”。没写时等于 `need: required`。 |
 
 三者缺一不可：写了 `gpu` 或 `requirements.gpu` 却没申请 `devices.gpu`，或者申请了 `devices.gpu` 却没写 `gpu.services`，
@@ -2481,6 +2486,43 @@ x-wonton:
 - 核心在容器里看不到宿主的 `/dev`，compose 把它只读、不递归地挂到 `/host/dev`（`WONTON_HOST_DEV`，`/dev/shm` 这类子挂载
   不带进来）；没挂时申请显卡的插件装不上，原因写明，核心不拿容器自己的 `/dev` 当宿主的。
 - 装好后核心不再盯着显卡：显卡拔了、驱动换了，容器自己会出错。
+
+### 按厂商换镜像（`gpu.images`）
+
+同一个应用，显卡厂商不同常常要用不同的镜像：同一个镜像换到另一家的显卡上，要么用不上加速，要么起不来。`compose` 里服务的
+`image` 写**通用镜像**：没有专门版本的厂商用它，不给显卡时也用它。按厂商换的镜像写在 `gpu.images` 里，只换 `image`
+这一个字段，可以换仓库。
+
+```yaml
+services:
+  ollama:
+    image: ollama/ollama:0.40.16@sha256:910d…        # 通用镜像（NVIDIA 的 CUDA 版也用它）
+x-wonton:
+  permissions: [devices.gpu]
+  gpu:
+    services: [ollama]
+    images:
+      ollama:
+        amd: ollama/ollama:0.40.16-rocm@sha256:85b3…
+  requirements:
+    gpu: { need: optional, vendors: [nvidia, amd] }
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `gpu.images.<服务>.<厂商>` | 完整的镜像引用，厂商取值和 `requirements.gpu.vendors` 一样（`amd`、`nvidia`、`intel`）。服务要在 `gpu.services` 里，厂商也要在 `requirements.gpu.vendors` 里，厂商版镜像不能和通用镜像相同。 |
+| `requirements.gpu.vendors` | 写了 `gpu.images` 就必须写它，`images` 里的厂商都要在里面。`vendors` 说的是这个插件在哪几家的显卡上能用，`images` 只说其中哪几家换镜像；不写 `vendors` 等于哪家都行，Intel 主机上就会拿通用镜像去配 Intel 的设备。 |
+
+- `vendors` 的顺序是优先级：主机有几家的显卡时用写在前面的那家，所以写反了会选到不想要的那家。`vendors` 里有、`images` 里
+  没有的厂商用通用镜像，这是作者说过的组合。
+- 不给显卡时一律用通用镜像。`need: optional` 本来就要求插件自己退回 CPU，它的通用镜像得能在 CPU 上跑；只有厂商专门版、
+  没有能跑 CPU 的镜像的插件写 `need: required`。主机没有支持的显卡就是“本机显卡不支持”，不会静默退回 CPU。
+- 核心给拿到显卡的服务注入 `WONTON_GPU_VENDOR`（`amd`、`nvidia`、`intel`），给了显卡才有，见“安装时注入的变量”。各家的
+  命令行参数或环境变量不同时，用 `${WONTON_GPU_VENDOR}` 插值，不用为每家各写一份 `environment`。
+- 厂商版镜像常比通用镜像支持的架构少（只有 `amd64`）。核心在预览时读镜像的平台列表，不支持本机架构时这家算不能用，接着看
+  下一家，都不行就按上面两条处理。`requirements.arch` 仍管整个插件，只对通用镜像。
+- 厂商版镜像和通用镜像一样要按摘要固定，官方索引收录每一个厂商版镜像之前都要先在那种显卡的真实主机上实测通过。
+- 换镜像不算权限变宽：用户确认的仍是 `devices.gpu`。设备和组不因为换了镜像而改变。
 
 ## 隧道端口（`tunnel.ports`）
 
