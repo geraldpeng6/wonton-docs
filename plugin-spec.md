@@ -1201,7 +1201,7 @@ x-wonton:
   - `org.matrix.msc4039.download_file`、`org.matrix.msc4515.rtc_transports`、`io.element.requires_client`
   - `org.matrix.msc4407.receive.sticky_event`、`org.matrix.msc4407.send.sticky_event`、`m.always_on_screen`、`org.matrix.msc4533.rtc_livekit_get_token`、`org.matrix.msc4533.rtc_livekit_delegate_delayed_leave`
 
-具体批准多少由 App 决定：页面请求的、清单写的和 App 允许的交集。声明了不等于一定拿到，页面要按实际批准的能力降级。
+具体批准多少由 App 决定：页面请求的、清单写的和 App 允许的交集。声明了不等于一定拿到，页面要按实际批准的能力降级。漏声明的要到运行时才暴露：`plugin check` 认得出 Element Call 的页面（`url` 查询带 `widgetId`、`baseUrl`、`intent`）时，对照 Element Call 的所需能力清单，把清单没声明的项作为提醒（不是不合格）列出来；别的 widget 应用不查。
 
 ## 静态网页和外部网页
 
