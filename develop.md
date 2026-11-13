@@ -38,7 +38,7 @@ scripts/dev.sh token
 | `screenshots/` | 商店截图 |
 | `scripts/check.sh` | 检查插件包 |
 | `scripts/dev.sh` | 启停开发环境、安装插件、查看日志和冒烟 |
-| `scripts/smoke-probes.sh` | 插件自己的冒烟探测钩子，不属于开发套件 |
+| `scripts/smoke-probes.sh` | 插件自己的冒烟探测钩子；套件只在你还没有这份文件时补模板起点，已有的不覆盖 |
 | `scripts/publish.sh` | 检查、发布；有自建镜像时先构建并推送 |
 | `scripts/kit.files`、`scripts/KIT` | 套件文件清单和来源提交 |
 | `.github/workflows/check.yml` | 调用模板的可复用检查工作流 |
