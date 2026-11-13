@@ -6,8 +6,8 @@
 容器插件的清单是 `docker-compose.yml`；compose 引用的配置文件、图标和设置表单与它放在同一个目录里，合称插件包。
 没有 `x-wonton` 的 compose 文件可以由用户手动导入，但必须先补全权限声明。插件包可以是一个 Git 仓库的根目录，
 也可以是仓库里的一个子目录（一个仓库放多个插件，见“发布与来源”），发布就是打 tag。可运行的示例见
-[插件模板](https://github.com/geraldpeng6/wonton-plugin-template)，官方插件的列表见
-[官方索引](https://github.com/geraldpeng6/wonton-store)。
+[插件模板](https://github.com/wontonapp/wonton-plugin-template)，官方插件的列表见
+[官方索引](https://github.com/wontonapp/wonton-store)。
 
 ## 示例
 
@@ -2909,7 +2909,7 @@ x-wonton:
 
 可选权限照常审：最高级（`docker.socket`）即使是可选的，也要写清为什么要；插件关着也必须能用主要功能，`off_loss` 和 README 说的要是一回事；README 的权限一节把可选项单列，`about` 不把可选能力说成自带。
 
-公开仓库 `geraldpeng6/wonton-store` 的 `index.json`：
+公开仓库 `wontonapp/wonton-store` 的 `index.json`：
 
 ```json
 {
@@ -2926,7 +2926,7 @@ x-wonton:
       "compose": "<docker-compose.yml 的原文>"
     },
     {
-      "source": "github:geraldpeng6/wonton-agents/agents/codex",
+      "source": "github:wontonapp/wonton-agents/agents/codex",
       "version": "0.1.0",
       "commit": "<40 位提交号>",
       "files": { "…": "…（路径相对插件包目录，不带子目录前缀）" },
@@ -3043,7 +3043,7 @@ x-wonton:
   这些不在里面；解析不了时和 `check` 一样报错，退出码 1。
 - 开发时从本地目录安装：把 `pack` 打出的 tar 上传到安装接口（见“插件包”），或者在 App 里选这个文件。装上后不检查升级。改了以后
   上传到升级接口（`POST /_wonton/api/plugins/{id}/upgrade`），保留数据。
-- 模板仓库 `geraldpeng6/wonton-plugin-template` 带开发环境和检查、发布的脚本。开发环境用发布的核心镜像在本机起一套
+- 模板仓库 `wontonapp/wonton-plugin-template` 带开发环境和检查、发布的脚本。开发环境用发布的核心镜像在本机起一套
   核心，和正式安装是同一份 compose，换掉项目名、核心的容器名（`WONTON_CORE_CONTAINER`）和实例名
   （`WONTON_INSTANCE`），几套开发环境可以共用一台 Docker，同一个插件也能同时装在几套里。
 - 没有配对设备也能走完会改数据的工具：`scripts/dev.sh approve` 批准等回答的卡片，`--watch` 一直批准。它用主人令牌请求

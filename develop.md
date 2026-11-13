@@ -1,6 +1,6 @@
 # 插件开发指南
 
-从[插件模板](https://github.com/geraldpeng6/wonton-plugin-template)新建自己的仓库，把示例换成你的应用。本指南集中说明开发、检查和发布流程；清单字段、权限和 Compose 规则以[插件规范 v0.8](plugin-spec.md)为准，不在这里重复。插件仓库的 README 只介绍这个插件自己的用途和操作。
+从[插件模板](https://github.com/wontonapp/wonton-plugin-template)新建自己的仓库，把示例换成你的应用。本指南集中说明开发、检查和发布流程；清单字段、权限和 Compose 规则以[插件规范 v0.8](plugin-spec.md)为准，不在这里重复。插件仓库的 README 只介绍这个插件自己的用途和操作。
 
 在云吞内让 Agent 写插件时，使用 [Agent Skill](skills/wonton-plugin/SKILL.md) 的工具流程；下面的脚本面向有 Docker 的开发主机，不要求环境内的 Agent 安装 Docker。
 
@@ -10,7 +10,7 @@
 - `git`、`curl`（7.76 或更新）、`python3`。
 - Docker 与仓库位于同一台主机：开发环境的数据目录使用仓库内的路径，网页使用该主机的端口。Docker 在别的机器时，按[在远程主机上开发](#在远程主机上开发)操作。
 
-不用安装云吞，不要用 root 执行脚本。套件使用发布的核心镜像 `ghcr.io/geraldpeng6/wonton-core` 检查插件和启动开发环境。
+不用安装云吞，不要用 root 执行脚本。套件使用发布的核心镜像 `ghcr.io/wontonapp/wonton-core` 检查插件和启动开发环境。
 
 ## 先跑起来
 
@@ -133,7 +133,7 @@ MCP 两条路径都复用 Hermes 官方镜像内的 [Python MCP SDK（MIT）](ht
 
 ### 选择核心镜像
 
-默认核心镜像是 `ghcr.io/geraldpeng6/wonton-core:stable`。第一次启动时可指定：
+默认核心镜像是 `ghcr.io/wontonapp/wonton-core:stable`。第一次启动时可指定：
 
 ```bash
 WONTON_CORE_IMAGE=<核心镜像> scripts/dev.sh up
