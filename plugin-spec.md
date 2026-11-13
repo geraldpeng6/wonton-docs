@@ -1,4 +1,4 @@
-# 插件规范 `x-wonton`（草案 v0.14）
+# 插件规范 `x-wonton`（草案 v0.15）
 
 > 草案，字段可能调整。正式发布之前规范直接改，不保留旧写法：核心只认当前的写法，插件跟着升。
 
@@ -67,6 +67,44 @@ x-wonton:
     memory: 2G
 ```
 
+### 编排器类插件
+
+编排器自己也是一个 Bot，同时提供 `agent_acp` 给别的前端使用，并通过同一能力把任务交给其他 Agent。下面的清单与核心契约测试里的示例一致：
+
+```yaml
+name: orchestrator
+services:
+  orchestrator:
+    image: ghcr.io/example/orchestrator:1
+    environment:
+      WONTON_AGENT_ACP_URL: ${WONTON_AGENT_ACP_URL}
+      WONTON_MCP_URL: ${WONTON_MCP_URL}
+      WONTON_MATRIX_HOMESERVER: ${WONTON_MATRIX_HOMESERVER}
+      WONTON_MATRIX_USER_ID: ${WONTON_MATRIX_USER_ID}
+      WONTON_MATRIX_ACCESS_TOKEN: ${WONTON_MATRIX_ACCESS_TOKEN}
+      WONTON_MATRIX_ALLOWED_USERS: ${WONTON_MATRIX_ALLOWED_USERS}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+
+x-wonton:
+  spec: "0.15"
+  id: app.example.orchestrator
+  version: 1.0.0
+  kind: agent
+  title: { zh: 任务编排, en: Task orchestrator }
+  description: { zh: 把复杂任务交给多个 Agent 协作完成, en: Coordinate multiple Agents to complete complex tasks }
+  agent:
+    protocol: matrix
+  bot:
+    display_name: { zh: 编排器, en: Orchestrator }
+  provides:
+    agent_acp:
+      service: orchestrator
+      port: 8080
+  requires: [agent_acp]
+  permissions: [matrix.bot, tools]
+```
+
 ## 字段
 
 | 字段 | 必填 | 说明 |
@@ -90,8 +128,8 @@ x-wonton:
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
 | `agent` | `kind=agent` 时必填 | `protocol`：`matrix`（Agent 自己登录 Matrix，须声明 `matrix.bot`）或 `acp`（经 ACP 桥接入）。可选 `login`，见“Agent 插件”。 |
 | `agent.skills.mount` | 否 | 仅 `kind: agent` 允许。容器内的绝对路径，不能是 `/`，不能含 `..` 路径段，不能是 `/proc`、`/sys`、`/dev` 或它们的子路径。填写 Agent 原生会读取、但自己不会往里写的技能目录。 |
-| `provides` | 否 | 向其他插件提供的能力：`models`（见“模型网关”，只能 `kind: system` 的插件声明）、`egress_proxy`（见“网络”的“代理插件”），以及其他能力，键是能力名，见“能力依赖”。托管能力（`static_web`、`web_storage`）还要写 `mount`，见“提供方”。 |
-| `requires`、`wants` | 否 | 依赖的能力名列表：`requires` 的能力没有提供方装不上，`wants` 有提供方就用、没有照装。见“能力依赖”。 |
+| `provides` | 否 | 向其他插件提供的能力：`models`（见“模型网关”，只能 `kind: system` 的插件声明）、`egress_proxy`（见“网络”的“代理插件”），`agent_acp`（见“Agent 插件”）以及其他能力，键是能力名，见“能力依赖”。托管能力（`static_web`、`web_storage`）还要写 `mount`，见“提供方”。 |
+| `requires`、`wants` | 否 | 依赖的能力名列表：`requires` 的能力没有提供方装不上，`wants` 有提供方就用、没有照装。提供方可以声明自己提供的同一能力；核心选提供方时排除自身。见“能力依赖”。 |
 | `gpu` | 否 | 拿到显卡的服务（`services`），以及按显卡厂商换的镜像（`images`）。要和 `devices.gpu` 权限一起声明，见“显卡”。 |
 | `lan` | 否 | 在局域网上开放的端口（`ports`）。要和 `network.lan` 权限一起声明，见“局域网”。 |
 | `clients` | 否 | 第三方 App 的入口：`http` 和 `tcp`。要和 `network.clients` 权限一起声明，见“第三方 App 入口”。 |
@@ -331,6 +369,10 @@ services:
 ### 各版本新增的字段
 
 清单用到下面某一版新增的字段时，`spec` 至少写那一版，`plugin check` 会逐项检查。
+
+**0.15**
+
+- `provides.agent_acp`、`requires`/`wants: [agent_acp]` 和注入变量 `WONTON_AGENT_ACP_URL`（见“能力依赖”和“Agent 插件”）。
 
 **0.14**
 
@@ -1332,6 +1374,7 @@ x-wonton:
 | `WONTON_MODEL_API_KEY` | `models` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。没接上网关时是空字符串。 |
 | `WONTON_MODEL_DEFAULT` | `models` | 默认模型名，由网关决定（magpie 是路由组 `group/wonton-default`）。没接上网关时是空字符串。 |
 | `WONTON_<能力名大写>_URL` | `requires` 或 `wants` 了某个能力 | 使用方访问提供方的地址：核心在插件网络里的别名 `<能力名>.wonton.internal`。名字转大写、非字母数字换成 `_`，如 `WONTON_TORRENT_CLIENT_URL`。见“能力依赖”。 |
+| `WONTON_AGENT_ACP_URL` | `requires` 或 `wants` 了 `agent_acp` | ACP 提供方地址，如 `http://agent_acp.wonton.internal`；使用方只通过 WebSocket 的 `/acp` 连接，核心负责选择提供方和注入身份、链、上限。 |
 | `WONTON_<能力名大写>_KEY` | 同上，且提供方声明了 `credentials` | 只属于本插件的凭据。见“能力依赖”。 |
 | `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，路径里带着这个 Bot 的总线令牌，如 `http://mcp.wonton.internal:8080/mcp/<令牌>`；没有 Bot 的插件不带令牌段，如 `http://mcp.wonton.internal:8080/mcp`。 |
 | `WONTON_NOTIFY_URL` | `notify` | 发通知的地址：核心在插件网络里的别名，如 `http://notify.wonton.internal:8080/notices`，见“通知”。 |
@@ -1426,6 +1469,7 @@ x-wonton:
   | `static_web` | 托管：HTTP 静态文件（RFC 9110 的 `GET`/`HEAD`、条件请求、`Range`），站点根是挂载点下的 `<X-Wonton-Plugin>/`。`runtime: static_web` 的插件隐含 `requires` 它，不用再写 | 不用 | 否 |
   | `web_storage` | 托管：WebDAV（RFC 4918）整文件读写的子集，见“静态网页的数据” | 不用 | 否 |
   | `personal_data` | 位置和健康数据的存取：`POST /location`、`POST /health`、`GET /query`、`DELETE /data`、`GET /export`、`POST /cleanup`；每个请求带 `X-Wonton-User`（数据属于谁），类型名和 JSON 形状见 wontonapp/wonton 的 `wonton-protocol` 库里 `personal_data` 的文档和常量 | 要，在 `provides.personal_data.credentials` 里 | 否 |
+  | `agent_acp` | ACP over WebSocket（`/acp`）。核心注入 `X-Wonton-Plugin`、`X-Wonton-User`、`X-Wonton-Bot`、`X-Wonton-Chain` 和 `X-Wonton-Max-Depth`、`X-Wonton-Max-Rounds`、`X-Wonton-Max-Tokens`；错误按 `permission_denied`、`busy`、`limit_reached`（`depth`、`rounds`、`cost`）、`stopped`、`invalid_input`（`self_call`、`loop`）或上游错误分类 | 不用 | 是 |
 
   接口有不兼容的变化时换一个新名字（如 `search2`），能力名不带版本号。高权限能力见下面的“高权限能力”。
 - **第三方定义的**：`x-<作者>.<名字>`，作者和名字都用小写字母、数字、连字符，如 `x-acme.ledger`。核心只按名字
@@ -1433,7 +1477,8 @@ x-wonton:
   “第三方定义的能力”。
 
 写了不带 `x-` 又不在表里的能力名，安装失败并说明“这份核心不认识能力 X，升级核心后再装”。同一个能力不能既在
-`requires` 又在 `wants`；提供能力的插件不能再 `requires` 别的能力（可以 `wants`）。
+`requires` 又在 `wants`。提供某项能力的插件可以在 `requires` 或 `wants` 中声明自己提供的同名能力；核心选提供方时排除这个插件：
+`requires` 只有自己时装不上并提示需要另一个提供方，`wants` 只有自己时照装但不建立自连。其他能力照旧不能这样声明。
 
 ### 使用方
 
@@ -2219,6 +2264,9 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
   | `wonton__set_profile` | 否 | 改你自己的 Bot 的名字或头像，不需要用户确认。`name`：新名字，去掉首尾空白后 1 到 32 个字符，不含控制字符，不能用核心（Wonton、云吞、雲吞）或用户的名字，不分大小写。`avatar`：静态头像在 outbox 里的相对路径。`avatars`：要改的状态，每项是相对 outbox 的路径，写 `null` 清掉这个状态，没写的不动。不收 `mxc://`。成功后删掉用过的 outbox 文件，失败时保留。每个 Bot 每小时最多成功改 10 次，超了返回 `rate_limited` 和还要等的秒数。 |
   | `wonton__user_locale` | 否 | 某人用的语言。`user_id` 是这台服务器上的 Matrix ID，省略时是主人；替某个人发言时一定要传他的 `user_id`，省了会拿到主人的语言。返回 `locale`（他最近一次请求的第一个语言标签，BCP 47 原样）和按偏好排的 `languages`（`*` 去掉）；没有记录时 `locale` 是 `null`、`languages` 是空数组。核心不替插件选默认语言。查主人以外的人要申请 `owner.identity`，没申请时一律 `permission_denied`（存在的人和陌生人是同一个错，不申请就探不出家里有谁）；不是本服务器的 ID 是 `not_this_server`，本服务器上不认识的人（含 Bot、已移除的家人）是 `not_found`。 |
   | `wonton__help` | 否 | Wonton 和 App 的帮助文档，见下面的“帮助文档”。 |
+  | `wonton__hand_off` | 是 | `target_bot`（含 `plugin_id`、`bot`）和非空 `message`；把首轮交给本服务器的目标 Bot，立即返回 `session`、`chain`，不等目标完成。调用方必须声明 `agent_acp`。 |
+  | `wonton__hand_off_status` | 否 | 可选 `session`；不填时列出当前 Bot 从当前房间和话题交出的会话，返回状态、链、时间和最近回复摘要。只读，不叫醒目标、不计轮数。 |
+  | `wonton__send_message` | 是 | `recipient` 和 `body`；给 Bot 归属人的家人或好友发消息。通常先发确认卡片，批准后返回出箱项 ID，不等待私聊投递。 |
 
 - 插件目录就是官方索引（见“发布与来源”）。Bot 能装官方索引里的插件和自己写的插件（见“Agent 写插件”），不能装社区插件。
 - 敏感的调用会一直等到用户回答或者确认过期（10 分钟）。确认卡片不是聊天消息：核心推送给该回答它的用户，Wonton App 把它显示在
@@ -2243,6 +2291,46 @@ Agent 用编号调 `wonton__view_file`、`wonton__share_file`，用户的设备�
 - 用户在 App 里点了“我来操作”时，这个插件的敏感调用先停住，不发卡片也不执行，用户交还后才继续判定。这段最多 10 分钟，
   和卡片各算各的，所以 Agent 的工具超时要超过 20 分钟。只读工具照常执行。停得太久或者停住的调用太多时返回错误，
   `_meta` 的 `app.wonton/failure` 是 `owner_operating`：调用明确没有执行，过一会可以重试。
+
+### Agent 调用链工具
+
+这三个工具只出现在声明了 `requires: [agent_acp]` 或 `wants: [agent_acp]` 的插件的 Bot 工具列表里。调用必须属于当前 ACP 会话和当前链；没有会话、会话不属于调用方或调用链已结束时，核心返回 `permission_denied`、`not_found` 或 `invalid_input`，不伪装成一次新的调用。
+
+**`wonton__hand_off`**
+
+参数：
+
+```json
+{"target_bot":{"plugin_id":"app.codex","bot":"owner"},"message":"修登录页并运行测试"}
+```
+
+`target_bot` 只能是本服务器上的 Bot，且目标必须听链代表的人；目标是调用方自己、或位于这次会话的祖先路径上时拒绝，分别是 `invalid_input` 的 `self_call` 或 `loop`。核心检查层数、轮数、花费和停链状态，然后经 `agent_acp` 开 `session/new` 并发出首轮。首轮已经写入目标连接后立即返回：
+
+```json
+{"session":"s-2","chain":"c-1"}
+```
+
+调用方不会收到目标的结果转发；目标在原房间、原话题里自己说进度和结果，调用方用 `wonton__hand_off_status` 查询，或等目标点名叫回。相同调用方会话和相同 MCP 请求 ID 的重试复用原会话；同一会话交给同一 Bot 且原文完全相同、原会话还在运行或等待权限时也复用。原会话结束、失败或停下后，同一句话可以开新会话。
+
+目标 Bot 不归链代表的人，或这是该插件第一次连到这个 Bot 时，先发 `HandOffConsent` 确认卡片。卡片写清“发起处 → 目标 Bot”，目标 Bot 的归属人确认后才开连接；交给自己名下已经确认过的 Bot 不重复询问。
+
+常见错误类别是：`invalid_input`（参数、自调、绕圈）、`permission_denied`（未声明能力、目标不听链代表的人、不是本地 Bot 或无权查看）、`limit_reached`、`stopped`、`busy`、`dependency_stopped`、`upstream_error`、`service_unavailable` 和 `storage`。这些类别来自核心，插件不要按人话消息猜原因。
+
+**`wonton__hand_off_status`**
+
+参数是可选的 `session` 字符串；省略时只列出当前 Bot 从当前房间和话题交出的会话。每项包含 `session`、目标 `bot`、`chain`、`status`、可空的 `stop_reason`、`started_at`、`last_activity_at` 和最多 2000 字的 `summary`。`status` 是 `running`、`waiting_permission`、`ended`、`stopped`、`limit_reached` 或 `failed`，不认识的值按 `other` 处理。这个工具只读，不发 ACP 帧、不叫醒目标、不增加轮数；查另一个 Bot 的会话返回 `permission_denied`，核心重启后找不到的旧会话返回 `not_found`。
+
+**`wonton__send_message`**
+
+参数为 `recipient` 和 `body`：
+
+```json
+{"recipient":"mom","body":"周末回来吗？"}
+```
+
+收件人必须是这个 Bot 归属人的家人或好友，陌生人直接返回 `permission_denied`，不发确认卡片。正常情况下核心发 `SendMessage` 确认卡片给 Bot 归属人，卡片显示收件人和完整正文；批准后工具返回 `{"outbox_item":"<项目 ID>"}`，不等待私聊投递。主人可以按收件人打开持续放行，但链的发起人不是这个 Bot 的归属人时每条仍需确认。
+
+桥从 `GET /agent/outbox` 取到 `Message` 后，以 Bot 身份发进和收件人的私聊，用出箱项 ID 作幂等事务 ID，再在同一路径回报事件 ID 或失败类别。参数错误是 `invalid_input`，无 Bot、无链路或无权限是 `permission_denied` 或 `source_unavailable`，出箱存储失败是 `storage`；投递没有私聊时回报 `no_room`，不能在工具调用里假报已经送达。
 
 **Bot 存文件**
 
@@ -2336,9 +2424,58 @@ Agent 自带的工具（shell、文件这类不经 MCP 总线的）要动手之�
 
 ## Agent 插件
 
-`kind: agent` 的插件是一个 Bot 的驱动。`protocol: matrix` 的 Agent 自己登录 Matrix；`protocol: acp` 的由 ACP 桥接到聊天。
+`kind: agent` 的插件是一个 Bot 的驱动。`protocol: matrix` 的 Agent 自己登录 Matrix；`protocol: acp` 的由 ACP 桥接到聊天。编排器也是一个 Bot：它可以同时 `provides.agent_acp`，并在 `requires` 或 `wants` 里声明 `agent_acp`，把任务交给其他 Agent。核心选择提供方时排除编排器自己；只有自己提供时，`requires` 装不上，`wants` 则不建立自连。
 桥在 `session/new` 交给 Agent 的 `mcpServers[].headers` 里放这个会话的 `wonton-origin-room`（和 `wonton-origin-thread`），
 Agent 调总线时自然带上，确认卡片就显示在这个会话里，Agent 不用改。
+
+### ACP 运行时和编排器
+
+声明 `agent_acp` 的提供方必须在自己的服务上提供 ACP WebSocket `/acp`。使用方连接注入的 `WONTON_AGENT_ACP_URL`，把路径加成 `/acp`；不能绕过核心直接访问提供方。核心只把带提供方令牌的连接转给它，并覆盖使用方自带的同名请求头：
+
+- `X-Wonton-Plugin`：使用方插件 ID；
+- `X-Wonton-User`：链代表的人；
+- `X-Wonton-Bot`：目标 Bot，格式为 `<插件 ID>#<Bot 名>`；
+- `X-Wonton-Chain`：调用链 ID；
+- `X-Wonton-Max-Depth`、`X-Wonton-Max-Rounds`、`X-Wonton-Max-Tokens`：这条链的层数、轮数和 token 上限；
+- `Authorization: Bearer <提供方令牌>`：只有提供方网关服务能使用，不能写进清单或交给 Agent。
+
+提供方和使用方都不能自行改变这些值。连接或请求被核心拒绝时，使用方按类别处理：`permission_denied`（身份、Bot 或归属人不允许）、`busy`（使用方连接数已满）、`limit_reached`（`depth`、`rounds` 或 `cost`）、`stopped`（链已停）、`invalid_input`（自调或绕圈）和上游错误。`limit_reached`、`stopped` 和 `invalid_input` 不要自动重试或换一条链继续原任务。
+
+**轮次登记。** 桥在每次 `session/prompt` 前先用总线令牌访问 `POST /agent/chains`，并在 `X-Wonton-Bot-Token` 里带这个 Bot 的 Matrix 访问令牌。总线令牌来自 `WONTON_MCP_URL` 的路径；只有总线令牌不够。`start` 的请求包括 ACP `session`、`room`、可选的 Matrix `thread`、实际 `sender` 和触发消息的 `event_id`：
+
+```http
+POST /agent/chains
+X-Wonton-Bot-Token: <Bot 的 Matrix 访问令牌>
+Content-Type: application/json
+
+{"phase":"start","session":"s-1","room":"!room:example.org","thread":"$root","sender":"@owner:example.org","event_id":"$event"}
+```
+
+核心成功才返回 `{ "chain": "<链 ID>", "layer": 1 }`，桥随后才发送 `session/prompt`；失败时返回带类别的错误，不得把这一轮发给 Agent。轮次成功、取消或出错后，桥用同一令牌发送 `{"phase":"end","session":"s-1"}`。MCP 请求使用 `wonton-session: s-1` 头，核心用它把工具调用归到当前轮次。
+
+**出箱。** 桥用同一条门和同一个 `X-Wonton-Bot-Token` 长轮询 `GET /agent/outbox`，没有项目时得到 `null`；取到项目后在同一路径 `POST` 回报：
+
+```json
+{"id":"out-1","kind":{"type":"cancel_turn","chain":"c-1","session":"s-1"}}
+```
+
+`CancelTurn` 要求桥对该 ACP 会话发送 `session/cancel`，并让这个会话所有未决的权限请求返回 `cancelled`，再回报 `{"id":"out-1","result":{"result":"sent","event_id":""}}`。`Message` 项则要求桥以 Bot 身份把正文发进收件人的私聊，再回报发送的 Matrix 事件 ID。未知项目要跳过并按失败类别回报，不能猜它的动作。
+
+**权限卡片过期。** Agent 发起 `session/request_permission` 后，核心的确认卡片过期时，桥必须先向同一 ACP 会话发送 `session/cancel`，再把原权限请求回答为 `{"outcome":{"outcome":"cancelled"}}`。不要先回 `cancelled`：取消是撤掉这一轮的动作，顺序反了会让 Agent 继续执行。
+
+### 调用链载体
+
+每轮 `session/prompt` 的 `_meta` 可以带 `app.wonton/chain`，值只有这两个字段：
+
+```json
+{"_meta":{"app.wonton/chain":{"id":"<链 ID>","depth":1}}}
+```
+
+`id` 是核心发的链 ID，`depth` 是带这个载体的会话所在层数。核心给下一跳的 `session/new` 也会写这个对象；编排器把收到的对象原样抄到下一跳的 `session/new`，不生成新 ID、不把层数清零。不认识调用链的 Agent 可以不带它，那一跳按新链处理。
+
+链 ID、层数、轮数和花费以核心账本为准，不以 Agent 自报为准：已登记且属于当前使用方的链，下一跳层数是 `max(账本层数, depth) + 1`；链 ID 未登记、已结束或不属于当前使用方时开新链，继续使用的 `depth` 加一；没有载体时从第 1 层开始；已停的链仍返回 `stopped`；载体缺字段、类型不对、`depth` 为负数或超出范围时返回 `invalid_input`，不建立会话。
+
+所有新的 `session/prompt` 都计入这条链的轮数，模型网关的 token 也按链记账。达到层数、轮数或花费上限时核心返回 `limit_reached` 并发上限卡片；停链后所有新的轮次、ACP 请求和模型请求都返回 `stopped`。
 
 **账号登录。** 模型默认经模型网关。Agent 官方程序能用账号登录时，在 `agent.login` 里声明，核心经引导和插件详情的接口把选项交给 App：
 
