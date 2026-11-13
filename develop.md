@@ -1,6 +1,6 @@
 # 插件开发指南
 
-从[插件模板](https://github.com/geraldpeng6/wonton-plugin-template)新建自己的仓库，把示例换成你的应用。本指南集中说明开发、检查和发布流程；清单字段、权限和 Compose 规则以[插件规范 v0.8](plugin-spec.md)为准，不在这里重复。插件仓库的 README 只介绍这个插件自己的用途和操作。
+从[插件模板](https://github.com/geraldpeng6/wonton-plugin-template)新建自己的仓库，把示例换成你的应用。本指南集中说明开发、检查和发布流程；清单字段、权限和 Compose 规则以[插件规范](plugin-spec.md)为准，不在这里重复。插件仓库的 README 只介绍这个插件自己的用途和操作。
 
 在云吞内让 Agent 写插件时，使用 [Agent Skill](skills/wonton-plugin/SKILL.md) 的工具流程；下面的脚本面向有 Docker 的开发主机，不要求环境内的 Agent 安装 Docker。
 

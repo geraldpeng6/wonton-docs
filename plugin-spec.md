@@ -361,6 +361,7 @@ services:
 - 安装时注入的变量：申请了 `notify` 的插件多拿到 `WONTON_SMTP_HOST`、`WONTON_SMTP_PORT`、`WONTON_MAIL_FROM`（见“发信”）。
 - `WONTON_OWNER_EMAIL`、OIDC 的 `email` 声明和 `{email}` 一律是用户的内部邮箱，总有值，见“安装时注入的变量”。
 - `webui.oidc.requires_email` 删掉：邮箱总有值，不用再声明，清单里写了会因未知字段报错。
+- 模型网关使用方改写 `wants: [models]`；提供方保留 `provides.models`，使用方保留 `WONTON_MODEL_*` 专用变量（见“模型网关”）。
 
 **0.10**
 
@@ -1073,7 +1074,6 @@ x-wonton:
 | --- | --- | --- |
 | `storage.share.<名称>:read` / `:write` | — | 读或写某个共享文件夹，如 `photos`、`documents`、`music`、`downloads`。设备上传的文件在 `transfers` 里。 |
 | `storage.home:read` / `:write` | — | 读或写当前用户的私人空间。 |
-| `models` | — | 有模型网关就用它：没接上时照样安装，见“模型网关”。 |
 | `tools` | — | 经核心的 MCP 总线调用核心和其他插件的工具，见“工具与 MCP 总线”。 |
 | `plugins.health` | — | 读所有插件的健康状态，见“插件健康探测”。 |
 | `matrix.bot` | — | 以 Bot 身份收发消息，见“Matrix Bot”。 |
@@ -1142,12 +1142,12 @@ x-wonton:
 | `WONTON_APP_HOST` | 声明了 `webui` | `WONTON_APP_URL` 里的主机名，带端口、默认端口不带（如 `app-photos.wonton.example`）。compose 插值取不出网址里的这一段，按 Host 认请求的应用（`ALLOWED_HOSTS`、`config.hosts` 这类白名单）用它收紧。 |
 | `WONTON_OWNER_NAME` | `owner.identity` | 用户的用户名，装好后不变，和 OIDC 的 `sub`、`preferred_username` 以及代登录模板的 `{user}` 同值，见下文。 |
 | `WONTON_OWNER_EMAIL` | `owner.identity` | 用户的内部邮箱 `<用户名>@wonton.internal`，装好后不变，和 OIDC 的 `email`、代登录模板的 `{email}` 同值。发到这个地址的信转进用户的“Wonton”私聊，见“发信”。 |
-| `WONTON_MODEL_BASE_URL` | `models` | 模型网关 OpenAI 兼容接口的地址，以 `/v1` 结尾，如 `http://models.wonton.internal:8080/v1`。没接上网关时是空字符串。 |
-| `WONTON_MODEL_ANTHROPIC_BASE_URL`、`WONTON_MODEL_GEMINI_BASE_URL` | `models`，且网关提供该接口 | Anthropic Messages、Gemini 接口的地址，按各自 SDK 的约定不带 `/v1`。没接上网关时是空字符串。 |
-| `WONTON_MODEL_API_KEY` | `models` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。没接上网关时是空字符串。 |
-| `WONTON_MODEL_DEFAULT` | `models` | 默认模型名，由网关决定（magpie 是路由组 `group/wonton-default`）。没接上网关时是空字符串。 |
-| `WONTON_<能力名大写>_URL` | `requires` 或 `wants` 了某个能力 | 使用方访问提供方的地址：核心在插件网络里的别名 `<能力名>.wonton.internal`。名字转大写、非字母数字换成 `_`，如 `WONTON_TORRENT_CLIENT_URL`。见“能力依赖”。 |
-| `WONTON_<能力名大写>_KEY` | 同上，且提供方声明了 `credentials` | 只属于本插件的凭据。见“能力依赖”。 |
+| `WONTON_MODEL_BASE_URL` | `wants: [models]` | 模型网关 OpenAI 兼容接口的地址，以 `/v1` 结尾，如 `http://models.wonton.internal:8080/v1`。没接上网关时是空字符串。 |
+| `WONTON_MODEL_ANTHROPIC_BASE_URL`、`WONTON_MODEL_GEMINI_BASE_URL` | `wants: [models]`，且网关提供该接口 | Anthropic Messages、Gemini 接口的地址，按各自 SDK 的约定不带 `/v1`。没接上网关时是空字符串。 |
+| `WONTON_MODEL_API_KEY` | `wants: [models]` | 只属于本插件（多 Bot 时只属于这个 Bot）的网关凭据。没接上网关时是空字符串。 |
+| `WONTON_MODEL_DEFAULT` | `wants: [models]` | 默认模型名，由网关决定（magpie 是路由组 `group/wonton-default`）。没接上网关时是空字符串。 |
+| `WONTON_<能力名大写>_URL` | `requires` 或 `wants` 了通用能力（不含 `models`、`egress_proxy`） | 使用方访问提供方的地址：核心在插件网络里的别名 `<能力名>.wonton.internal`。名字转大写、非字母数字换成 `_`，如 `WONTON_TORRENT_CLIENT_URL`。见“能力依赖”。 |
+| `WONTON_<能力名大写>_KEY` | 同上，且提供方声明了 `credentials` | 只属于本插件的凭据。`models` 使用上面的专用变量，不注入 `WONTON_MODELS_URL`、`WONTON_MODELS_KEY`。见“能力依赖”。 |
 | `WONTON_MCP_URL` | `tools` | MCP 总线的地址（Streamable HTTP）：核心在插件网络里的别名，路径里带着这个 Bot 的总线令牌，如 `http://mcp.wonton.internal:8080/mcp/<令牌>`；没有 Bot 的插件不带令牌段，如 `http://mcp.wonton.internal:8080/mcp`。 |
 | `WONTON_NOTIFY_URL` | `notify` | 发通知的地址：核心在插件网络里的别名，如 `http://notify.wonton.internal:8080/notices`，见“通知”。 |
 | `WONTON_SMTP_HOST`、`WONTON_SMTP_PORT` | `notify` | 应用发信用的 SMTP 服务器，如 `smtp.wonton.internal` 和 `25`。宣告 AUTH 但接受任何凭据；不强制加密，需要 STARTTLS 的应用直接用同一个端口，见“发信”。 |
@@ -1213,8 +1213,8 @@ x-wonton:
 
 核心不支持插件间依赖时，安装和升级含非空 `requires`、`wants`，或声明 `torrent_client`、`jellyfin`、第三方能力的
 `provides` 的插件均报 `unsupported`，提示升级核心；`plugin check` 仍校验这些声明，作者可以先写好清单。
-`models` 权限、`provides.models` 和 `provides.egress_proxy` 不受这道拦截影响。下面的连接和生命周期规则仅适用于
-支持这些能力的核心；字段的最低规范版本以“各版本新增的字段”收录为准。
+`provides.models` 和 `provides.egress_proxy` 不受这道拦截影响。下面的连接和生命周期规则仅适用于支持这些能力的核心；
+字段的最低规范版本以“各版本新增的字段”收录为准。
 
 ```yaml
 x-wonton:
@@ -1232,7 +1232,7 @@ x-wonton:
 
   | 能力 | 接口 | 凭据 | 高权限 |
   | --- | --- | --- | --- |
-  | `models` | OpenAI 兼容 API（`provides.models.apis`），凭据按使用方隔离。使用方照旧申请 `models` 权限，不经 `wants` 声明 | 要，在 `provides.models.credentials` 里 | 否 |
+  | `models` | OpenAI 兼容 API（`provides.models.apis`），凭据按使用方隔离。使用方写 `wants: [models]`，不能写进 `requires`；注入变量见“模型网关” | 要，在 `provides.models.credentials` 里 | 否 |
   | `egress_proxy` | HTTP 代理，出口设置在提供方。没有使用方声明，不能写在 `requires`/`wants` 里 | 不用 | 否（风险由 `egress.proxy` 高权限管） |
   | `matrix_rtc` | MatrixRTC 的 LiveKit 授权服务（MSC4195：`/sfu/get`、`/get_token`），见“通话授权服务”。没有使用方声明，不能写在 `requires`/`wants` 里 | 不用 | 否 |
   | `torrent_client` | qBittorrent Web API v2（`/api/v2/`） | 不用 | 否 |
@@ -1252,8 +1252,8 @@ x-wonton:
 ### 使用方
 
 - 访问地址是核心在插件网络里的别名 `<能力名>.wonton.internal`（第三方的如
-  `x-acme.ledger.wonton.internal`），核心认出来源、转发给它选用的提供方，并注入
-  `WONTON_<能力名大写>_URL`。插件和提供方不在同一个网络里，只能经这个别名访问。
+  `x-acme.ledger.wonton.internal`），核心认出来源、转发给它选用的提供方。通用能力注入
+  `WONTON_<能力名大写>_URL`，`models` 保留“模型网关”一节的专用变量。插件和提供方不在同一个网络里，只能经这个别名访问。
 - 核心转发时带上 `X-Wonton-Plugin: <使用方 ID>`，提供方据此区分是谁。没声明这个能力的插件访问别名得到
   403，提供方没在运行时得到 503。
 - 提供方没在运行（停了、异常、记录读不懂）时，`requires` 它的插件标为异常并写明是哪个提供方，提供方恢复后
@@ -1276,7 +1276,7 @@ x-wonton:
 ```
 
 - `service` 是 compose 里的服务，`port` 是它监听的端口；核心只转发到这个端口。
-- `credentials` 的形状和执行方式同模型网关的凭据命令（见“模型网关”的“凭据的签发与吊销”）：核心给每个使用方
+- 通用能力的 `credentials` 形状和执行方式同模型网关的凭据命令（见“模型网关”的“凭据的签发与吊销”）：核心给每个使用方
   签一个只属于它的凭据，注入 `WONTON_<能力名大写>_KEY`。能力表标了“不用凭据”的能力不声明它，提供方只认经
   核心转发来的请求。
 - **托管能力**（能力表里接口以“托管”开头的）的提供方还要写 `mount`：容器里的绝对路径，不能是 `/`，不能含 `..`，
@@ -1290,7 +1290,7 @@ x-wonton:
     kind: system
     provides:
       static_web: { service: web, port: 8080, mount: /srv/wonton }
-  ```
+  ````models` 的凭据和变量仍按“模型网关”的约定处理。
 - 同一能力可以装几个提供方。设置里每种能力有一个全局默认的提供方（装上第一个时它就是默认；默认的被卸掉时，
   核心换成装得最早的），使用方可以在自己的详情页里单独指定另一个，不跟默认走。
 
@@ -1395,14 +1395,29 @@ x-wonton:
 
 ## 模型网关
 
-模型请求只经模型网关（默认 magpie）。网关是一个声明了 `provides.models` 的系统插件（见“预装插件”）；
-核心把声明了 `models` 的插件接到它上面，给每个插件单独的凭据。
+模型网关让插件共用模型服务商设置。网关是声明了 `provides.models` 的系统插件（见“预装插件”）；核心按能力连接记录
+把使用方接到它选用的提供方，给每个插件单独的凭据。`provides.models` 的接口路径、默认模型、凭据和服务商命令保留专用字段。
 
 ### 使用方
 
+使用方在 `wants` 里声明可选的模型能力：
+
+```yaml
+x-wonton:
+  spec: "0.11"
+  wants: [models]
+  permissions: []
+```
+
+`models` 不能写进 `requires`，也不能写进 `optional_permissions`；网关不是安装门槛。
+
+变量沿用 `WONTON_MODEL_BASE_URL`、`WONTON_MODEL_API_KEY`、`WONTON_MODEL_ANTHROPIC_BASE_URL`、
+`WONTON_MODEL_GEMINI_BASE_URL` 和 `WONTON_MODEL_DEFAULT`，路径与默认路由组的含义不变（见“安装时注入的变量”）。
+不注入通用规则推导出的 `WONTON_MODELS_URL`、`WONTON_MODELS_KEY`，插件不用为这次声明变更改写模型配置。
+
 - 地址指向核心在插件网络里的别名 `models.wonton.internal`，由核心转发给网关（见“网络”），如
   `http://models.wonton.internal:8080/v1`。插件和网关不在同一个网络里，只能经这个别名访问；网关按来源地址认出
-  请求来自哪个插件网络，没申请 `models` 的插件得到 403 `permission_denied`，网关没在运行时得到 503
+  请求来自哪个插件网络，未声明使用这项能力或没有对应连接记录的请求得到 403 `permission_denied`，网关没在运行时得到 503
   `models_unavailable`。请求和响应都流式转发，不缓冲，也不设总超时。主机名一定带点：
   Hermes 把不带点的主机名当成本机模型服务，会去探测 Ollama 接口，而 magpie 正好兼容这组接口，结果每个
   请求都被加上 Ollama 专用的参数。
@@ -1412,12 +1427,13 @@ x-wonton:
 - 凭据默认可以用网关里的所有模型：插件和网关在同一台机器上，能访问就该能用。凭据由核心自动签发和注入，
   插件不用配置，作用是按插件记账和单独吊销。要限定某个插件能用的模型、设额度或限定账号，用户在网关自己的
   网页里改；核心不同步这些设置。
-- **网关可选。** `models` 的意思是“有网关就用”：没装、没就绪、或核心签发凭据失败，都照样安装，
+- **网关可选。** `wants: [models]` 的意思是“有网关就用”：首次没装、没就绪、或核心签发凭据失败，都照样安装，
   `WONTON_MODEL_*` 照样定义、值为空字符串，用户用自己的登录或 key 设置（详情页有“没接上”的轻提示）。
   不加“必需”档。插件在启动时按变量有没有值选路：有值走网关，没值走自己的设置。
 - 网关之后就绪（装上、起来、恢复）时，核心给没接上的使用方签发凭据并重建它们的容器，插件的启动选路在下一次
-  启动时生效；网关卸掉或坏了，使用方不动，提示变回“没接上”。
-- 安装预览只请求 `/models`，不发送可能计费的对话请求。`kind: agent` 即使没有申请 `models` 也给出默认路由提示，
+  启动时生效；网关卸掉或坏了，使用方不动，提示变回“没接上”。核心持久保存凭据和最近一次成功注入的变量；
+  网关不可用时重建仍用记下的值，恢复后按同一值对账。凭据和变量都没变时不重建容器。
+- 安装预览只请求 `/models`，不发送可能计费的对话请求。`kind: agent` 即使没有声明 `wants: [models]` 也给出默认路由提示，
   但不影响安装和状态：使用订阅账号的 ACP Agent 可能不经过模型网关。
 - 接上网关之后，核心按默认路由的探测结果给详情页的轻提示（不是错误，状态照常，见“凭据的签发与吊销”的记法）：
   约 30 秒一次的巡检只读 `GET <apis.openai>/models`，所有运行中的使用方共用一次结果；默认模型不在 `data` 里
@@ -1495,8 +1511,8 @@ x-wonton:
 - 时机：
   - 安装使用方时签发，再用这个凭据请求一次 `GET <openai 基础地址>/models`，返回 200 才算成功。返回 401
     说明网关里的同名凭据不是这个值，核心先 `revoke` 再 `issue` 一次；还是不行就报错。
-  - 网关每次启动后（安装、升级、核心重启后的恢复），核心按同样的步骤为所有使用方对一次账；对账失败的使用方
-    标为异常、写明原因。
+  - 网关每次启动后（安装、升级、核心重启后的恢复），核心按同样的步骤为已连接的使用方对账，再尝试接上未连接的使用方；
+    签发或验证失败不把使用方标为异常，详情页以 `models_not_connected` 轻提示带上原因。
   - 卸载使用方（删不删数据都一样）或删掉一个 Bot 时吊销，再从密钥库删除；重装是一个新值。网关已经卸载了就没有
     可吊销的；网关装着但没在运行时吊销不了，卸载如实失败。
 - 命令超时 30 秒。失败时错误里附上命令的标准错误输出，并区分“网关未就绪”和“网关拒绝”。
@@ -2774,12 +2790,12 @@ x-wonton:
   | `auth.wonton.internal` | `webui.sso: oidc` | 身份提供方的公开端点。签发方和后台端点用它，浏览器走 `auth.<基础域名>`，见“OIDC”。 |
   | `<slug>.<基础域名>` | 声明了 `webui` | 总是解析到核心网关；每 Bot 网页时仍指向默认 Bot。普通、全插件一份的网页允许本插件网络来源的自请求（`self_request`）不带会话转发，也不带身份；别的来源仍要会话。每 Bot 网页只取消该豁免，默认 Bot 也先拒绝插件网络来源，回 403 `permission_denied`。 |
   | 非默认 Bot 的 origin 主机名 | `webui.service` 在 `bots.services`，对应 Bot 已登记 | 每个主机名都须在本插件网络作为核心网关的 DNS 别名；请求到达网关后，插件网络来源同样回 403 `permission_denied`，不是 DNS 失败。命名见“每个 Bot 的网页”。 |
-  | `models.wonton.internal` | `models` | 模型网关声明的服务和端口。 |
+  | `models.wonton.internal` | `wants: [models]` | 使用方选用的模型网关声明的服务和端口。 |
   | `matrix.wonton.internal` | `matrix.bot` | Tuwunel 的 Matrix 客户端接口。 |
   | `mcp.wonton.internal` | `tools` | 核心的 MCP 总线。 |
   | `health.wonton.internal` | `plugins.health` | 只读的健康接口，见“插件健康探测”。 |
 
-  不让声明 `models` 的插件直接加入模型网关的网络：那样这些插件彼此也连通了，还能访问网关容器的所有端口。
+  不让使用模型能力的插件直接加入模型网关的网络：那样这些插件彼此也连通了，还能访问网关容器的所有端口。
   经核心转发只多一跳（核心网关的 p50 约 0.27 ms），却守住了插件之间的隔离，核心也能按插件
   限流和审计。Matrix 同理。
 - 出网：没有 `network.egress` 的插件网络是 Docker 的内部网络（`internal: true`）：不能访问外网和局域网，
@@ -3079,7 +3095,6 @@ x-wonton:
 
 ## 待定问题
 
-- 插件间依赖与通信的声明方式。
 - 官方索引的签名（minisign），签名后索引也能经镜像和国内的静态托管分发。
 - 快捷方式（`shortcuts`）的写法。
 - 插件升级时的数据迁移钩子。
