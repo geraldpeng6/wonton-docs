@@ -1313,7 +1313,7 @@ x-wonton:
 | 权限 | 风险级别 | 含义 |
 | --- | --- | --- |
 | `storage.share.<名称>:read` / `:write` | — | 读或写某个共享文件夹，如 `photos`、`documents`、`music`、`downloads`。设备上传的文件在 `transfers` 里。 |
-| `storage.home:read` / `:write` | — | 读或写当前用户的私人空间。 |
+| `storage.home:read` / `:write` | — | 读或写 Bot 归属人的私人空间，挂载点 `/wonton/home`，见“用户的私人空间（`storage.home`）”。 |
 | `models` | — | 有模型网关就用它：没接上时照样安装，见“模型网关”。 |
 | `tools` | — | 经核心的 MCP 总线调用核心和其他插件的工具，见“工具与 MCP 总线”。 |
 | `plugins.health` | — | 读所有插件的健康状态，见“插件健康探测”。 |
@@ -1364,7 +1364,45 @@ x-wonton:
 - 核心给这个插件的**所有**服务注入 `WONTON_PERMISSION_<名字>=1`（开着时才有，见“安装时注入的变量”），服务据此切换行为。NVIDIA 显卡在容器里没有设备节点可看，串口路径也不固定，所以别只看文件在不在。
 - 开关只重建渲染结果变了的服务（拿到或失去字段、变量变了），数据不动。
 
-核心兑现上表除了 `storage.home:*` 的全部权限。`storage.home:*` 清单里可以声明，但安装时如实报“尚未支持”。共享文件夹在数据目录的 `shares/<名称>` 下，只授权读时必须以 `:ro` 挂载，而且只能整个挂载，不能挂其中的子路径。
+核心兑现上表的全部权限。共享文件夹在数据目录的 `shares/<名称>` 下，只授权读时必须以 `:ro` 挂载，而且只能整个挂载，不能挂其中的子路径。私人空间见下节。
+
+### 用户的私人空间（`storage.home`）
+
+声明 `storage.home` 的插件，每个 Bot 服务挂归属人自己的私人空间，挂载点固定是 `/wonton/home`：默认 Bot 挂用户的，
+家人的私人 Bot 挂这个家人自己的。全插件一份的服务没有这个挂载点。
+
+```yaml
+name: journal
+services:
+  bot:
+    image: ghcr.io/example/journal:1
+    volumes:
+      - ${WONTON_BOT_DATA}:/data
+
+x-wonton:
+  spec: "0.14"
+  id: app.example.journal
+  version: 1.0.0
+  kind: app
+  title: { zh: 家人手记, en: Family Journal }
+  description: { zh: 给每个家人一本只属于自己的手记, en: A private journal for each family member }
+  permissions: [matrix.bot, storage.home:write]
+  bots:
+    services: [bot]
+```
+
+- 必须声明 `bots`，也因此要申请 `matrix.bot`（见“一个插件多个 Bot”）：只写 `storage.home` 不写 `bots` 的清单能通过清单校验，
+  但安装时拒绝，错误写明缺 `storage.home` 的授权。
+- 挂载由核心渲染，compose 里没有对应的写法。也不要在 Bot 服务里声明碰到 `/wonton/home` 的卷或 `tmpfs`：
+  目标含 `..`、与 `/wonton/home` 相同或在其上下的，安装时拒绝。
+- 只读还是读写由核心按归属人定，插件改不了：清单只声明 `:read` 时一律只读；声明了 `:write` 时，用户的默认 Bot
+  和家人的私人 Bot 读写，但家人角色里的 AI 限成只读时强制只读（角色由用户在 App 里管）。角色变了，核心重建
+  对应 Bot 的容器让挂载跟上。
+- 共享 Bot（归全家、主人管的 Bot）没有私人空间：声明了 `storage.home` 的插件建不了共享 Bot；已经有共享 Bot 的
+  插件装不上。归属人不再有私人空间（角色收回了“私人 Bot”、成员被移出）时，这个 Bot 的容器一并撤掉，不留旧挂载。
+- `/wonton/home` 是这个人的私人空间，不是插件私有的：声明了 `storage.home` 的插件挂到的是同一个目录，插件自己
+  的数据仍放 `${WONTON_APP_DATA}`。这个人从设备上传的文件在他的空间的 `transfers` 里，和共享文件夹一样。
+- 挂载点只在 Bot 服务里有：全插件一份的服务里没有 `/wonton/home`，代码要能处理它不存在。
 
 ## 安装时注入的变量
 
@@ -1947,6 +1985,8 @@ x-wonton:
   是 Bot 名（小写字母、数字和单个 `-`），`WONTON_BOT_DATA` 是 `${WONTON_APP_DATA}/bots/<Bot 名>`。
 - 隔离：Bot 服务挂载应用数据目录时只能挂自己的 `${WONTON_BOT_DATA}`，也不能用命名卷，这样一个 Bot 读不到
   别的 Bot 的记忆和凭据。
+- 声明了 `storage.home` 时，Bot 服务还挂归属人的私人空间到 `/wonton/home`，读写由核心按归属人定，
+  见“用户的私人空间（`storage.home`）”。
 - 依赖：Bot 服务可以依赖同一个 Bot 的服务和全插件一份的服务；全插件一份的服务不能依赖 Bot 服务。
   `mcp`、`provides` 不能指向 Bot 服务。`webui` 可以：每个 Bot 一份独立 origin，插件级入口指向默认 Bot
   `default` 且经过同一项插件网页权限检查；地址算法、访问权限和登录要求见“每个 Bot 的网页”。应用只监听回环地址时，
@@ -3421,8 +3461,6 @@ x-wonton:
 - 官方索引的签名（minisign），签名后索引也能经镜像和国内的静态托管分发。
 - 快捷方式（`shortcuts`）的写法。
 - 插件升级时的数据迁移钩子。
-- 多 Bot 时的存储授权：共享文件夹是插件级的授权，家人的私人空间（`storage.home`）要按 Bot 的用户分别
-  挂载。
 - `network.lan` 能不能和 `matrix.bot` 一起申请：Bot 的令牌能从旧容器读回（见“Matrix Bot”）后，地址变了也能重建。
 - 插件密钥在 App 里的查看（如应用的管理员密码）与轮换；收存的秘密在恢复数据时怎样交还插件。
 - compose 的 `secrets`：以文件形式交给容器的密钥，给遵循 `*_FILE` 约定的镜像用。
