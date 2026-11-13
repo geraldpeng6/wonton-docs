@@ -80,7 +80,7 @@ x-wonton:
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`license_url`、`tags`、`about`、`release_notes`、`setup` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
 | `notices` | 否 | 插件包里的许可和声明文件（UTF-8 文本）的路径列表，见“插件包”。官方索引要求必填。 |
-| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`accounts`（见“好友分享”）、`cross_origin_isolated`（见“跨源隔离”）、`health`（核心代探测的健康路径，见“健康检查”）。 |
+| `webui` | 否 | 作为小程序打开的入口：`service`、`port`、`path`（默认 `/`）、`sso`（`oidc`、`proxy`、`none`，默认 `none`）、`oidc`、`proxy`（见“网页入口与单点登录”）、`accounts`（见“好友分享”）、`cross_origin_isolated`（见“跨源隔离”）、`health`（核心代探测的健康路径，见“健康检查”）、`guests`（见“第三方 App 入口”的“访客链接”）。 |
 | `tabs` | 否 | 能放进侧边栏“我的应用”的应用页面，要和 `webui` 一起声明，见“应用页面”。 |
 | `matrix_widget` | 否 | 插件网页也是房间里的 Matrix widget：`url`、`entry`、`capabilities`，要和 `webui` 一起声明，见“房间里的 widget”。 |
 | `static_web` | 否 | 仅 `runtime: static_web` 允许：`root`（包里的静态文件目录，默认 `web`）、`fallback`（找不到的路径回这个文件）、`connect`（页面能连的外部来源），见“静态网页和外部网页”。 |
@@ -94,6 +94,7 @@ x-wonton:
 | `requires`、`wants` | 否 | 依赖的能力名列表：`requires` 的能力没有提供方装不上，`wants` 有提供方就用、没有照装。见“能力依赖”。 |
 | `gpu` | 否 | 拿到显卡的服务（`services`），以及按显卡厂商换的镜像（`images`）。要和 `devices.gpu` 权限一起声明，见“显卡”。 |
 | `lan` | 否 | 在局域网上开放的端口（`ports`）。要和 `network.lan` 权限一起声明，见“局域网”。 |
+| `clients` | 否 | 第三方 App 的入口：`http` 和 `tcp`。要和 `network.clients` 权限一起声明，见“第三方 App 入口”。 |
 | `tunnel` | 否 | 经隧道映射到已配对设备本机的端口（`ports`），见“隧道端口”。不需要新增权限，与 `lan` 独立。 |
 | `secrets` | 否 | 插件自己的密钥：核心生成后注入，或插件运行中生成、交给核心保管（见“插件密钥”）。 |
 | `permissions` | 是 | 安装时由用户确认的权限，见下表。没有权限时写空列表。 |
@@ -341,6 +342,7 @@ services:
 - 安装时注入的变量：`WONTON_GPU_VENDOR`，给了显卡时才有（见“安装时注入的变量”）。
 - `x-wonton.matrix_widget`：插件网页作为房间里的 widget 打开（见“房间里的 widget”）。
 - `x-wonton.license_url`：非 SPDX 许可证的全文地址（见“商店信息”）。
+- `x-wonton.clients`、权限 `network.clients`、`webui.guests` 和变量 `WONTON_EXTERNAL_URL`（见“第三方 App 入口”）。使用它们的清单至少写 `spec: "0.14"`。
 
 **0.13**
 
@@ -863,6 +865,141 @@ webui:
   `test` 不算），否则同样拒绝安装，见“健康检查”。
 - 用 `{secret:…}` 的插件分不出是谁在用：每个能打开这个小程序的人都以同一个应用身份登录。
 
+## 第三方 App 入口（`clients`）
+
+第三方原生 App（手机上的 Immich、Jellyfin、Git 客户端这些）只会填一个地址，也不认用户装的证书，所以它们走
+公共证书的 HTTPS 入口：家里有入口容器统一收发 TLS，按域名里的标签转给插件。局域网和公网两条路用同一套声明。
+
+```yaml
+x-wonton:
+  permissions: [network.clients]
+  clients:
+    http:
+      service: forgejo
+      port: 3000
+      single_host: false
+      auth:
+        credentials:
+          issue: [sh, /wonton/token.sh, issue, "{name}"]
+          revoke: [sh, /wonton/token.sh, revoke, "{name}"]
+          ends_sessions: true
+      public:
+        deny: [/admin, /user/sign_up]
+      auth_failures:
+        - { path: /user/login, status: [401, 403] }
+    tcp:
+      - { service: forgejo, port: 22, name: ssh }
+```
+
+- `clients` 和权限 `network.clients` 要一起写，只写一个时清单不合法；只声明 `webui.guests: true` 的部分例外（见“访客链接”）。`http`、`tcp` 至少一项。`http` 最多一个。
+- 权限不算高权限：装好不生效，用户按应用打开开关才生效，和 `network.lan` 不同。声明了 `network.clients` 的插件默认关掉
+  应用的自助注册，第一个账号只能由用户自己建。
+- `http.service` 要和 `http.port` 配成网页服务（见“网络”），TCP 入口不发布端口，全部经家里的服务器转给插件。
+- `http.port` 不能是 `mcp` 的端口，可以是 `webui` 的端口（有的应用网页和 API 同一个端口）。`tcp` 的端口不能是 `webui` 或
+  `mcp` 的端口：经网关加的请求头在 TCP 上伪造得了。
+- 插件按 `X-Forwarded-Host` 知道请求的地址。要固定地址的应用（往外登记回调、只认一个 `Host`）用变量
+  `WONTON_EXTERNAL_URL` 和 `http.single_host`，见下文。
+
+### 谁验证（`auth`）
+
+`gateway`、`credentials`、`app` 恰好写一个。
+
+**`gateway`：家里的服务器验证。** 应用认反向代理传来的用户名，或者本来不需要登录（Radicale 的 `http_x_remote_user`）。
+
+```yaml
+auth:
+  gateway:
+    headers:
+      X-Remote-User: "{user}"
+```
+
+家里的服务器只认 HTTP 的 `Basic`（用户名是用户的用户名）和 `Bearer`，通过后删掉 `Authorization`、按模板加请求头。
+模板和 `webui.proxy.headers` 一样（见“网关代登录”的模板说明）。没带或不对时回 401 和 `WWW-Authenticate: Basic`。
+每个客户端一个密码，吊销后下一个请求就失效，已经升级的 WebSocket 立即断开。
+
+Subsonic 的 `u`、`t`、`s` 这类协议私有的写法不进核心，用下一种或 `app`。
+
+**`credentials`：应用验证，核心发密码。** 和“凭据的签发与吊销”同一套约定：核心在插件的容器里执行声明的命令，看退出码。
+
+```yaml
+auth:
+  credentials:
+    issue: [sh, /wonton/password.sh, set, "{name}"]
+    verify: [sh, /wonton/password.sh, check, "{name}"]
+    revoke: [sh, /wonton/password.sh, revoke, "{name}"]
+    ends_sessions: true
+    service: sidecar
+    username: "{email}"
+    per_client: true
+    generates: false
+```
+
+| 字段 | 说明 |
+| --- | --- |
+| `issue` | 必填。把标准输入给的值设成密码，**不结束**已有的登录。可能被重复执行，每次结果要一样。 |
+| `verify` | 标准输入给值，退出码 0 表示有效。 |
+| `revoke` | 吊销。`per_client: true` 时必填。 |
+| `rotate` | 换值。`per_client: false` 时必填，也不能写 `revoke`。 |
+| `ends_sessions` | 必填，不设默认值：吊销和换值结不结束应用里已有的登录。写 `false` 的，同时在 `about` 里说明。 |
+| `service` | 跑命令的服务，默认 `http.service`。 |
+| `username` | 显示给用户填的用户名，默认 `{user}`。 |
+| `per_client` | 默认 `true`：每个客户端一个密码。应用里每个用户只能有一个密码时写 `false`，整个插件一个。 |
+| `generates` | 默认 `false`。为 `true` 时值由应用生成：`issue` 不读标准输入，把值写到标准输出的第一行（上限 4 KiB），其余不解析；这时必须写 `verify`。 |
+
+- 命令超时 30 秒。
+- 插件每次启动后核心对一次账：有 `verify` 只验证，无效时再 `issue`；没有 `verify` 就重新 `issue` 同一个值。
+- `revoke` 和 `rotate` 失败或超时都算结果未知，核心先记下来重试，所以这两个命令也要能重复执行。
+
+**`app`：应用自己的账号。** 核心不发密码，App 只给地址，写明用这个应用自己的账号。`tcp` 全部按这个算。必须写
+`setup_done`，写的是判断“管理员已经有了”的命令（退出码 0 是有，1 是还没有，其余算不确定）：首次注册没完成时入口
+打不开，免得别人在公网上抢先注册。
+
+```yaml
+auth:
+  app:
+    setup_done: [sh, /wonton/setup-done.sh]
+```
+
+### 公网上的路径（`public`）
+
+`public.allow` 和 `public.deny` 二选一，只作用于公网入口，局域网不受影响。按整段前缀匹配，不分大小写：`/share`
+匹配 `/share` 和 `/share/...`。要收外部回调的（n8n 这类）用 `public.allow` 列出那几条路径，其余路径只在家里能用。
+`allow` 不绕过 `auth`。
+
+### 验证失败的响应（`auth_failures`）
+
+声明哪些路径和状态码算验证失败：应用的登录接口在哪、错的时候回什么，比如 Immich 回 401。声明才计数，没声明的不算。
+`gateway` 模式不看它（这种入口只计带了 `Authorization` 的 401）。状态是 400–599。
+
+### 路径的写法
+
+`public` 和 `auth_failures` 的路径都要满足：以 `/` 开头；只能用 `A-Z`、`a-z`、`0-9`、`-._~!$&'()*+,=:@/`；不能有 `%`、
+`\`、`;`、`?`、`#`、空白，不能有 `.` 和 `..` 段；最长 256 字节。各应用解析路径的方式不同（有的解码一次再切段），只收
+一种写法，前缀匹配就没有歧义。客户端发来的地址里有百分号编码或 `;` 也没关系：拦它靠的是解码后也不会变成点段，
+转发的一直是原始路径。
+
+### 对外地址（`WONTON_EXTERNAL_URL`、`single_host`）
+
+引用了 `${WONTON_EXTERNAL_URL}` 的清单要声明 `clients.http` 或 `webui.guests: true`，否则清单不合法。值取用户实际
+打开的那个入口：公网入口开着是 `https://<标签>.<域名>`；否则局域网入口开着是 `https://<标签>.lan.<域名>:<端口>`；都没开
+时和 `WONTON_APP_URL` 相同。往外部服务登记回调地址、只认一个地址的应用用它，不要自己拼。
+
+`http.single_host: true` 给只认一个地址的应用：经任何入口进来的请求，`Host` 都改成这个地址的主机名，原来的放进
+`X-Forwarded-Host`，`X-Forwarded-Proto` 改成它的协议。开关入口时值会变，应用跟着重启。
+
+### TCP 入口（`tcp`）
+
+给不是 HTTP 的协议（Git over SSH、Syncthing）用。每项是 `service`、`port` 和 `name`：`name` 是入口的名字，用户开关和
+接口路径用它，只能用 `a-z`、`0-9` 和中间的连字符，最长 32 字节，同一份清单里不能重复。TCP 入口没有域名，公网侧
+怎么把端口送到家里由公网入口的种类决定（路由器上转的端口、自己的服务器上的 frps、我们的中继分配端口；Cloudflare
+Tunnel 只转 HTTP，用不了 TCP 入口）。应用里的端口下次还能用：关掉开关时端口留着。
+
+### 访客链接（`webui.guests`）
+
+应用自己能接待匿名用户（自带房间码或口令）时，在 `webui` 里写 `guests: true`，并申请 `network.clients`；这时可以不写 `clients`。用户可以给
+这个应用建带有效期的链接，拿到链接的人进得来，没有身份、不能用 Bot。没声明的应用不给建。只声明它、没有
+`clients.http` 时，入口上只有拿着有效链接的请求能到应用。
+
 ## 应用页面（`tabs`）
 
 有 `webui` 的插件可以声明应用页面。页面出现在侧边栏的“我的应用”里，用户决定放哪些、什么顺序，插件和 Bot 都改不了。App 不支持这些字段时忽略它们，插件照常从“应用”打开。没声明 `tabs` 的插件也能放，入口是 `webui.path`，用插件自己的标题和图标。
@@ -1128,6 +1265,7 @@ x-wonton:
 | `owner.identity` | — | 知道用户的用户名和邮箱，还能查家人用什么语言，见“安装时注入的变量”。 |
 | `network.egress` | — | 能访问外网，也能访问用户的局域网，安装确认按这句写。见“网络”。 |
 | `network.lan` | 高 | 在局域网上开放 `lan.ports` 列出的端口，见“局域网”。 |
+| `network.clients` | — | 让第三方 App 连进来：`clients.http`、`clients.tcp` 的入口，以及访客链接（`webui.guests`）。装好不生效，用户打开开关才生效，见“第三方 App 入口”。 |
 | `egress.proxy` | 高 | 做出网代理：选它以后，所有出网插件的请求都经过它，它能看到这些插件访问了哪些网站，也能改写不加密的内容。和 `provides.egress_proxy` 成对，见“网络”的“代理插件”。 |
 | `devices.gpu` | 高 | 使用显卡，见“显卡”。 |
 | `devices.<路径>` | 高 | 访问宿主设备，路径只能是 `/dev/net/tun` 或 `/dev/fuse`，如 `devices./dev/net/tun`。 |
@@ -1212,6 +1350,7 @@ x-wonton:
 | `WONTON_GPU_VENDOR` | 给了显卡 | 选中那家的显卡的厂商：`amd`、`nvidia`、`intel`。各家参数不同时用它插值；不给显卡时不存在（不是空串）。 |
 | `WONTON_PERMISSION_DOCKER_SOCKET`、`_DEVICES_GPU`、`_DEVICES_SERIAL`、`_DEVICES_USB` | 对应的可选权限开着 | 值是 `1`。关着时不定义（不是空串），用 `${VAR:+x}` 或 `[ -n "$VAR" ]` 判断。给这个插件的所有服务，不只拿到字段的那个。 |
 | `WONTON_LAN_ADDRESSES` | `network.lan` | 局域网端口开在哪些地址上，逗号分隔，如 `192.0.2.10`。地址变化时的重建规则见“局域网”。 |
+| `WONTON_EXTERNAL_URL` | `clients.http`，或 `webui.guests: true` | 这个 App 对外的规范 origin，不带路径和末尾 `/`：公网入口开着时是公网地址，否则是局域网入口的地址，都没开时和 `WONTON_APP_URL` 相同。往外部服务登记回调地址、只认一个地址的应用用它，见“第三方 App 入口”。 |
 | `WONTON_PROXY_URL` | `network.egress` | 出口容器的地址 `http://egress.wonton.internal:3128`，用户没配代理时是空串。给有自己代理设置、不读 `HTTP_PROXY` 的程序用，见“网络”。 |
 
 - 这些变量只用于 compose 插值（`${VAR}`、`${VAR:-默认值}` 等，`$$` 表示字面量 `$`），不会自动进入
