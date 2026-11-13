@@ -10,7 +10,7 @@
 - `git`、`curl`（7.76 或更新）、`python3`。
 - Docker 与仓库位于同一台主机：开发环境的数据目录使用仓库内的路径，网页使用该主机的端口。Docker 在别的机器时，按[在远程主机上开发](#在远程主机上开发)操作。
 
-不用安装云吞，不要用 root 执行脚本。套件使用发布的核心镜像 `ghcr.io/geraldpeng6/wonton-core` 检查插件和启动开发环境。
+不用安装云吞，不要用 root 执行脚本。套件使用发布的核心镜像 `ghcr.io/wontonapp/wonton-core` 检查插件和启动开发环境。
 
 ## 先跑起来
 
@@ -133,7 +133,7 @@ MCP 两条路径都复用 Hermes 官方镜像内的 [Python MCP SDK（MIT）](ht
 
 ### 选择核心镜像
 
-默认核心镜像是 `ghcr.io/geraldpeng6/wonton-core:stable`。第一次启动时可指定：
+默认核心镜像是 `ghcr.io/wontonapp/wonton-core:stable`。第一次启动时可指定：
 
 ```bash
 WONTON_CORE_IMAGE=<核心镜像> scripts/dev.sh up

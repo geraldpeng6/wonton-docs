@@ -7,7 +7,7 @@
 没有 `x-wonton` 的 compose 文件可以由用户手动导入，但必须先补全权限声明。插件包可以是一个 Git 仓库的根目录，
 也可以是仓库里的一个子目录（一个仓库放多个插件，见“发布与来源”），发布就是打 tag。可运行的示例见
 [插件模板](https://github.com/geraldpeng6/wonton-plugin-template)，官方插件的列表见
-[官方索引](https://github.com/geraldpeng6/wonton-store)。
+[官方索引](https://github.com/wontonapp/wonton-store)。
 
 ## 示例
 
@@ -2956,7 +2956,7 @@ x-wonton:
 
 可选权限照常审：最高级（`docker.socket`）即使是可选的，也要写清为什么要；插件关着也必须能用主要功能，`off_loss` 和 README 说的要是一回事；README 的权限一节把可选项单列，`about` 不把可选能力说成自带。
 
-公开仓库 `geraldpeng6/wonton-store` 的 `index.json`：
+公开仓库 `wontonapp/wonton-store` 的 `index.json`：
 
 ```json
 {
@@ -2973,7 +2973,7 @@ x-wonton:
       "compose": "<docker-compose.yml 的原文>"
     },
     {
-      "source": "github:geraldpeng6/wonton-agents/agents/codex",
+      "source": "github:wontonapp/wonton-agents/agents/codex",
       "version": "0.1.0",
       "commit": "<40 位提交号>",
       "files": { "…": "…（路径相对插件包目录，不带子目录前缀）" },

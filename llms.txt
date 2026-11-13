@@ -13,4 +13,4 @@
 ## 可选
 
 - [插件模板](https://github.com/geraldpeng6/wonton-plugin-template)：电脑上有 Docker 时用，带开发环境和发布脚本
-- [官方索引](https://github.com/geraldpeng6/wonton-store)：官方商店收录的插件
+- [官方索引](https://github.com/wontonapp/wonton-store)：官方商店收录的插件
