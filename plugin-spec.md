@@ -376,6 +376,7 @@ services:
 
 **0.14**
 
+- `x-wonton.matrix_widget`：插件网页作为 Matrix widget 在聊天房间里打开（见“Matrix widget 页面”）。使用此字段的清单至少写 `spec: "0.14"`。
 - `x-wonton.install_timeout_secs`：安装最多等多久（见“健康检查”）。
 - `secrets.<名字>.generate.encoding` 的新取值 `base64url`（无填充的 base64url，见“插件密钥”）。
 - 安装时注入的变量：`WONTON_GATEWAY_CIDR`（见“网关代登录”）和 `WONTON_APP_HOST`（见“安装时注入的变量”）。
@@ -1186,7 +1187,7 @@ x-wonton:
 | `capabilities` | 否 | 页面要的能力串，见下面。 |
 
 - 要有 `webui`：widget 是这个插件的一页。不能和 `webui.cross_origin_isolated` 一起写——声明了跨源隔离的页面在 Android 上交给系统浏览器，那里没有桥，widget 跑不起来。
-- 页面只拿到打开它的那个房间，不放别的房间。事件按类型逐项声明，不收 `*`；`state_key` 也写实际的，不收 `*`。
+- 页面只拿到打开它的那个房间，不放别的房间。事件按类型逐项声明，不收 `*`；`#state_key` 写的话写实际的，不收 `*`，带运行时身份的见下面。
 - 声明了就会拿到一小时的登录凭证（OpenID），只能拿它换回用户 ID。安装和更新的确认页会写明。
 - 能力按事件类型分两档，高级的在确认页上醒目显示：
   - 高级：`m.room.message`、`m.room.encrypted`、`m.room.redaction`、`m.room.member`、`m.room.power_levels`，读到聊天内容或改历史、成员、权限。
@@ -1202,6 +1203,20 @@ x-wonton:
   - `org.matrix.msc4407.receive.sticky_event`、`org.matrix.msc4407.send.sticky_event`、`m.always_on_screen`、`org.matrix.msc4533.rtc_livekit_get_token`、`org.matrix.msc4533.rtc_livekit_delegate_delayed_leave`
 
 具体批准多少由 App 决定：页面请求的、清单写的和 App 允许的交集。声明了不等于一定拿到，页面要按实际批准的能力降级。
+
+**state_key 带运行时身份的状态事件，清单只写事件类型，不写死 `#state_key`。**比如 `m.call.member`，发的时候
+state_key 要带上发的人的用户和装置 ID（MSC3779，Element Call 写 `#<自己>`、`#<自己>_<装置>`、
+`#<自己>_<装置>_m.call` 这类）。清单是静态的，装的时候不知道是哪台装置，写不进去；所以声明成不限 state_key 的
+一条（不接 `#`），App 批准时按调用者收窄：
+
+- 发状态事件（`send.state_event`）：state_key 只能是自己的——等于自己的用户 ID，或以自己的用户 ID 加下划线
+  开头（`<自己>_…`、`_<自己>_…`）。页面请求“任意 state_key”时只批 `#<自己>` 一条；页面点名具体的 state_key
+  时逐条核这条规则，不是自己的不批。
+- 收状态事件（`receive.state_event`）：不按人收窄，清单不限就是不限；清单写死了 `#state_key` 就只批那一条。
+
+事件类型在比对前都按客户端用的 SDK 解析一遍：`m.call.member` 解析成 `org.matrix.msc3401.call.member`，清单里
+两种写法都行。标志位里 SDK 不认识的（`m.always_on_screen`、两个 `sticky_event`、MSC4533 的两个 LiveKit
+标志位）页面经桥拿不到，声明着是给别的客户端和以后的 SDK 用。
 
 ## 静态网页和外部网页
 
