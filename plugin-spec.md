@@ -1068,28 +1068,29 @@ x-wonton:
 | `icon` | 是 | 单色图标，插件包里的 PNG 或 SVG。只取透明通道，颜色由 App 上色，全透明或全不透明的图标不合格。SVG 的规则见“图标和截图”。 |
 | `icon_selected` | 否 | 选中时的图标，规则相同。没写时选中只靠颜色区分。 |
 | `path` | 是 | 入口路径，写法和 `webui.path` 相同（见“网页入口与单点登录”）。 |
-| `layout` | 否 | `inset`（默认）：从状态栏下沿开始，底边铺到屏幕底。`edge-to-edge`：页面铺满，内容从状态栏和 Home 条后面滚过去，作者按 `--wonton-inset-*` 留位置（见“主题”）。 |
+| `layout` | 否 | `inset`（默认）：从状态栏下沿开始，底边铺到屏幕底。`edge-to-edge`：页面铺满，内容从状态栏和 Home 条后面滚过去，作者按 `--wonton-inset-*` 留位置（见“主题”）。整页打开时不看这一项，见“整页显示”。 |
 
 - 一个插件最多 4 项。不申请新权限，页面能做的事不变。
 - 插件停了、升级中、出错时，App 显示状态页，页面不用处理。升级后 App 重新加载已打开的页面。
 
 ### 整页显示
 
-页面打开就是整页，右上角有一个胶囊（“···”和“关闭”），状态栏竖屏照常显示。
+页面打开就是整页，右上角有一个胶囊（“···”和“关闭”），状态栏照常显示。胶囊一直在，页面隐藏不了它。
 
-胶囊会自己藏起来：打开、加载完、转屏时出现，3 秒没碰就淡出；用户在页面上往下拉一下就出来，往上推就藏起。藏起来时不挡点按，点到的是页面。页面不用为它留位置，也隐藏不了它。
+用户点胶囊的“关闭”就关闭这个页面，回到打开它的地方；刚关掉的几个页面再次打开不重新加载，更早关掉的会重新加载。
 
-用户点胶囊的“关闭”就关闭这个页面，回到打开它的地方；再次打开会重新加载。
+页面铺满屏幕，`layout` 不改变整页的样子。顶上状态栏和胶囊那一条由 App 替页面让开，页面不用为胶囊留位置：
 
-页面怎么躲开状态栏、Home 条（导航栏），按 `layout` 分：
+| 系统 | 顶上那一条 | 页面看到的 |
+| --- | --- | --- |
+| iOS 26 起 | 页面的背景照样画到屏幕顶；固定在顶上的元素和滚动到头的位置落在胶囊下面，内容滚动时从这一条后面穿过 | `--wonton-inset-top` 和 `env(safe-area-inset-top)` 是 0 |
+| iOS 17–18 | App 不让，页面画到屏幕顶，胶囊浮在右上角 | `--wonton-inset-top` 是状态栏加胶囊那一行的高度，页面按它排自己的标题 |
+| Android | 页面从胶囊下面开始，上面这一条是 App 的底色 | `--wonton-inset-top` 是 0 |
 
-| `layout` | 页面内容 |
-| --- | --- |
-| `inset` | 从状态栏下面开始，底边到 Home 条（导航栏）为止或画到它后面、由 App 让出这一块。页面什么都不用做，`env(safe-area-inset-*)` 是 0。状态栏那一条是 App 的底色 |
-| `edge-to-edge` | 铺满屏幕。写 `viewport-fit=cover`，按 `--wonton-inset-top`、`--wonton-inset-bottom`、`--wonton-inset-left`、`--wonton-inset-right` 留位置 |
+底边和横屏时的两侧由页面自己让：按 `--wonton-inset-bottom`、`--wonton-inset-left`、`--wonton-inset-right` 留位置。
 
-- 给 `html` 设背景色：页面之外露出来的地方（比如 Home 条后面）画的是它。
-- 要画到状态栏底下，用 `edge-to-edge`，按 `--wonton-inset-top` 排自己的标题。它是状态栏下沿（横屏为 0），不含胶囊；别把它当成固定值，按变量算。
+- 给 `html` 或 `body` 设背景色：页面之外露出来的地方（顶上那一条、Home 条后面）画的是它。
+- 顶上一律按 `--wonton-inset-top` 排，别把它当成固定值，也别自己再加状态栏的高度：App 已经让开时它是 0。
 - 用 `--wonton-inset-*`，不要用 `env()`：一些 Android WebView 版本的 `env()` 值不可靠。
 - 返回：iOS 从左边缘滑动，Android 按返回键，都是先退网页历史，到头就关闭这个应用页。页面自己用横滑手势时，别从屏幕边缘开始。
 
@@ -1106,8 +1107,8 @@ App 在文档开始前把下面的 CSS 变量写到根元素，同时设置 `col
 | `--font-sans` | 系统字体 |
 | `--border-radius-xs`、`--border-radius-md`、`--border-radius-lg`、`--border-radius-full` | 圆角 |
 | `--wonton-accent-fill`、`--wonton-accent-ink`、`--wonton-accent-ink-on-fill` | 重点色的底色、文字和图标、放在重点色上的文字 |
-| `--wonton-inset-top`、`--wonton-inset-bottom` | 状态栏下沿 / Home 条。`inset` 布局下是 0 |
-| `--wonton-inset-left`、`--wonton-inset-right` | 左右安全区，横屏时躲刘海和圆角。`inset` 布局下是 0 |
+| `--wonton-inset-top`、`--wonton-inset-bottom` | 页面顶上、底下要自己让出的高度，见“整页显示”；App 已经替页面让开的边是 0 |
+| `--wonton-inset-left`、`--wonton-inset-right` | 左右安全区，横屏时躲刘海和圆角 |
 
 变量名只增不改。页面也可能在浏览器里打开，所以写上后备值：
 
