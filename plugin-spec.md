@@ -1084,12 +1084,15 @@ x-wonton:
 | 系统 | 顶上那一条 | 页面看到的 |
 | --- | --- | --- |
 | iOS 26 起 | 页面的背景照样画到屏幕顶；固定在顶上的元素和滚动到头的位置落在胶囊下面，内容滚动时从这一条后面穿过 | `--wonton-inset-top` 和 `env(safe-area-inset-top)` 是 0 |
-| iOS 17–18 | App 不让，页面画到屏幕顶，胶囊浮在右上角 | `--wonton-inset-top` 是状态栏加胶囊那一行的高度，页面按它排自己的标题 |
-| Android | 页面从胶囊下面开始，上面这一条是 App 的底色 | `--wonton-inset-top` 是 0 |
+| iOS 17–18、Android | 页面从胶囊下面开始，上面这一条由 App 涂成页面的颜色 | `--wonton-inset-top` 是 0 |
+
+上面这一条的颜色跟着页面走，和浏览器给地址栏上色的读法一样：页面声明的 `<meta name="theme-color">`（可以用 `media` 给深色、浅色各写一条），
+没声明就用 `body`、再 `html` 的背景色；页面换了声明或背景色，这一条跟着变。颜色要不透明；都没有时是 App 的底色。
+想让这一条和自己的顶栏连成一片，就把 `theme-color` 写成顶栏的颜色。
 
 底边和横屏时的两侧由页面自己让：按 `--wonton-inset-bottom`、`--wonton-inset-left`、`--wonton-inset-right` 留位置。
 
-- 给 `html` 或 `body` 设背景色：页面之外露出来的地方（顶上那一条、Home 条后面）画的是它。
+- 给 `html` 或 `body` 设背景色：页面之外露出来的地方（Home 条后面；没声明 `theme-color` 时还有顶上那一条）画的是它。
 - 顶上一律按 `--wonton-inset-top` 排，别把它当成固定值，也别自己再加状态栏的高度：App 已经让开时它是 0。
 - 用 `--wonton-inset-*`，不要用 `env()`：一些 Android WebView 版本的 `env()` 值不可靠。
 - 返回：iOS 从左边缘滑动，Android 按返回键，都是先退网页历史，到头就关闭这个应用页。页面自己用横滑手势时，别从屏幕边缘开始。
