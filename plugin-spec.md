@@ -113,7 +113,7 @@ x-wonton:
 | `id` | 是 | 反向域名形式，全局唯一，安装后不可修改。至少两段，每段由小写字母、数字和单个连字符组成，总长不超过 63。 |
 | `version` | 是 | 插件包版本（语义化版本），和镜像版本无关。 |
 | `kind` | 是 | `app`（普通应用）、`agent`（Agent 运行时）、`channel`（第三方 IM 渠道）、`model`（模型服务）、`system`（系统插件，仅官方，只能由安装器预装）。 |
-| `runtime` | 否 | 运行形态：`compose`、`remote_mcp`、`skills`、`static_web` 或 `link`，省略时为 `compose`。`compose` 必须有非空的顶层 `services`；其他运行形态不允许出现 `services`，即使为空也不行。与 `kind` 独立。`static_web`、`link` 见“静态网页和外部网页”。 |
+| `runtime` | 否 | 运行形态：`compose`、`remote_mcp`、`skills`、`static_web` 或 `link`，省略时为 `compose`。`compose` 必须有非空的顶层 `services`；其他运行形态不允许出现 `services`，即使为空也不行。与 `kind` 独立。`static_web`、`link` 见“静态网页和外部网页”，`remote_mcp` 见“远端 MCP”。 |
 | `title`、`description` | 是 | 多语言文本，至少写一种语言。怎么写见“标题和说明怎么写”。 |
 | `icon` | 否 | 插件包里的 PNG 或 SVG，见“商店信息”。官方索引要求必填。 |
 | `screenshots`、`author`、`homepage`、`license`、`license_url`、`tags`、`about`、`release_notes`、`setup` | 否 | 商店信息，见“商店信息”。官方索引要求有 `tags`、`author` 和 `license`。 |
@@ -123,6 +123,7 @@ x-wonton:
 | `matrix_widget` | 否 | 插件网页也是房间里的 Matrix widget：`url`、`entry`、`capabilities`，要和 `webui` 一起声明，见“房间里的 widget”。 |
 | `static_web` | 否 | 仅 `runtime: static_web` 允许：`root`（包里的静态文件目录，默认 `web`）、`fallback`（找不到的路径回这个文件）、`connect`（页面能连的外部来源），见“静态网页和外部网页”。 |
 | `link` | `runtime: link` 时必填 | 仅 `runtime: link` 允许：`url`，一个 `https` 地址，见“静态网页和外部网页”。 |
+| `remote_mcp` | `runtime: remote_mcp` 时必填 | 仅 `runtime: remote_mcp` 允许：`url`（服务器地址，`https`）、`auth`（`none`、`header`、`oauth`）、`headers`（`auth: header` 时必填，值模板只能引用 `input` 项）、`tools`、`tool_idle_seconds`、`tool_total_seconds`（后三项同 `mcp.*`），见“远端 MCP”。 |
 | `mcp` | 否 | 给 Agent 的工具入口：`service`、`port`、`path`（默认 `/mcp`）、`transport`（`streamable-http`），可选 `headers`（见“提供工具”）、`tool_idle_seconds`、`tool_total_seconds`、`tools`（只提供列出的工具），见“工具与 MCP 总线”。 |
 | `bot` | 否 | Bot 的显示名（`display_name`，多语言）、静态头像（`avatar`）和状态头像（`avatars`：`idle`、`working`、`waiting`、`offline` 四个状态各一个文件），都是插件包里的文件；聊天页的默认显示方式（`chat_layout`，见“聊天页的显示方式”）。只能和 `matrix.bot` 权限一起声明，见“Matrix Bot”。 |
 | `bots` | 否 | 一个插件多个 Bot：`services` 列出每个 Bot 一份的服务（见“一个插件多个 Bot”）。 |
@@ -374,6 +375,7 @@ services:
 **0.15**
 
 - `provides.agent_acp`、`requires`/`wants: [agent_acp]` 和注入变量 `WONTON_AGENT_ACP_URL`（见“能力依赖”和“Agent 插件”）。
+- `x-wonton.remote_mcp`：`runtime: remote_mcp` 的远端服务器地址、鉴权方式和工具范围（见“远端 MCP”）。
 
 **0.14**
 
@@ -1311,6 +1313,73 @@ x-wonton:
 - App 用系统自带的 App 内浏览器打开，顶上显示网址；页面和 App 之间没有任何通道（不能发消息、调工具）。用户可以把它
   钉进侧边栏或面板。
 
+### 远端 MCP（`runtime: remote_mcp`）
+
+插件只是一条到远端 MCP 服务器的记录。核心不直接外连，把请求交给提供能力 `remote_mcp` 的连接器插件（托管形态，同
+“静态网页”）。工具照旧挂在插件自己的名下，确认、放宽和按 Bot 放行都和别的插件一样。
+
+```yaml
+x-wonton:
+  spec: "0.15"
+  id: io.github.alice.notion
+  version: 1.0.0
+  kind: app
+  runtime: remote_mcp
+  title: { zh: 笔记（Notion）, en: Notes (Notion) }
+  description: { zh: 让 Agent 读写你的 Notion 页面, en: Let agents read and write your Notion pages }
+  permissions: []
+  remote_mcp:
+    url: https://mcp.example.com/mcp
+    auth: oauth
+    tools: [search, fetch]          # 可选，只接这几个工具
+    tool_idle_seconds: 600          # 可选，同 mcp.*
+    tool_total_seconds: 1800
+```
+
+- `url` 只收 `https`，不能带用户名和密码，不能带 `#`。第一版只连公网地址；远端在内网的先用容器插件。
+- `auth` 三选一：
+  - `none`：不鉴权。
+  - `header`：`headers` 必填。名字是请求头，值是模板，只能引用 `secrets` 里的 `input` 项：
+
+    ```yaml
+    remote_mcp:
+      url: https://mcp.example.com/mcp
+      auth: header
+      headers:
+        Authorization: "Bearer {secret:token}"
+    secrets:
+      token:
+        input:
+          title: { zh: 访问令牌, en: Access token }
+          url: https://example.com/keys
+    ```
+
+    `X-Wonton-*`、`Host`、`Cookie`、代理和逐跳头、`Mcp-Session-Id`、
+    `Mcp-Protocol-Version` 由核心写，不能再声明；`{user}` 这类身份占位符也不能用。
+  - `oauth`：App 用系统的认证会话打开授权页，把授权码交给连接器，令牌只在连接器里。不能写 `headers`。
+- `tools` 只接列出的工具。`tool_idle_seconds`、`tool_total_seconds` 同 `mcp.*`：1 秒到一周，空闲期限不能超过总期限。
+- **只能写这些字段：** 商店信息、`remote_mcp` 和 `secrets`（只能 `input` 项），`permissions` 写空列表。写了 `services`、
+  `webui`、`tabs`、`mcp`、`bot`、`bots`、`agent`、`provides`、`requires`、`wants`、`lan`、`tunnel`、`setup`、`settings`、
+  `gpu`、`optional_permissions` 或任何权限，清单不合法：远端插件在服务器上不跑东西。
+- **没有连接器时**按缺 `requires` 处理。连接器没在运行时，插件标为异常，原因是“依赖的插件没有在运行”。
+- 确认页写明数据会发到哪个主机。连不上服务器是 `remote_unavailable`（DNS、TLS、超时、拒连），服务器回 5xx 或说了
+  接口之外的话是 `remote_error`。
+- 填了密钥仍然被服务器拒绝时安装失败，写明服务器不接受填的密钥。
+- 连接器只连公网地址，每次连接前重新解析并检查。经出网代理时，代理自己的解析结果可能不同，第一版接受这点残留风险。
+
+#### 连接器要实现的接口
+
+核心发往连接器的每个请求都带 `X-Wonton-Plugin`（插件 ID）、`X-Wonton-Remote-Url`（服务器地址）、
+`X-Wonton-Remote-Auth`（`none`、`header`、`oauth`）和 `X-Wonton-Remote-Forward`（清单 `headers` 填好密钥后的请求头，
+JSON 对象做 base64）。连接器不读清单，装、改、卸都不用重启它。
+
+| 接口 | 用途 |
+| --- | --- |
+| `GET /_wonton/probe` | 试连远端：通回 204，连不上回 502 `remote_unavailable`，远端出错回 502 `remote_error` |
+| `POST /_wonton/oauth/start` | 开始授权，回授权页地址 |
+| `POST /_wonton/oauth/finish` | 交回授权码，换令牌 |
+| `DELETE /_wonton/plugins/{id}` | 卸载时撤掉这个插件的连接和令牌 |
+
 ### 安全档位
 
 商店、安装确认页和详情页显示核心按清单算出的安全档位，作者不能填：外部网页和不写 `connect` 的静态网页最低；
@@ -1534,6 +1603,7 @@ x-wonton:
   | `web_storage` | 托管：WebDAV（RFC 4918）整文件读写的子集，见“静态网页的数据” | 不用 | 否 |
   | `personal_data` | 位置和健康数据的存取：`POST /location`、`POST /health`、`GET /query`、`DELETE /data`、`GET /export`、`POST /cleanup`；每个请求带 `X-Wonton-User`（数据属于谁），类型名和 JSON 形状见 wontonapp/wonton 的 `wonton-protocol` 库里 `personal_data` 的文档和常量 | 要，在 `provides.personal_data.credentials` 里 | 否 |
   | `agent_acp` | ACP over WebSocket（`/acp`）。核心注入 `X-Wonton-Plugin`、`X-Wonton-User`、`X-Wonton-Bot`、`X-Wonton-Chain` 和 `X-Wonton-Max-Depth`、`X-Wonton-Max-Rounds`、`X-Wonton-Max-Tokens`；错误按 `permission_denied`、`busy`、`limit_reached`（`depth`、`rounds`、`cost`）、`stopped`、`invalid_input`（`self_call`、`loop`）或上游错误分类 | 不用 | 是 |
+  | `remote_mcp` | 托管：MCP Streamable HTTP（2025-11-25），核心把发往远端服务器的请求交给提供方，见“远端 MCP”和“连接器要实现的接口”。`runtime: remote_mcp` 的插件隐含 `requires` 它，不用再写 | 不用 | 否 |
 
   接口有不兼容的变化时换一个新名字（如 `search2`），能力名不带版本号。高权限能力见下面的“高权限能力”。
 - **第三方定义的**：`x-<作者>.<名字>`，作者和名字都用小写字母、数字、连字符，如 `x-acme.ledger`。核心只按名字
