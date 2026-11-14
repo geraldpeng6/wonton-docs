@@ -742,7 +742,8 @@ Minimal app icon, flat vector. Solid plain light grey background #F4F4F4 filling
 
 客户端可申请的 scope：`openid`、`profile`（`name`、`preferred_username`、`locale`）、`email`（`email`、
 `email_verified`）、`groups`、`offline_access`。`groups` 总有 `user`；这个人是这个应用的管理员时再加 `plugin_admin`
-和声明的 `admin_groups`。插件看到的只有这两档：家里给每个人配的角色由主人起名、随时会改，不发给插件，
+和声明的 `admin_groups`。“这个应用的管理员”指主人，或者能打开这个应用、角色里又勾了在这个应用当管理员的家人；
+好友不是。插件看到的只有这两档：家里给每个人配的角色由主人起名、随时会改，不发给插件，
 按年龄、按库之类的细分在应用自己的用户设置里做（应用按 `sub` 认得出是谁）。
 `admin_groups` 和 `role_claim` 只发给声明它的这个客户端，别的插件看不到。客户端 ID 就是插件 `id`，密钥在安装时
 生成，卸载时删除客户端。
@@ -845,7 +846,7 @@ webui:
 
 | 字段 | 说明 |
 | --- | --- |
-| `webui.proxy.headers` | 请求头名 → 值模板。不能是 `Host`、`Cookie`、`Forwarded`、`X-Real-IP`、`X-Forwarded-*` 和逐跳头部。 |
+| `webui.proxy.headers` | 请求头名 → 值模板。不能是 `Host`、`Cookie`、`Forwarded`、`X-Real-IP`、`X-Forwarded-*`、`X-Wonton-Capabilities` 和逐跳头部。 |
 | `webui.proxy.cookies` | Cookie 名 → 值模板。名字不能以 `wonton_` 开头。和浏览器发来的其他 Cookie 合并成一个 `Cookie` 头。 |
 
 `sso: proxy` 至少写一项头或 Cookie。
@@ -860,6 +861,9 @@ webui:
 | `{role}` | `admin`（这个人是这个应用的管理员）或 `user`。由网关认证身份后确定，不接受客户端自报。 |
 
 `{role}` 须由支持它的核心校验和渲染；不支持时应报错，不能假定所有人都是 `admin`。
+
+网关转发前还按这个人是不是这个应用的管理员注入请求头 `X-Wonton-Capabilities`：是管理员时值为 `plugin_admin`，
+不是时不带头。页面自己带的同名头一律先删掉，清单也不能声明这个头（写了按不允许的请求头报错）。
 
 应用认人用 `{user}`。只有应用确实只能按邮箱认人、没有用户名概念时，才用 `{email}` 认人。
 
@@ -1442,7 +1446,7 @@ x-wonton:
 | `WONTON_SECRET_<名字>` | `secrets` 里由核心生成的项 | 插件密钥，名字转成大写，如 `WONTON_SECRET_WEB_KEY`。 |
 | `WONTON_SETTING_<名字>` | 清单声明了这一项，服务引用了它 | 设置，名字转成大写，如 `WONTON_SETTING_BUDGET`。值的写法见“插件设置”。 |
 | `WONTON_BOT_NAME`、`WONTON_BOT_DATA` | `bots.services` 里的服务 | Bot 名和这个 Bot 的数据目录（宿主路径）。 |
-| `WONTON_BOT_AI_LEVEL` | `matrix.bot` 或 `bots.services` 里的服务 | 用这个 Bot 的人能让 AI 动手到哪一级：`read_only`（只给只读的工具）、`admin_approves_deletes`（改的自己确认，删的要管理员批）、`self_confirms`（都自己确认）。共享 Bot 取用它的人里最低的一级。Agent 插件凭它选自带工具的模式：不是 `self_confirms` 时用最严的那档；不认识的值按 `read_only`。 |
+| `WONTON_BOT_AI_LEVEL` | `matrix.bot` 或 `bots.services` 里的服务 | 这个 Bot 能让 AI 动手到哪一级：`read_only`（只给只读的工具）、`admin_approves_deletes`（改的自己确认，删的要管理员批）、`self_confirms`（都自己确认）。私人 Bot 按归属人的角色，共享 Bot 取能用它的人里最低的一级。归属人的级别是 `read_only` 时，这个私人 Bot 的共享文件夹挂载一律只读，声明了写权限也一样。Agent 插件凭它选自带工具的模式：不是 `self_confirms` 时用最严的那档；不认识的值按 `read_only`。 |
 | `WONTON_GPU_VENDOR` | 给了显卡 | 选中那家的显卡的厂商：`amd`、`nvidia`、`intel`。各家参数不同时用它插值；不给显卡时不存在（不是空串）。 |
 | `WONTON_PERMISSION_DOCKER_SOCKET`、`_DEVICES_GPU`、`_DEVICES_SERIAL`、`_DEVICES_USB` | 对应的可选权限开着 | 值是 `1`。关着时不定义（不是空串），用 `${VAR:+x}` 或 `[ -n "$VAR" ]` 判断。给这个插件的所有服务，不只拿到字段的那个。 |
 | `WONTON_LAN_ADDRESSES` | `network.lan` | 局域网端口开在哪些地址上，逗号分隔，如 `192.0.2.10`。地址变化时的重建规则见“局域网”。 |
@@ -2217,12 +2221,16 @@ x-wonton:
   不能重复，每个名字按 MCP 2025-11-25 的工具名规定校验（1–128 个字符，只有 ASCII 字母、数字、`_`、`-` 和 `.`）。
   列表里写了但上游没有的名字：其余工具照常提供，缺哪些写在 `wonton__list_plugins` 的 `tools_error` 里；调用不在
   列表里的工具和调用不存在的工具一样报错。
-- 总线转来的 `tools/call` 在 `_meta` 里带 `app.wonton/user`：私人 Bot 调用时是归属人的用户名；共享 Bot 认得出这一轮
-  只替一个人办事时带这个人，否则不带。同时带 `app.wonton/capabilities`，是这个人在这个插件里的能力列表，
-  已定义的只有 `plugin_admin`（是这个应用的管理员），不认识的值忽略。多用户的应用按它们切到这个人的数据、给对应的权限；不认它们的插件
+- 总线转来的 `tools/call` 带人时，`_meta` 同时带 `app.wonton/user`（私人 Bot 是归属人的用户名）和
+  `app.wonton/capabilities`（这个人在这个应用里的能力列表）：主人或在角色里当了这个应用管理员的人是
+  `["plugin_admin"]`，其余是空表；已定义的能力只有 `plugin_admin`，不认识的值忽略。共享 Bot、认不出人的
+  调用、应用界面（MCP Apps）发起的调用两个都不带。多用户的应用按它们切到这个人的数据、给对应的权限；不认它们的插件
   对所有人给同样的数据。没带 `app.wonton/user` 时，不能把这次调用当成管理员的，按大家共用的数据给，或者拒绝。
 - 没有标 `readOnlyHint: true`（MCP 的工具注解）的工具算敏感：总线先请用户确认，确认了才转给插件。会改数据的工具
-  不要标成只读。不会改数据的工具要标上，否则 Bot 每次调用都要用户确认。
+  不要标成只读。不会改数据的工具要标上，否则 Bot 每次调用都要用户确认。删除、覆盖数据的工具要再标
+  `destructiveHint: true`。按角色封顶时（`WONTON_BOT_AI_LEVEL` 的 `read_only`），只有标了 `readOnlyHint: true`
+  的工具能过，`destructiveHint` 没标的都按“会删”算，不会因为没标就放宽；“每次都问”的确认仍只认明确标了
+  `destructiveHint: true` 的，没标的不会被每次问。
 - 用户可以放宽确认：卡片上放行一段时间、对某个 Bot 始终允许、对某个 Bot 一律允许，或者把某个工具标成只读。这些都在总线
   上判定，插件看不到，也不用为此做什么。始终允许在插件升级后还在，新版本多出来的工具也算在内。开着最高级权限的插件
   不放宽：它的每个工具调用都发卡片，不看工具注解和主人的只读标记。
