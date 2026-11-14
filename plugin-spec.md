@@ -1320,7 +1320,7 @@ x-wonton:
 
 ```yaml
 x-wonton:
-  spec: "0.14"
+  spec: "0.15"
   id: io.github.alice.notion
   version: 1.0.0
   kind: app
