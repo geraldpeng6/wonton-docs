@@ -376,6 +376,7 @@ services:
 
 - `provides.agent_acp`、`requires`/`wants: [agent_acp]` 和注入变量 `WONTON_AGENT_ACP_URL`（见“能力依赖”和“Agent 插件”）。
 - `x-wonton.remote_mcp`：`runtime: remote_mcp` 的远端服务器地址、鉴权方式和工具范围（见“远端 MCP”）。
+- `webui.service` 指向的长期运行服务可以省略 `healthcheck`：没有容器健康检查时，核心按 `webui.port` 和 `webui.path` 代做 HTTP 探测，2xx–4xx 算存活（见“健康检查”）。显式 `webui.health` 仍可指定独立的健康路径。
 
 **0.14**
 
@@ -3241,29 +3242,32 @@ x-wonton:
 
 - 长期运行的服务都要有健康检查，而且检查的是真正可用，不只是进程还活着：Hermes 要 Matrix 已经连上
   （用它自己的 `/health/detailed`），magpie 用自带的 `magpie healthcheck`。
-- `webui` 指向宿主网络的服务时，健康检查是安装的硬要求：没写、写了 `disable: true` 或没写 `test` 都拒绝
-  安装（`webui.health` 也算，核心经中继探）。宿主网络上端口可能被别的程序占用，应用可能只记一行日志、容器照样运行，检查要确认网页真的能打开。
-  宿主网络的 webui 不能用 `sso: proxy`，见“网关代登录”。
-- 写在 compose 的 `healthcheck` 里。镜像自带的 `HEALTHCHECK` 也算数，但官方索引的插件要在 compose 里
-  显式写出，便于审核，也随插件版本锁定。
+- `webui.service` 指向的长期运行服务可以不写 compose `healthcheck`；其余服务仍要写。镜像自带的
+  `HEALTHCHECK` 也算数，但官方索引里没有网页入口的服务要在 compose 里显式写出，便于审核，也随插件版本锁定。
+- 核心优先使用容器的健康检查；网页服务没有有效的容器健康检查（包括 `disable: true` 或 `test: [NONE]`）时，
+  核心代做 HTTP 探测。只给网页服务省略健康检查、没有写 `webui.health` 的清单至少写 `spec: "0.15"`。
+- `webui` 指向宿主网络的服务也适用核心代探测，网页必须能响应才算就绪：端口可能被别的程序占用，
+  应用可能只记一行日志、容器照样运行。宿主网络的 webui 不能用 `sso: proxy`，见“网关代登录”。
 - 写上 `start_period` 和 `start_interval`：安装时能尽快判断就绪，启动慢时又不会误判失败。安装、启动、
   升级时等健康的时限取自各服务 `healthcheck.start_period` 的最大值（加余量），上限 60 分钟；都没写时等
   300 秒。装载要几分钟的插件（大模型类）写长一点的 `start_period`，不会被 300 秒误判失败。
 - 安装时要下载大文件（模型、词表）的插件还可以写 `x-wonton.install_timeout_secs`：安装、启动、升级、重建等
   主人等着的操作至少等这么久，60 到 1800 秒。它只放宽下限，`start_period` 的规则不变。
-- 检查只能用镜像里已有的命令，distroless 之类的镜像里没有 `curl`、`wget`。
-- `scratch`、`distroless` 这类镜像里连 shell 都没有，写不出能用的 `healthcheck`，改用核心代探测：
-  `webui.health` 写网页服务的一个路径（如 `/health`），核心按它探。只有 `webui.service` 指向的服务能这么写，
-  别的服务仍要在 compose 里写健康检查。`webui.health` 和 `healthcheck` 写一样就够，`--official` 两样都认。
-- 探测和别的健康检查走同一条路：安装、启动按同一个时限等它通过，运行期间每 30 秒探一次（每次 5 秒超时），
-  2xx 和 3xx 算健康，其余状态码和连不上、超时都算不健康，原因写进插件状态（如“GET /health：HTTP 503”）。
-  探测用核心访问插件网页的同一个地址（插件网络里，宿主网络经中继），和 `webui.path` 无关：入口是 `/` 的插件
-  照样写 `/health` 这类能确认应用好的路径，不是写 `/`。
-- 官方索引的插件缺健康检查时不收录（`wonton-core plugin check --official` 检查）。导入的应用和社区插件
-  没有健康检查时照常安装，状态如实显示为“运行中，健康未知”，不显示“健康”。
+- 检查只能用镜像里已有的命令；`scratch`、`distroless` 镜像没有 `curl`、`wget` 或 shell 时，网页服务直接省略
+  `healthcheck`，不用改镜像或安装工具。
+- 默认探测 `GET http://<网页服务在插件网络里的地址>:<webui.port><webui.path>`，`webui.path` 默认 `/`。
+  请求由核心直连插件网络，不经网关鉴权，不带主人会话；宿主网络服务经核心的中继访问同一个端口和路径。
+  不跟随重定向，2xx–4xx 都算存活（包括跳转登录、401、403、404）；5xx 算上游出错，连不上和超时也算失败。
+- 应用有独立健康接口时，可用 `webui.health` 指定如 `/health` 的路径，替代默认的 `webui.path` 探测。
+  只有 `webui.service` 指向的服务能这样替代健康检查，其他服务不受影响。
+- HTTP 探测和容器健康检查进入同一套状态判断：安装、启动、升级按同一个时限等它通过；超时未通过则操作失败，
+  安装回滚。运行期间每 30 秒探一次，每次最多 5 秒；失败标为 `degraded`，原因区分连不上、超时和 HTTP 5xx，
+  带上服务、探测路径和状态码（如 `GET /health：HTTP 503`）。恢复响应后，核心重新核对并恢复运行。
+- 官方索引里既没有容器健康检查、也不属于网页服务的长期运行服务不收录（`wonton-core plugin check --official` 检查）。
+  导入的应用和社区插件仍可安装，但这些服务的健康未知；网页服务的核心探测通过则算健康。
 - 核心在安装、每次启动时检查，运行期间每 30 秒再看一次容器，插件列表里运行中的插件带上最近一次的结果：每个
-  长期运行的服务都有健康检查而且都通过了是 `healthy`（`webui.health` 的探测算健康检查）；有服务没有健康检查，
-  或者检查还没通过，是 `unknown`（只知道在运行）。
+  长期运行的服务都有通过的容器健康检查或核心 HTTP 探测才是 `healthy`；有服务没有健康检查，或者检查还没通过，
+  是 `unknown`（只知道在运行）。
 - 检查失败的插件标为异常；容器好了，核心重新核对一遍，插件恢复运行。卸载中途失败、记录损坏这些和容器无关的异常
   不会自己恢复。
 - 一个容器失败不拿走别的服务的入口：只有 `webui` 指向的容器不健康时网页才打不开（503），`mcp` 服务和模型网关
@@ -3485,7 +3489,7 @@ x-wonton:
   提交的检出（带子目录时是那个子目录的检出；核心不连 Git，不核对），条目的 JSON 写到标准输出；加 `--index <索引目录>`
   时直接写进本地的索引目录，同一个来源的旧条目换掉。
 - 收录要求：`wonton-core plugin check --official` 通过，即有 `icon`、`tags`、`license`、`author`、`notices`，`description`、`tags`、`about`、`release_notes`、`setup` 都写了 `zh` 和 `en`，所有服务的 `image`
-  按摘要固定，长期运行的服务都有健康检查；申请的权限和插件做的事相符；镜像来自上游官方或作者可复现的构建；
+  按摘要固定，长期运行的服务都有健康检查（网页服务可由核心代探测，见“健康检查”）；申请的权限和插件做的事相符；镜像来自上游官方或作者可复现的构建；
   清单里 `requires` 的每个能力，索引里至少要有一个插件提供，否则这个条目不收录。
 - 核心不内置索引，从 GitHub 取，取不到时用磁盘上次成功的那份，并说明列表是什么时候的、为什么没更新。开发镜像和测试用本地的索引目录代替（`WONTON_STORE_INDEX`）：`index.json`
   加上按 sha256 存放的文件（`blobs/<sha256 的十六进制>`）。
@@ -3553,9 +3557,9 @@ x-wonton:
   最后打印插件包里的文件和插件包摘要；`--official` 再按官方索引的要求检查。不连 Docker，也不联网。
   - 插件包解析不了时只报这一条（和安装时报的一样）；解析得了时列出所有问题。
   - 不合格（退出码 1）：装不上的（核心还不支持的权限、渲染不了的 compose），图标或截图处理不了。
-  - 提醒（退出码 0）：镜像没有按摘要固定，长期运行的服务没有健康检查，没有图标，图标的角是透明的，截图的长边不到
+  - 提醒（退出码 0）：镜像没有按摘要固定，非网页的长期运行服务没有健康检查，没有图标，图标的角是透明的，截图的长边不到
     1280，横屏和竖屏的截图混在一起，`kind: system`。`--official` 时前三项也算不合格，另外要有 `tags`、`license`、
-    `author`、`notices`，`description`、`tags`、`about`、`release_notes`、`setup` 要写 `zh` 和 `en`。只看得到 compose 里写的健康检查，镜像自带的看不到。
+    `author`、`notices`，`description`、`tags`、`about`、`release_notes`、`setup` 要写 `zh` 和 `en`。网页服务可以由核心代探测；其余服务只看得到 compose 里的健康检查，镜像自带的看不到。
   - 用法不对时退出码 2。
 - 打包：`wonton-core plugin pack <目录>` 把插件包打成 tar 写到标准输出，只有 compose 文件和它引用的文件，README、截图
   这些不在里面；解析不了时和 `check` 一样报错，退出码 1。
