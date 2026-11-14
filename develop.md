@@ -225,7 +225,7 @@ scripts/check.sh --official
 
 脚本在核心镜像里调用 `wonton-core plugin check`，不连接正在运行的开发核心；检查、打包和核心能力探测的临时容器都用 `--network none`，不依赖 Docker 默认 bridge。所需镜像须在本地或先拉取。输出问题、插件包文件和摘要；退出码、提醒与官方索引要求见[开发与校验](plugin-spec.md#开发与校验)。默认镜像不能读取现行 spec 时，根据错误中的版本信息用 `WONTON_CORE_IMAGE` 选择支持该规范的镜像。
 
-检查分两档：默认是私用档——自己装、Agent 从目录装的插件，问题清零就能装、能升级，提醒（镜像没按摘要固定、没有图标这类）可以留着不管。`--official` 是官方索引收录档，在上面之外还要求：`icon`、`tags`、`license`、`author`、`notices` 必填；`description`、`tags`、`about`、`release_notes`、`setup` 写了就要 `zh` 和 `en` 都有；所有服务的镜像按摘要固定；长期运行的服务在 compose 里写健康检查；env 不写死代理地址；按请求头认用户的应用只信任核心地址 `${WONTON_CORE_ADDRESS}`（申请了出网权限的插件做不到就不收）。
+检查分两档：默认是私用档——自己装、Agent 从目录装的插件，问题清零就能装、能升级，提醒（镜像没按摘要固定、没有图标这类）可以留着不管。`--official` 是官方索引收录档，在上面之外还要求：`icon`、`tags`、`license`、`author`、`notices` 必填；`description`、`tags`、`about`、`release_notes`、`setup` 写了就要 `zh` 和 `en` 都有；所有服务的镜像按摘要固定；长期运行的服务要有健康检查（网页服务可省略，由核心代探测，见[健康检查](plugin-spec.md#健康检查)）；env 不写死代理地址；按请求头认用户的应用只信任核心地址 `${WONTON_CORE_ADDRESS}`（申请了出网权限的插件做不到就不收）。
 
 插件仓库的 `.github/workflows/check.yml` 在 PR 和推送 main 时调用模板的 `plugin-check.yml`：检查 shell、执行 `scripts/check.sh`，有 `Cargo.toml` 时还运行 Rust 格式、Clippy 和测试，并检查受 Git 管理的指定源码文件行数。CI 失败时修复问题，不跳过失败。工作流版本随[开发套件](#更新开发套件)更新；需要覆盖检查使用的核心镜像时，通过可复用工作流的 `core-image` 输入指定。
 

@@ -25,7 +25,7 @@ description: 写一个 Wonton 插件，装到主人的服务器上，让主人�
 
 ## 检查的两档
 
-`wonton__check_plugin` 的问题必须清零，提醒可以留着：私用（自己装、Agent 写的，从目录安装）到这一步就够了。要上官方商店，还得通过 `--official` 那一档，比私用多要求：必须提供图标；镜像按摘要固定；长期运行的服务在 compose 里写健康检查；`tags`、`license`、`author`、`notices` 必填；`description`、`tags`、`about`、`release_notes`、`setup` 写了就要 `zh` 和 `en` 都有；代理地址交给核心注入，不写死；用请求头认用户的应用只信核心的代理地址（出网插件做不到就不收）。上架流程见[插件的开发指南](https://github.com/wontonapp/wonton-docs/blob/main/develop.md)。
+`wonton__check_plugin` 的问题必须清零，提醒可以留着：私用（自己装、Agent 写的，从目录安装）到这一步就够了。要上官方商店，还得通过 `--official` 那一档，比私用多要求：必须提供图标；镜像按摘要固定；长期运行的服务要有健康检查（网页服务可由核心代探测，见[健康检查](https://github.com/wontonapp/wonton-docs/blob/main/plugin-spec.md#健康检查)）；`tags`、`license`、`author`、`notices` 必填；`description`、`tags`、`about`、`release_notes`、`setup` 写了就要 `zh` 和 `en` 都有；代理地址交给核心注入，不写死；用请求头认用户的应用只信核心的代理地址（出网插件做不到就不收）。上架流程见[插件的开发指南](https://github.com/wontonapp/wonton-docs/blob/main/develop.md)。
 
 ## 不能写的
 
@@ -39,7 +39,7 @@ description: 写一个 Wonton 插件，装到主人的服务器上，让主人�
 ## 一定要写的
 
 - `init: true`。否则程序作为 1 号进程不响应停止信号，每次更新都多等 10 秒，这段时间页面打不开。
-- `healthcheck`，带 `start_period` 和 `start_interval`。检查真正可用的地址，只用镜像里有的命令。镜像里没有 shell 和 curl/wget 时（`scratch`、`distroless`），改在清单里写 `webui.health: /health`，由核心代探测。
+- 长期运行的服务写 `healthcheck`，带 `start_period` 和 `start_interval`，只用镜像里有的命令。`webui.service` 指向的网页服务可省略，核心按网页端口和路径代探测；这样写时 `spec` 至少为 `0.15`。有独立健康接口时可写 `webui.health: /health`。
 - `user: "${PUID}:${PGID}"`，写数据时用。这样数据目录里的文件归主人，不归 root。
 
 ## 容易猜错的
