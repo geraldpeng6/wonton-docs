@@ -1339,7 +1339,15 @@ x-wonton:
     tool_total_seconds: 1800
 ```
 
-- `url` 只收 `https`，不能带用户名和密码，不能带 `#`。第一版只连公网地址；远端在内网的先用容器插件。
+- `url` 只收 `https`，不能带用户名和密码，不能带 `#`。主机不能是 IP 字面量、`localhost`、其子域或单段名。
+  只连公网地址；远端在内网的先用容器插件。
+- `url` 的路径和查询可以用 `{secret:<名字>}` 引用已声明的 `input` 密钥，不能引用其他类型或不存在的密钥。
+  scheme、主机、端口和用户信息中不能出现模板；校验时先将模板替换为占位值，再按上述 URL 规则检查。
+  例如 `https://mcp.example.com/api/{secret:token}/mcp?key={secret:key}`；不要在清单里填写真实密钥。
+  替换值按 URL 组件百分号编码，密钥中的 `/`、`?`、`&`、`#` 等不会改变路径或查询的结构。
+  核心每次请求重新读取密钥，改值后下一个请求就用新地址和请求头，不重建容器。
+  展开后的地址只用于连接器握手和总线转发；核心日志、错误、详情和审计只显示清单模板，不显示展开后的完整地址，
+  连接器详情中回显的展开地址换回清单模板，密钥值移除后再展示；不展示可能带密钥的底层错误原文。
 - `auth` 三选一：
   - `none`：不鉴权。
   - `header`：`headers` 必填。名字是请求头，值是模板，只能引用 `secrets` 里的 `input` 项：
@@ -1357,28 +1365,31 @@ x-wonton:
           url: https://example.com/keys
     ```
 
-    `X-Wonton-*`、`Host`、`Cookie`、代理和逐跳头、`Mcp-Session-Id`、
-    `Mcp-Protocol-Version` 由核心写，不能再声明；`{user}` 这类身份占位符也不能用。
-  - `oauth`：App 用系统的认证会话打开授权页，把授权码交给连接器，令牌只在连接器里。不能写 `headers`。
+    `X-Wonton-*`、`Host`、`Cookie`、`Content-Length`、代理和逐跳头、`Mcp-Session-Id`、
+    `Mcp-Protocol-Version`、`Last-Event-Id` 由传输层或核心写，不能再声明；`{user}` 这类身份占位符也不能用。
+  - `oauth`：App 用系统的认证会话打开授权页，把授权码交给连接器，令牌只在连接器里。不能写 `headers` 或 `secrets`。
 - `tools` 只接列出的工具。`tool_idle_seconds`、`tool_total_seconds` 同 `mcp.*`：1 秒到一周，空闲期限不能超过总期限。
 - **只能写这些字段：** 商店信息、`remote_mcp` 和 `secrets`（只能 `input` 项），`permissions` 写空列表。写了 `services`、
   `webui`、`tabs`、`mcp`、`bot`、`bots`、`agent`、`provides`、`requires`、`wants`、`lan`、`tunnel`、`setup`、`settings`、
-  `gpu`、`optional_permissions` 或任何权限，清单不合法：远端插件在服务器上不跑东西。
+  `gpu`、`requirements`、`devices`、`clients`、`matrix_widget`、`static_web`、`link`、`install_timeout_secs`、
+  `optional_permissions` 或任何权限，清单不合法：远端插件在服务器上不跑东西。
 - **没有连接器时**按缺 `requires` 处理。连接器没在运行时，插件标为异常，原因是“依赖的插件没有在运行”。
 - 确认页写明数据会发到哪个主机。连不上服务器是 `remote_unavailable`（DNS、TLS、超时、拒连），服务器回 5xx 或说了
   接口之外的话是 `remote_error`。
 - 填了密钥仍然被服务器拒绝时安装失败，写明服务器不接受填的密钥。
+- 同时支持 Streamable HTTP 和旧式 HTTP+SSE。握手分类 `legacy_sse` 和 `ok` 一样允许安装，由连接器转发旧传输，
+  核心侧仍使用 Streamable HTTP。
 - 连接器只连公网地址，每次连接前重新解析并检查。经出网代理时，代理自己的解析结果可能不同，第一版接受这点残留风险。
 
 #### 连接器要实现的接口
 
-核心发往连接器的每个请求都带 `X-Wonton-Plugin`（插件 ID）、`X-Wonton-Remote-Url`（服务器地址）、
+核心发往连接器 `/mcp` 的请求带 `X-Wonton-Plugin`（插件 ID）、`X-Wonton-Remote-Url`（展开密钥后的服务器地址）、
 `X-Wonton-Remote-Auth`（`none`、`header`、`oauth`）和 `X-Wonton-Remote-Forward`（清单 `headers` 填好密钥后的请求头，
-JSON 对象做 base64）。连接器不读清单，装、改、卸都不用重启它。
+JSON 对象做 base64，不是逗号分隔的头名列表）。连接器不读清单，装、改、卸都不用重启它。
 
 | 接口 | 用途 |
 | --- | --- |
-| `GET /_wonton/probe` | 试连远端：通回 204，连不上回 502 `remote_unavailable`，远端出错回 502 `remote_error` |
+| `POST /_wonton/probe` | 试连远端：JSON 请求体为 `url`（展开后的地址）、`auth`、`headers`（展开后的请求头对象）；返回 JSON，含 `outcome`、可选 `http_status`、不含密钥的 `detail`、可选工具名列表 `tools`。`ok`、`legacy_sse` 继续安装，其余分类拒装并报告原因 |
 | `POST /_wonton/oauth/start` | 开始授权，回授权页地址 |
 | `POST /_wonton/oauth/finish` | 交回授权码，换令牌 |
 | `DELETE /_wonton/plugins/{id}` | 卸载时撤掉这个插件的连接和令牌 |
