@@ -377,6 +377,7 @@ services:
 - `provides.agent_acp`、`requires`/`wants: [agent_acp]` 和注入变量 `WONTON_AGENT_ACP_URL`（见“能力依赖”和“Agent 插件”）。
 - `x-wonton.remote_mcp`：`runtime: remote_mcp` 的远端服务器地址、鉴权方式和工具范围（见“远端 MCP”）。
 - `webui.service` 指向的长期运行服务可以省略 `healthcheck`：没有容器健康检查时，核心按 `webui.port` 和 `webui.path` 代做 HTTP 探测，2xx–4xx 算存活（见“健康检查”）。显式 `webui.health` 仍可指定独立的健康路径。
+- 安装时注入的变量：`WONTON_BOT_AI_LEVEL`，`matrix.bot` 或 `bots.services` 里的服务按 Bot 各拿一份，单 Bot 的插件在插件级变量里（见“安装时注入的变量”）。
 
 **0.14**
 
@@ -387,7 +388,6 @@ services:
 - `x-wonton.gpu.images`：按显卡厂商换服务的镜像，和 `requirements.gpu.vendors` 一起写（见“显卡”的“按厂商换镜像”）。
 - `requirements.gpu.vendors` 的顺序从此是优先级；`vendors` 里不认识的厂商算清单不合法。只用旧字段的清单不用因此抬版本，但顺序写反了会选到不想要的那家。
 - 安装时注入的变量：`WONTON_GPU_VENDOR`，给了显卡时才有（见“安装时注入的变量”）。
-- `x-wonton.matrix_widget`：插件网页作为房间里的 widget 打开（见“房间里的 widget”）。
 - `x-wonton.license_url`：非 SPDX 许可证的全文地址（见“商店信息”）。
 - `x-wonton.clients`、权限 `network.clients`、`webui.guests` 和变量 `WONTON_EXTERNAL_URL`（见“第三方 App 入口”）。使用它们的清单至少写 `spec: "0.14"`。
 - `x-wonton.devices`：按类声明要交给哪些服务，宿主上的具体设备由用户在安装时选（见“设备”）。
@@ -413,6 +413,7 @@ services:
 
 - `x-wonton.tunnel.ports`（见“隧道端口”）。使用此字段的清单至少写 `spec: "0.11"`；声明端口不等于核心和 App 已支持运行时映射。
 - `x-wonton.setup`（见“商店信息”的“装好后要做的一步”）。
+- `requires`、`wants` 和 `provides` 里按能力名声明提供方（`models`、`egress_proxy` 这两个专用字段更早就有，见“能力依赖”）。使用这些写法的清单至少写 `spec: "0.11"`。
 - 安装时注入的变量：申请了 `notify` 的插件多拿到 `WONTON_SMTP_HOST`、`WONTON_SMTP_PORT`、`WONTON_MAIL_FROM`（见“发信”）。
 - `WONTON_OWNER_EMAIL`、OIDC 的 `email` 声明和 `{email}` 一律是用户的内部邮箱，总有值，见“安装时注入的变量”。
 - `webui.oidc.requires_email` 删掉：邮箱总有值，不用再声明，清单里写了会因未知字段报错。
@@ -429,6 +430,7 @@ services:
   `spec` 保持旧版本。写 `spec: "0.9"` 的清单只有支持 0.9 的核心才装。
 - `bots.services` 里的服务每个 Bot 一组容器，各自注入 `WONTON_BOT_NAME`、这个 Bot 的 `WONTON_BOT_DATA`、模型凭据，以及
   带这个 Bot 总线令牌的 `WONTON_MCP_URL`（见“一个插件多个 Bot”）。
+- 网页代登录（`sso: proxy`）的 `headers`、`cookies` 模板可以用 `{role}`，按认出的身份渲染 `admin` 或 `user`（见“网关代登录”）。不支持它的核心要报错，不能把所有人都当成 `admin`。
 - `webui.friends`（见“好友分享”）。
 
 **0.8**
